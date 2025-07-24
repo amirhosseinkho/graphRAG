@@ -1,0 +1,47 @@
+آمار گراف Hetionet
+==================================================
+
+تاریخ ایجاد: 2025-07-19 20:54:36
+تعداد کل نودها: 47031
+تعداد کل یال‌ها: 2107709
+
+انواع نودها:
+--------------------
+Anatomy: 402
+Biological Process: 11381
+Cellular Component: 1391
+Compound: 1552
+Disease: 137
+Gene: 20945
+Molecular Function: 2884
+Pathway: 1822
+Pharmacologic Class: 345
+Side Effect: 5734
+Symptom: 438
+
+انواع یال‌ها:
+--------------------
+AdG: 48324
+AeG: 526407
+AuG: 13098
+CbG: 11506
+CcSE: 138944
+CdG: 21102
+CpD: 390
+CrC: 6486
+CtD: 755
+CuG: 18756
+DaG: 12461
+DdG: 7508
+DlA: 3602
+DpS: 3357
+DrD: 543
+DuG: 7731
+GcG: 61586
+GiG: 145477
+GpBP: 559504
+GpCC: 73566
+GpMF: 97222
+GpPW: 84372
+Gr>G: 263983
+PCiC: 1029

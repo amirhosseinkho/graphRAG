@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GraphRAG - سیستم بازیابی مبتنی بر گراف</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1><i class="fas fa-brain"></i> GraphRAG</h1>
+            <p>سیستم بازیابی مبتنی بر گراف برای علوم زیستی</p>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Query Section -->
+            <section class="query-section">
+                <div class="query-form">
+                    <h2><i class="fas fa-question-circle"></i> سوال خود را بپرسید</h2>
+                    
+                    <div class="form-group">
+                        <label for="query">سوال:</label>
+                        <textarea id="query" placeholder="مثال: What is the relationship between HMGB3 and diabetes?" rows="3"></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="retrieval-method">روش بازیابی:</label>
+                            <select id="retrieval-method">
+                                <option value="NO_RETRIEVAL">بدون بازیابی (فقط مدل)</option>
+                                <option value="BFS">BFS (جستجوی سطح اول)</option>
+                                <option value="DFS">DFS (جستجوی عمیق اول)</option>
+                                <option value="SHORTEST_PATH">کوتاه‌ترین مسیر</option>
+                                <option value="NEIGHBORS">همسایه‌ها</option>
+                                <option value="HYBRID">ترکیبی</option>
+                                <option value="MULTI_METHOD">چند روشی (Multi-Method)</option>
+                                <option value="ENSEMBLE">گروهی (Ensemble)</option>
+                                <option value="ADAPTIVE">تطبیقی (Adaptive)</option>
+                                <option value="INTELLIGENT">جستجوی معنایی هوشمند</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="generation-model">مدل تولید متن:</label>
+                            <select id="generation-model">
+                                <option value="HUGGINGFACE">HuggingFace Models (رایگان)</option>
+                                <option value="GPT_SIMULATION">GPT Simulation</option>
+                                <option value="CUSTOM">Custom Model</option>
+                                <option value="OPENAI_GPT">OpenAI GPT (فعال ✅)</option>
+                                <option value="ANTHROPIC_CLAUDE">Anthropic Claude (نیاز به API Key)</option>
+                                <option value="GOOGLE_GEMINI">Google Gemini (نیاز به API Key)</option>
+                                <option value="SIMPLE">Simple Template</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="max-depth">حداکثر عمق:</label>
+                            <input type="number" id="max-depth" min="1" max="5" value="2">
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button id="submit-btn" class="btn btn-primary">
+                            <i class="fas fa-search"></i> پردازش سوال
+                        </button>
+                        <button id="sample-btn" class="btn btn-secondary">
+                            <i class="fas fa-random"></i> سوال نمونه
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section" id="results-section" style="display: none;">
+                <div class="results-container">
+                    <!-- Process Steps -->
+                    <div class="process-steps">
+                        <h3><i class="fas fa-cogs"></i> مراحل پردازش</h3>
+                        <div id="process-steps" class="steps-list"></div>
+                    </div>
+
+                    <!-- Keywords -->
+                    <div class="keywords-section">
+                        <h3><i class="fas fa-tags"></i> کلمات کلیدی استخراج شده</h3>
+                        <div id="keywords" class="keywords-list"></div>
+                    </div>
+
+                    <!-- Matched Nodes -->
+                    <div class="matched-nodes">
+                        <h3><i class="fas fa-link"></i> نودهای تطبیق یافته</h3>
+                        <div id="matched-nodes" class="nodes-list"></div>
+                    </div>
+
+                    <!-- Retrieved Information -->
+                    <div class="retrieved-info">
+                        <h3><i class="fas fa-database"></i> اطلاعات بازیابی شده</h3>
+                        <div class="info-tabs">
+                            <button class="tab-btn active" data-tab="nodes">نودها</button>
+                            <button class="tab-btn" data-tab="edges">یال‌ها</button>
+                            <button class="tab-btn" data-tab="paths">مسیرها</button>
+                            <button class="tab-btn" data-tab="context">متن زمینه</button>
+                        </div>
+                        
+                        <div class="tab-content">
+                            <div id="tab-nodes" class="tab-pane active">
+                                <div id="retrieved-nodes" class="nodes-grid"></div>
+                            </div>
+                            <div id="tab-edges" class="tab-pane">
+                                <div id="retrieved-edges" class="edges-list"></div>
+                            </div>
+                            <div id="tab-paths" class="tab-pane">
+                                <div id="retrieved-paths" class="paths-list"></div>
+                            </div>
+                            <div id="tab-context" class="tab-pane">
+                                <pre id="context-text" class="context-text"></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Answer -->
+                    <div class="answer-section">
+                        <h3><i class="fas fa-comment"></i> پاسخ تولید شده</h3>
+                        <div class="answer-container">
+                            <div id="answer-text" class="answer-text"></div>
+                            <div class="answer-meta">
+                                <span class="confidence">
+                                    <i class="fas fa-chart-line"></i>
+                                    اطمینان: <span id="confidence-score"></span>
+                                </span>
+                                <span class="model">
+                                    <i class="fas fa-robot"></i>
+                                    مدل: <span id="model-name"></span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Graph Info -->
+            <section class="graph-info">
+                <h3><i class="fas fa-project-diagram"></i> اطلاعات گراف</h3>
+                <div id="graph-stats" class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number" id="total-nodes">-</div>
+                        <div class="stat-label">کل نودها</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="total-edges">-</div>
+                        <div class="stat-label">کل یال‌ها</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="node-types">-</div>
+                        <div class="stat-label">انواع نود</div>
+                    </div>
+                </div>
+                <div id="node-types-chart" class="chart-container"></div>
+            </section>
+        </main>
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="loading-overlay" style="display: none;">
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <p>در حال پردازش...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html> 
