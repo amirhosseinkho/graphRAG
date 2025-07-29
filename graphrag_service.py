@@ -415,9 +415,30 @@ class GraphRAGService:
             self.create_sample_graph()
     
     def extract_keywords(self, text: str) -> List[str]:
-        """استخراج کلمات کلیدی از متن"""
+        """استخراج کلمات کلیدی از متن با بهبود برای ژن‌ها و اصطلاحات تخصصی"""
         doc = self.nlp(text)
         keywords = set()
+        
+        # نگاشت ژن‌های مشهور و نام‌های مختلف آنها
+        famous_genes = {
+            'tp53': ['TP53', 'P53', 'p53', 'Tumor Protein P53', 'Tumor Suppressor P53'],
+            'brca1': ['BRCA1', 'Breast Cancer 1', 'BRCA1 Gene'],
+            'brca2': ['BRCA2', 'Breast Cancer 2', 'BRCA2 Gene'],
+            'apoe': ['APOE', 'Apolipoprotein E', 'APOE Gene'],
+            'cftr': ['CFTR', 'Cystic Fibrosis Transmembrane Conductance Regulator'],
+            'mmp9': ['MMP9', 'Matrix Metallopeptidase 9'],
+            'bid': ['BID', 'BH3 Interacting Domain Death Agonist'],
+            'kcnq2': ['KCNQ2', 'Potassium Voltage-Gated Channel Subfamily Q Member 2'],
+            'hmgb3': ['HMGB3', 'High Mobility Group Box 3']
+        }
+        
+        # بررسی ژن‌های مشهور در متن
+        text_lower = text.lower()
+        for gene_key, gene_variants in famous_genes.items():
+            if gene_key in text_lower:
+                keywords.add(gene_key)
+                # اضافه کردن نام اصلی ژن
+                keywords.add(gene_variants[0])
         
         # موجودیت‌های نام‌دار
         for ent in doc.ents:
@@ -437,7 +458,25 @@ class GraphRAGService:
                 if clean_text.strip():
                     keywords.add(clean_text.strip())
         
-        return sorted(keywords)
+        # اضافه کردن کلمات کلیدی تخصصی
+        technical_terms = [
+            'cancer', 'tumor', 'malignancy', 'oncology', 'carcinoma', 'sarcoma', 
+            'leukemia', 'lymphoma', 'gene', 'protein', 'dna', 'rna', 'mrna',
+            'apoptosis', 'cell cycle', 'dna repair', 'mutation', 'expression',
+            'regulation', 'pathway', 'signaling', 'metabolic', 'cascade'
+        ]
+        
+        for term in technical_terms:
+            if term in text_lower:
+                keywords.add(term)
+        
+        # حذف کلمات خیلی کوتاه و عمومی
+        filtered_keywords = set()
+        for keyword in keywords:
+            if len(keyword) >= 2 and keyword not in ['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by']:
+                filtered_keywords.add(keyword)
+        
+        return sorted(filtered_keywords)
     
     def analyze_question_intent(self, query: str) -> Dict[str, Any]:
         """تحلیل مفهومی سوال و استخراج قصد کاربر بر اساس جدول نگاشت Hetionet"""
@@ -738,6 +777,15 @@ class GraphRAGService:
         
         print(f"🧬 ژن‌های یافت شده: {[name for name, _ in gene_nodes]}")
         print(f"🏥 سرطان‌های یافت شده: {[name for name, _ in cancer_nodes]}")
+        
+        # اضافه کردن ژن‌های اصلی به نتایج
+        for gene_token, gene_node_id in gene_nodes:
+            gene_name = self.G.nodes[gene_node_id]['name']
+            # امتیاز بالاتر برای ژن‌های اصلی
+            score = 10.0  # امتیاز بالاتر برای ژن‌های اصلی
+            explanation = f"Primary gene: {gene_name}"
+            results.append((gene_node_id, 0, score, explanation))
+            print(f"  ✅ ژن اصلی: {gene_name} (امتیاز: {score})")
         
         # جستجوی روابط مستقیم ژن-سرطان
         for gene_token, gene_node_id in gene_nodes:
@@ -3126,8 +3174,36 @@ class GraphRAGService:
         answer_parts.append(f"• ژن‌های اصلی: {len(primary_genes)}")
         answer_parts.append(f"• سرطان‌های مرتبط: {len(cancer_diseases)}")
         
+        # تحلیل تخصصی برای TP53
+        if any('tp53' in gene.name.lower() for gene in primary_genes):
+            answer_parts.append("\n🔬 **تحلیل تخصصی TP53:**")
+            answer_parts.append("TP53 (Tumor Protein P53) یکی از مهم‌ترین ژن‌های سرکوبگر تومور است که:")
+            answer_parts.append("• در بیش از 50% سرطان‌های انسانی جهش یافته است")
+            answer_parts.append("• نقش کلیدی در تنظیم چرخه سلولی و آپوپتوز دارد")
+            answer_parts.append("• به عنوان 'نگهبان ژنوم' شناخته می‌شود")
+            answer_parts.append("• اختلال در عملکرد آن منجر به تکثیر غیرقابل کنترل سلول‌ها می‌شود")
+            answer_parts.append("")
+        
+        # تحلیل روابط خاص
+        if retrieval_result.edges:
+            answer_parts.append("**تحلیل روابط یافت شده:**")
+            gene_cancer_edges = []
+            for edge in retrieval_result.edges:
+                source_node = next((n for n in retrieval_result.nodes if n.id == edge.source), None)
+                target_node = next((n for n in retrieval_result.nodes if n.id == edge.target), None)
+                if source_node and target_node:
+                    if (source_node.kind == 'Gene' and target_node.kind == 'Disease') or \
+                       (source_node.kind == 'Disease' and target_node.kind == 'Gene'):
+                        gene_cancer_edges.append((source_node, target_node, edge.relation))
+            
+            if gene_cancer_edges:
+                answer_parts.append("روابط ژن-سرطان یافت شده:")
+                for source, target, relation in gene_cancer_edges[:5]:
+                    answer_parts.append(f"• {source.name} → {target.name} ({relation})")
+                answer_parts.append("")
+        
         # پیام راهنما
-        answer_parts.append("\n📌 **راهنما:** تحلیل اهمیت زیستی و بالینی این ژن‌ها را بررسی کنید.")
+        answer_parts.append("📌 **راهنما:** تحلیل اهمیت زیستی و بالینی این ژن‌ها را بررسی کنید.")
         
         return "\n".join(answer_parts)
     
