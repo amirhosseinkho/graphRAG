@@ -1,142 +1,167 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
 """
-تست روش جستجوی معنایی هوشمند
+تست بهبودهای intelligent_semantic_search
+این فایل تغییرات جدید در جستجوی ژن‌های بیان شده را آزمایش می‌کند
 """
 
-import json
 import sys
 import os
-
-# اضافه کردن مسیر پروژه
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from graphrag_service import GraphRAGService, RetrievalMethod, GenerationModel
 
-def test_intelligent_search():
-    """تست روش جستجوی معنایی هوشمند"""
-    
-    print("🧠 تست روش جستجوی معنایی هوشمند")
-    print("=" * 50)
+def test_improved_intelligent_search():
+    """تست بهبودهای intelligent_semantic_search"""
+    print("🧪 تست بهبودهای intelligent_semantic_search")
+    print("=" * 60)
     
     # ایجاد سرویس
     service = GraphRAGService()
-    service.initialize()
     
-    # تنظیم API Key برای OpenAI
-    service.set_openai_api_key("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")
+    # تست سوال اصلی
+    test_query = "What genes are expressed in the heart?"
+    print(f"\n🔍 تست سوال: {test_query}")
     
-    # سوالات تست مختلف
-    test_questions = [
-        {
-            "question": "چه ژن‌هایی در قلب بیان می‌شوند؟",
-            "description": "سوال آناتومی - بیان ژن"
-        },
-        {
-            "question": "چه داروهایی برای درمان دیابت استفاده می‌شوند؟",
-            "description": "سوال دارو - درمان بیماری"
-        },
-        {
-            "question": "ژن HMGB3 چه عملکردی دارد؟",
-            "description": "سوال ژن - عملکرد"
-        },
-        {
-            "question": "چه بیماری‌هایی با ژن‌های قلبی مرتبط هستند؟",
-            "description": "سوال بیماری - ارتباط با ژن"
-        },
-        {
-            "question": "چه ترکیباتی با پروتئین‌های قلب تعامل دارند؟",
-            "description": "سوال ترکیب - تعامل"
-        }
-    ]
-    
-    # مدل‌های مختلف برای تست
-    models = [
-        GenerationModel.OPENAI_GPT,
-        GenerationModel.GPT_SIMULATION,
-        GenerationModel.CUSTOM
-    ]
-    
-    for i, test_case in enumerate(test_questions, 1):
-        print(f"\n📝 تست {i}: {test_case['description']}")
-        print(f"سوال: {test_case['question']}")
-        print("-" * 40)
+    # تست 1: جستجوی مستقیم intelligent_semantic_search
+    print("\n📋 تست 1: جستجوی مستقیم intelligent_semantic_search")
+    try:
+        results = service.intelligent_semantic_search(test_query, max_depth=3)
+        print(f"✅ تعداد نتایج: {len(results)}")
         
-        for model in models:
-            print(f"\n🤖 مدل: {model.value}")
-            
-            try:
-                # پردازش با روش هوشمند
-                result = service.process_query(
-                    query=test_case['question'],
-                    retrieval_method=RetrievalMethod.INTELLIGENT,
-                    generation_model=model,
-                    max_depth=3
-                )
-                
-                # نمایش نتایج
-                print(f"✅ موفقیت")
-                print(f"تعداد نودهای بازیابی شده: {len(result['retrieval_result']['nodes'])}")
-                print(f"تعداد یال‌های بازیابی شده: {len(result['retrieval_result']['edges'])}")
-                print(f"تعداد مسیرهای یافت شده: {len(result['retrieval_result']['paths'])}")
-                
-                # نمایش نودهای مهم
-                if result['retrieval_result']['nodes']:
-                    print("\nنودهای مهم:")
-                    for node in result['retrieval_result']['nodes'][:5]:  # فقط 5 نود اول
-                        print(f"  - {node['name']} ({node['kind']}) [امتیاز: {node['score']:.2f}]")
-                
-                # نمایش بخشی از پاسخ
-                answer = result['generation_result']['answer']
-                if len(answer) > 200:
-                    answer = answer[:200] + "..."
-                print(f"\nپاسخ: {answer}")
-                
-            except Exception as e:
-                print(f"❌ خطا: {e}")
-            
-            print("-" * 30)
+        if results:
+            print("📊 نتایج یافت شده:")
+            for i, (node_id, depth, score, explanation) in enumerate(results[:5], 1):
+                node_name = service.G.nodes[node_id]['name']
+                node_kind = service.G.nodes[node_id]['kind']
+                print(f"  {i}. {node_name} ({node_kind}) - عمق: {depth}, امتیاز: {score:.2f}")
+                print(f"     توضیح: {explanation}")
+        else:
+            print("❌ هیچ نتیجه‌ای یافت نشد")
+    except Exception as e:
+        print(f"❌ خطا در تست 1: {e}")
     
-    print("\n🎉 تست روش جستجوی معنایی هوشمند تکمیل شد!")
+    # تست 2: پردازش کامل سوال
+    print("\n📋 تست 2: پردازش کامل سوال")
+    try:
+        result = service.process_query(
+            query=test_query,
+            retrieval_method=RetrievalMethod.INTELLIGENT,
+            generation_model=GenerationModel.GPT_SIMULATION,
+            max_depth=3
+        )
+        
+        print("✅ پردازش کامل انجام شد")
+        print(f"📊 تعداد نودهای بازیابی شده: {len(result['retrieval_result'].nodes)}")
+        print(f"📊 تعداد یال‌های بازیابی شده: {len(result['retrieval_result'].edges)}")
+        
+        # نمایش پاسخ
+        print("\n💬 پاسخ تولید شده:")
+        print(result['generation_result'].answer)
+        
+    except Exception as e:
+        print(f"❌ خطا در تست 2: {e}")
+    
+    # تست 3: مقایسه روش‌های مختلف
+    print("\n📋 تست 3: مقایسه روش‌های مختلف")
+    methods = [
+        RetrievalMethod.INTELLIGENT,
+        RetrievalMethod.ADAPTIVE,
+        RetrievalMethod.DFS
+    ]
+    
+    for method in methods:
+        print(f"\n🔍 تست روش: {method.value}")
+        try:
+            result = service.process_query(
+                query=test_query,
+                retrieval_method=method,
+                generation_model=GenerationModel.SIMPLE,
+                max_depth=2
+            )
+            
+            node_count = len(result['retrieval_result'].nodes)
+            edge_count = len(result['retrieval_result'].edges)
+            print(f"  📊 نودها: {node_count}, یال‌ها: {edge_count}")
+            
+            # بررسی وجود ژن‌های بیان شده
+            gene_nodes = [n for n in result['retrieval_result'].nodes if n.kind == 'Gene']
+            anatomy_nodes = [n for n in result['retrieval_result'].nodes if n.kind == 'Anatomy']
+            aeG_edges = [e for e in result['retrieval_result'].edges if e.relation == 'AeG']
+            
+            print(f"  🧬 ژن‌ها: {len(gene_nodes)}, 🫀 آناتومی: {len(anatomy_nodes)}, 🔗 یال‌های AeG: {len(aeG_edges)}")
+            
+        except Exception as e:
+            print(f"  ❌ خطا: {e}")
+    
+    # تست 4: سوالات مشابه
+    print("\n📋 تست 4: سوالات مشابه")
+    similar_queries = [
+        "What genes are expressed in the brain?",
+        "Which genes are expressed in the liver?",
+        "Genes expressed in the heart",
+        "What genes are active in the heart?",
+        "Heart gene expression"
+    ]
+    
+    for query in similar_queries:
+        print(f"\n🔍 تست: {query}")
+        try:
+            results = service.intelligent_semantic_search(query, max_depth=2)
+            gene_count = len([r for r in results if service.G.nodes[r[0]]['kind'] == 'Gene'])
+            print(f"  ✅ ژن‌های یافت شده: {gene_count}")
+        except Exception as e:
+            print(f"  ❌ خطا: {e}")
+    
+    print("\n" + "=" * 60)
+    print("✅ تست‌ها کامل شد")
 
-def test_question_analysis():
-    """تست تحلیل سوال"""
-    
-    print("\n🔍 تست تحلیل سوال")
-    print("=" * 30)
+def test_anatomy_expression_specific():
+    """تست خاص برای بیان ژن در آناتومی"""
+    print("\n🧬 تست خاص برای بیان ژن در آناتومی")
+    print("=" * 60)
     
     service = GraphRAGService()
-    service.initialize()
     
-    test_questions = [
-        "چه ژن‌هایی در قلب بیان می‌شوند؟",
-        "چه داروهایی برای درمان دیابت استفاده می‌شوند؟",
-        "ژن HMGB3 چه عملکردی دارد؟",
-        "چه بیماری‌هایی با ژن‌های قلبی مرتبط هستند؟",
-        "چه ترکیباتی با پروتئین‌های قلب تعامل دارند؟"
-    ]
+    # تست تابع جدید _search_genes_expressed_in_anatomy
+    print("\n📋 تست تابع _search_genes_expressed_in_anatomy")
     
-    for question in test_questions:
-        print(f"\nسوال: {question}")
+    # ایجاد داده‌های تست
+    test_matched_nodes = {}
+    test_intent = {'question_type': 'anatomy_expression'}
+    
+    # یافتن نود آناتومی heart
+    for node_id, attrs in service.G.nodes(data=True):
+        if attrs.get('kind') == 'Anatomy' and 'heart' in attrs.get('name', '').lower():
+            test_matched_nodes['heart'] = node_id
+            break
+    
+    if test_matched_nodes:
+        print(f"✅ نود آناتومی یافت شد: {test_matched_nodes}")
         
-        # تحلیل سوال
-        intent = service.analyze_question_intent(question)
-        
-        print(f"نوع سوال: {intent['question_type']}")
-        print(f"موجودیت‌های اصلی: {intent['main_entities']}")
-        print(f"انواع موجودیت: {intent['entity_types']}")
-        print(f"روابط: {intent['relationships']}")
-        print(f"الگوهای تشخیص داده شده: {intent['patterns']}")
-        print(f"کلمات کلیدی: {intent['keywords'][:5]}...")  # فقط 5 کلمه اول
+        try:
+            results = service._search_genes_expressed_in_anatomy(test_matched_nodes, test_intent, max_depth=2)
+            print(f"✅ تعداد ژن‌های بیان شده یافت شد: {len(results)}")
+            
+            for gene_id, depth, score, explanation in results:
+                gene_name = service.G.nodes[gene_id]['name']
+                print(f"  🧬 {gene_name} - امتیاز: {score:.2f}")
+                print(f"     توضیح: {explanation}")
+                
+        except Exception as e:
+            print(f"❌ خطا در تست تابع: {e}")
+    else:
+        print("❌ نود آناتومی heart یافت نشد")
+    
+    print("\n" + "=" * 60)
 
 if __name__ == "__main__":
-    print("🚀 شروع تست‌های جستجوی معنایی هوشمند")
+    print("🚀 شروع تست‌های بهبود intelligent_semantic_search")
     
-    # تست تحلیل سوال
-    test_question_analysis()
+    # تست اصلی
+    test_improved_intelligent_search()
     
-    # تست جستجوی هوشمند
-    test_intelligent_search()
+    # تست خاص
+    test_anatomy_expression_specific()
     
-    print("\n✅ تمام تست‌ها تکمیل شد!") 
+    print("\n🎉 تمام تست‌ها کامل شد!") 

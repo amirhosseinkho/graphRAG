@@ -99,16 +99,75 @@ def graph_info():
 
 @app.route('/api/sample_queries')
 def sample_queries():
-    """سوالات نمونه"""
+    """سوالات نمونه بر اساس ساختار Hetionet و روابط موجود"""
     samples = [
-        "What is the relationship between HMGB3 and diabetes?",
-        "What drugs treat diabetes?",
+        # سوالات مربوط به بیان ژن در بافت‌ها (AeG, AuG, AdG)
         "What genes are expressed in the heart?",
+        "Which genes are upregulated in the brain?",
+        "What genes are downregulated in muscle tissue?",
+        "How do genes express differently in liver vs kidney?",
+        "What genes are expressed in the lung?",
+        
+        # سوالات مربوط به ژن‌ها و بیماری‌ها (DaG, DuG, DdG)
+        "What genes are associated with diabetes?",
         "How does TP53 relate to cancer?",
-        "What biological processes does BRCA1 regulate?",
-        "Which drugs prevent heart disease?",
-        "What diseases affect the brain?",
-        "How do genes interact with each other?"
+        "Which genes are upregulated in cancer?",
+        "What genes are downregulated in heart disease?",
+        "What genes are associated with Alzheimer's disease?",
+        
+        # سوالات مربوط به داروها و درمان (CtD, CuG, CdG)
+        "What drugs treat diabetes?",
+        "Which compounds upregulate TP53?",
+        "What drugs downregulate cancer genes?",
+        "How do drugs interact with genes?",
+        "What compounds bind to insulin receptor?",
+        
+        # سوالات مربوط به فرآیندهای زیستی (GpBP, GpMF, GpCC)
+        "What genes participate in cell cycle regulation?",
+        "Which genes are involved in apoptosis?",
+        "What molecular functions does TP53 have?",
+        "How do genes function in cellular components?",
+        "What genes participate in DNA repair?",
+        
+        # سوالات مربوط به مسیرهای زیستی (GpPW)
+        "What pathways are involved in cancer progression?",
+        "Which signaling pathways regulate metabolism?",
+        "How do genes participate in immune pathways?",
+        "What pathways control cell growth?",
+        "Which pathways involve insulin signaling?",
+        
+        # سوالات مربوط به تعامل ژن‌ها (GiG, Gr>G)
+        "How do genes interact with each other?",
+        "Which genes regulate TP53?",
+        "What genes are regulated by TP53?",
+        "How do genes covary in expression?",
+        "What genes interact with BRCA1?",
+        
+        # سوالات مربوط به بیماری‌ها و علائم (DpS, DlA)
+        "What symptoms are associated with diabetes?",
+        "How does cancer affect different tissues?",
+        "What diseases affect the heart?",
+        "Which diseases localize to specific tissues?",
+        "What diseases present similar symptoms?",
+        
+        # سوالات مربوط به عوارض جانبی داروها (CcSE)
+        "What side effects does aspirin cause?",
+        "How do drugs affect patient symptoms?",
+        "What adverse reactions occur with diabetes drugs?",
+        "Which compounds cause heart-related side effects?",
+        "What side effects do cancer drugs cause?",
+        
+        # سوالات پیچیده و چندمرحله‌ای
+        "How do drugs affect gene expression in heart tissue?",
+        "What genes and pathways are involved in diabetes progression?",
+        "How do genetic mutations lead to cancer development?",
+        "What therapeutic targets exist for heart disease?",
+        "How do genes participate in drug metabolism pathways?",
+        "What biological processes are disrupted in cancer?",
+        "What drugs treat diseases that affect the heart?",
+        "How do genes that interact with TP53 relate to cancer?",
+        "What compounds bind to genes expressed in the brain?",
+        "Which diseases have symptoms related to diabetes?"
     ]
     return jsonify({'queries': samples})
 

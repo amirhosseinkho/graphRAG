@@ -102,60 +102,307 @@ class GraphRAGService:
             self.create_sample_graph()
     
     def create_sample_graph(self):
-        """ایجاد گراف نمونه"""
-        print("🔧 ایجاد گراف نمونه...")
+        """ایجاد گراف نمونه بر اساس ساختار واقعی Hetionet"""
+        print("🔧 ایجاد گراف نمونه بر اساس Hetionet...")
         
-        self.G = nx.Graph()
+        self.G = nx.DiGraph()
         
-        # نودهای نمونه
-        sample_nodes = [
-            ('Gene::HMGB3', 'HMGB3', 'Gene'),
-            ('Gene::PCNA', 'PCNA', 'Gene'),
-            ('Gene::TP53', 'TP53', 'Gene'),
-            ('Gene::BRCA1', 'BRCA1', 'Gene'),
-            ('Disease::Diabetes', 'Type 2 Diabetes', 'Disease'),
-            ('Disease::Cancer', 'Cancer', 'Disease'),
-            ('Disease::HeartDisease', 'Heart Disease', 'Disease'),
-            ('Drug::Metformin', 'Metformin', 'Drug'),
-            ('Drug::Aspirin', 'Aspirin', 'Drug'),
-            ('Drug::Insulin', 'Insulin', 'Drug'),
-            ('Biological Process::GO:0008150', 'Metabolic Process', 'Biological Process'),
-            ('Biological Process::GO:0006915', 'Apoptosis', 'Biological Process'),
-            ('Biological Process::GO:0007049', 'Cell Cycle', 'Biological Process'),
-            ('Anatomy::Heart', 'Heart', 'Anatomy'),
-            ('Anatomy::Lung', 'Lung', 'Anatomy'),
-            ('Anatomy::Brain', 'Brain', 'Anatomy'),
-            ('Anatomy::Liver', 'Liver', 'Anatomy')
+        # اضافه کردن نودها بر اساس metanodes واقعی Hetionet
+        nodes_data = [
+            # Gene nodes (20945 total in Hetionet)
+            ('Gene::TP53', {'name': 'TP53', 'kind': 'Gene', 'metanode': 'Gene'}),
+            ('Gene::BRCA1', {'name': 'BRCA1', 'kind': 'Gene', 'metanode': 'Gene'}),
+            ('Gene::MMP9', {'name': 'MMP9', 'kind': 'Gene', 'metanode': 'Gene'}),
+            ('Gene::BID', {'name': 'BID', 'kind': 'Gene', 'metanode': 'Gene'}),
+            ('Gene::HMGB3', {'name': 'HMGB3', 'kind': 'Gene', 'metanode': 'Gene'}),
+            ('Gene::KCNQ2', {'name': 'KCNQ2', 'kind': 'Gene', 'metanode': 'Gene'}),
+            ('Gene::APOE', {'name': 'APOE', 'kind': 'Gene', 'metanode': 'Gene'}),
+            ('Gene::CFTR', {'name': 'CFTR', 'kind': 'Gene', 'metanode': 'Gene'}),
+            
+            # Anatomy nodes (402 total in Hetionet)
+            ('Anatomy::Heart', {'name': 'Heart', 'kind': 'Anatomy', 'metanode': 'Anatomy'}),
+            ('Anatomy::Brain', {'name': 'Brain', 'kind': 'Anatomy', 'metanode': 'Anatomy'}),
+            ('Anatomy::Liver', {'name': 'Liver', 'kind': 'Anatomy', 'metanode': 'Anatomy'}),
+            ('Anatomy::Lung', {'name': 'Lung', 'kind': 'Anatomy', 'metanode': 'Anatomy'}),
+            ('Anatomy::Kidney', {'name': 'Kidney', 'kind': 'Anatomy', 'metanode': 'Anatomy'}),
+            ('Anatomy::Stomach', {'name': 'Stomach', 'kind': 'Anatomy', 'metanode': 'Anatomy'}),
+            
+            # Disease nodes (137 total in Hetionet)
+            ('Disease::Breast Cancer', {'name': 'Breast Cancer', 'kind': 'Disease', 'metanode': 'Disease'}),
+            ('Disease::Lung Cancer', {'name': 'Lung Cancer', 'kind': 'Disease', 'metanode': 'Disease'}),
+            ('Disease::Heart Disease', {'name': 'Heart Disease', 'kind': 'Disease', 'metanode': 'Disease'}),
+            ('Disease::Alzheimer Disease', {'name': 'Alzheimer Disease', 'kind': 'Disease', 'metanode': 'Disease'}),
+            ('Disease::Cystic Fibrosis', {'name': 'Cystic Fibrosis', 'kind': 'Disease', 'metanode': 'Disease'}),
+            
+            # Compound nodes (1552 total in Hetionet)
+            ('Compound::Aspirin', {'name': 'Aspirin', 'kind': 'Compound', 'metanode': 'Compound'}),
+            ('Compound::Ibuprofen', {'name': 'Ibuprofen', 'kind': 'Compound', 'metanode': 'Compound'}),
+            ('Compound::Paracetamol', {'name': 'Paracetamol', 'kind': 'Compound', 'metanode': 'Compound'}),
+            ('Compound::Caffeine', {'name': 'Caffeine', 'kind': 'Compound', 'metanode': 'Compound'}),
+            ('Compound::Vitamin C', {'name': 'Vitamin C', 'kind': 'Compound', 'metanode': 'Compound'}),
+            ('Compound::Metformin', {'name': 'Metformin', 'kind': 'Compound', 'metanode': 'Compound'}),
+            
+            # Biological Process nodes (11381 total in Hetionet)
+            ('BiologicalProcess::Cell Death', {'name': 'Cell Death', 'kind': 'Biological Process', 'metanode': 'Biological Process'}),
+            ('BiologicalProcess::DNA Repair', {'name': 'DNA Repair', 'kind': 'Biological Process', 'metanode': 'Biological Process'}),
+            ('BiologicalProcess::Cell Cycle', {'name': 'Cell Cycle', 'kind': 'Biological Process', 'metanode': 'Biological Process'}),
+            ('BiologicalProcess::Apoptosis', {'name': 'Apoptosis', 'kind': 'Biological Process', 'metanode': 'Biological Process'}),
+            
+            # Pathway nodes (1822 total in Hetionet)
+            ('Pathway::Apoptosis', {'name': 'Apoptosis', 'kind': 'Pathway', 'metanode': 'Pathway'}),
+            ('Pathway::Cell Cycle', {'name': 'Cell Cycle', 'kind': 'Pathway', 'metanode': 'Pathway'}),
+            ('Pathway::DNA Repair', {'name': 'DNA Repair', 'kind': 'Pathway', 'metanode': 'Pathway'}),
+            
+            # Symptom nodes (438 total in Hetionet)
+            ('Symptom::Pain', {'name': 'Pain', 'kind': 'Symptom', 'metanode': 'Symptom'}),
+            ('Symptom::Fever', {'name': 'Fever', 'kind': 'Symptom', 'metanode': 'Symptom'}),
+            ('Symptom::Cough', {'name': 'Cough', 'kind': 'Symptom', 'metanode': 'Symptom'}),
+            ('Symptom::Fatigue', {'name': 'Fatigue', 'kind': 'Symptom', 'metanode': 'Symptom'}),
+            
+            # Side Effect nodes (5734 total in Hetionet)
+            ('SideEffect::Nausea', {'name': 'Nausea', 'kind': 'Side Effect', 'metanode': 'Side Effect'}),
+            ('SideEffect::Headache', {'name': 'Headache', 'kind': 'Side Effect', 'metanode': 'Side Effect'}),
+            ('SideEffect::Dizziness', {'name': 'Dizziness', 'kind': 'Side Effect', 'metanode': 'Side Effect'}),
+            
+            # Molecular Function nodes (2884 total in Hetionet)
+            ('MolecularFunction::Enzyme', {'name': 'Enzyme', 'kind': 'Molecular Function', 'metanode': 'Molecular Function'}),
+            ('MolecularFunction::Receptor', {'name': 'Receptor', 'kind': 'Molecular Function', 'metanode': 'Molecular Function'}),
+            ('MolecularFunction::Transporter', {'name': 'Transporter', 'kind': 'Molecular Function', 'metanode': 'Molecular Function'}),
+            
+            # Cellular Component nodes (1391 total in Hetionet)
+            ('CellularComponent::Nucleus', {'name': 'Nucleus', 'kind': 'Cellular Component', 'metanode': 'Cellular Component'}),
+            ('CellularComponent::Mitochondria', {'name': 'Mitochondria', 'kind': 'Cellular Component', 'metanode': 'Cellular Component'}),
+            ('CellularComponent::Cell Membrane', {'name': 'Cell Membrane', 'kind': 'Cellular Component', 'metanode': 'Cellular Component'}),
+            
+            # Pharmacologic Class nodes (345 total in Hetionet)
+            ('PharmacologicClass::NSAID', {'name': 'NSAID', 'kind': 'Pharmacologic Class', 'metanode': 'Pharmacologic Class'}),
+            ('PharmacologicClass::Antibiotic', {'name': 'Antibiotic', 'kind': 'Pharmacologic Class', 'metanode': 'Pharmacologic Class'}),
+            ('PharmacologicClass::Antihypertensive', {'name': 'Antihypertensive', 'kind': 'Pharmacologic Class', 'metanode': 'Pharmacologic Class'})
         ]
         
-        for node_id, name, kind in sample_nodes:
-            self.G.add_node(node_id, name=name, kind=kind)
+        for node_id, attrs in nodes_data:
+            self.G.add_node(node_id, **attrs)
         
-        # یال‌های نمونه
-        sample_edges = [
-            ('Gene::HMGB3', 'Gene::PCNA', 'interacts_with'),
-            ('Gene::PCNA', 'Disease::Diabetes', 'associates'),
-            ('Gene::TP53', 'Disease::Cancer', 'causes'),
-            ('Gene::BRCA1', 'Disease::Cancer', 'causes'),
-            ('Drug::Metformin', 'Disease::Diabetes', 'treats'),
-            ('Drug::Aspirin', 'Disease::HeartDisease', 'prevents'),
-            ('Drug::Insulin', 'Disease::Diabetes', 'treats'),
-            ('Gene::HMGB3', 'Biological Process::GO:0008150', 'participates_in'),
-            ('Gene::TP53', 'Biological Process::GO:0006915', 'regulates'),
-            ('Gene::BRCA1', 'Biological Process::GO:0007049', 'regulates'),
-            ('Anatomy::Heart', 'Anatomy::Lung', 'adjacent_to'),
-            ('Anatomy::Brain', 'Anatomy::Heart', 'controls'),
-            ('Gene::HMGB3', 'Anatomy::Heart', 'expressed_in'),
-            ('Gene::TP53', 'Anatomy::Brain', 'expressed_in'),
-            ('Gene::BRCA1', 'Anatomy::Liver', 'expressed_in'),
-            ('Disease::Diabetes', 'Anatomy::Heart', 'affects'),
-            ('Disease::Cancer', 'Anatomy::Brain', 'affects')
+        # اضافه کردن یال‌ها بر اساس metaedges واقعی Hetionet
+        edges_data = [
+            # Anatomy - expresses - Gene (AeG) - 526407 edges in Hetionet
+            ('Anatomy::Heart', 'Gene::MMP9', 'AeG'),
+            ('Anatomy::Heart', 'Gene::BID', 'AeG'),
+            ('Anatomy::Heart', 'Gene::KCNQ2', 'AeG'),
+            ('Anatomy::Brain', 'Gene::APOE', 'AeG'),
+            ('Anatomy::Brain', 'Gene::TP53', 'AeG'),
+            ('Anatomy::Liver', 'Gene::BRCA1', 'AeG'),
+            ('Anatomy::Lung', 'Gene::CFTR', 'AeG'),
+            
+            # Anatomy - upregulates - Gene (AuG) - 97848 edges in Hetionet
+            ('Anatomy::Heart', 'Gene::HMGB3', 'AuG'),
+            ('Anatomy::Brain', 'Gene::BRCA1', 'AuG'),
+            
+            # Anatomy - downregulates - Gene (AdG) - 102240 edges in Hetionet
+            ('Anatomy::Liver', 'Gene::MMP9', 'AdG'),
+            
+            # Disease - associates - Gene (DaG) - 12623 edges in Hetionet
+            ('Disease::Breast Cancer', 'Gene::BRCA1', 'DaG'),
+            ('Disease::Breast Cancer', 'Gene::TP53', 'DaG'),
+            ('Disease::Lung Cancer', 'Gene::MMP9', 'DaG'),
+            ('Disease::Alzheimer Disease', 'Gene::APOE', 'DaG'),
+            ('Disease::Cystic Fibrosis', 'Gene::CFTR', 'DaG'),
+            
+            # Disease - upregulates - Gene (DuG) - 7731 edges in Hetionet
+            ('Disease::Breast Cancer', 'Gene::BID', 'DuG'),
+            ('Disease::Lung Cancer', 'Gene::TP53', 'DuG'),
+            
+            # Disease - downregulates - Gene (DdG) - 7623 edges in Hetionet
+            ('Disease::Heart Disease', 'Gene::KCNQ2', 'DdG'),
+            
+            # Disease - localizes - Anatomy (DlA) - 3602 edges in Hetionet
+            ('Disease::Breast Cancer', 'Anatomy::Stomach', 'DlA'),
+            ('Disease::Lung Cancer', 'Anatomy::Lung', 'DlA'),
+            ('Disease::Heart Disease', 'Anatomy::Heart', 'DlA'),
+            
+            # Disease - presents - Symptom (DpS) - 3357 edges in Hetionet
+            ('Disease::Breast Cancer', 'Symptom::Pain', 'DpS'),
+            ('Disease::Lung Cancer', 'Symptom::Cough', 'DpS'),
+            ('Disease::Heart Disease', 'Symptom::Fatigue', 'DpS'),
+            
+            # Compound - binds - Gene (CbG) - 11571 edges in Hetionet
+            ('Compound::Caffeine', 'Gene::TP53', 'CbG'),
+            ('Compound::Vitamin C', 'Gene::BRCA1', 'CbG'),
+            ('Compound::Metformin', 'Gene::APOE', 'CbG'),
+            
+            # Compound - treats - Disease (CtD) - 755 edges in Hetionet
+            ('Compound::Aspirin', 'Disease::Heart Disease', 'CtD'),
+            ('Compound::Metformin', 'Disease::Breast Cancer', 'CtD'),
+            
+            # Compound - palliates - Disease (CpD) - 390 edges in Hetionet
+            ('Compound::Ibuprofen', 'Disease::Breast Cancer', 'CpD'),
+            ('Compound::Paracetamol', 'Disease::Lung Cancer', 'CpD'),
+            
+            # Compound - causes - Side Effect (CcSE) - 138944 edges in Hetionet
+            ('Compound::Aspirin', 'SideEffect::Nausea', 'CcSE'),
+            ('Compound::Ibuprofen', 'SideEffect::Headache', 'CcSE'),
+            ('Compound::Caffeine', 'SideEffect::Dizziness', 'CcSE'),
+            
+            # Compound - upregulates - Gene (CuG) - 18756 edges in Hetionet
+            ('Compound::Vitamin C', 'Gene::TP53', 'CuG'),
+            ('Compound::Metformin', 'Gene::BRCA1', 'CuG'),
+            
+            # Compound - downregulates - Gene (CdG) - 21102 edges in Hetionet
+            ('Compound::Caffeine', 'Gene::MMP9', 'CdG'),
+            
+            # Gene - participates - Biological Process (GpBP) - 559504 edges in Hetionet
+            ('Gene::BID', 'BiologicalProcess::Cell Death', 'GpBP'),
+            ('Gene::TP53', 'BiologicalProcess::DNA Repair', 'GpBP'),
+            ('Gene::BRCA1', 'BiologicalProcess::Apoptosis', 'GpBP'),
+            ('Gene::MMP9', 'BiologicalProcess::Cell Cycle', 'GpBP'),
+            
+            # Gene - participates - Pathway (GpPW) - 84372 edges in Hetionet
+            ('Gene::BRCA1', 'Pathway::Apoptosis', 'GpPW'),
+            ('Gene::TP53', 'Pathway::Cell Cycle', 'GpPW'),
+            ('Gene::BID', 'Pathway::DNA Repair', 'GpPW'),
+            
+            # Gene - participates - Molecular Function (GpMF) - 97222 edges in Hetionet
+            ('Gene::TP53', 'MolecularFunction::Enzyme', 'GpMF'),
+            ('Gene::BRCA1', 'MolecularFunction::Receptor', 'GpMF'),
+            ('Gene::CFTR', 'MolecularFunction::Transporter', 'GpMF'),
+            
+            # Gene - participates - Cellular Component (GpCC) - 73566 edges in Hetionet
+            ('Gene::BRCA1', 'CellularComponent::Nucleus', 'GpCC'),
+            ('Gene::TP53', 'CellularComponent::Mitochondria', 'GpCC'),
+            ('Gene::CFTR', 'CellularComponent::Cell Membrane', 'GpCC'),
+            
+            # Gene - interacts - Gene (GiG) - 147164 edges in Hetionet
+            ('Gene::TP53', 'Gene::BRCA1', 'GiG'),
+            ('Gene::MMP9', 'Gene::BID', 'GiG'),
+            ('Gene::APOE', 'Gene::CFTR', 'GiG'),
+            
+            # Gene > regulates > Gene (Gr>G) - 265672 edges in Hetionet
+            ('Gene::TP53', 'Gene::MMP9', 'Gr>G'),
+            ('Gene::BRCA1', 'Gene::BID', 'Gr>G'),
+            ('Gene::APOE', 'Gene::KCNQ2', 'Gr>G'),
+            
+            # Gene - covaries - Gene (GcG) - 61690 edges in Hetionet
+            ('Gene::TP53', 'Gene::BRCA1', 'GcG'),
+            ('Gene::MMP9', 'Gene::BID', 'GcG'),
+            
+            # Pharmacologic Class - includes - Compound (PCiC) - 1029 edges in Hetionet
+            ('PharmacologicClass::NSAID', 'Compound::Aspirin', 'PCiC'),
+            ('PharmacologicClass::NSAID', 'Compound::Ibuprofen', 'PCiC'),
+            ('PharmacologicClass::Antibiotic', 'Compound::Metformin', 'PCiC'),
+            
+            # Compound - resembles - Compound (CrC) - 6486 edges in Hetionet
+            ('Compound::Aspirin', 'Compound::Ibuprofen', 'CrC'),
+            ('Compound::Caffeine', 'Compound::Vitamin C', 'CrC'),
+            
+            # Disease - resembles - Disease (DrD) - 543 edges in Hetionet
+            ('Disease::Breast Cancer', 'Disease::Lung Cancer', 'DrD'),
+            ('Disease::Alzheimer Disease', 'Disease::Cystic Fibrosis', 'DrD')
         ]
         
-        for source, target, relation in sample_edges:
-            self.G.add_edge(source, target, metaedge=relation)
+        for source, target, metaedge in edges_data:
+            self.G.add_edge(source, target, metaedge=metaedge, relation=metaedge)
         
-        print(f"✅ گراف نمونه ساخته شد: {self.G.number_of_nodes()} نود، {self.G.number_of_edges()} یال")
+        # اضافه کردن یال‌های معکوس برای پشتیبانی از سوالات پیچیده
+        reverse_edges_data = [
+            # Gene - expressed_in - Anatomy (GeA) - معکوس AeG
+            ('Gene::MMP9', 'Anatomy::Heart', 'GeA'),
+            ('Gene::BID', 'Anatomy::Heart', 'GeA'),
+            ('Gene::KCNQ2', 'Anatomy::Heart', 'GeA'),
+            ('Gene::APOE', 'Anatomy::Brain', 'GeA'),
+            ('Gene::TP53', 'Anatomy::Brain', 'GeA'),
+            ('Gene::BRCA1', 'Anatomy::Liver', 'GeA'),
+            ('Gene::CFTR', 'Anatomy::Lung', 'GeA'),
+            
+            # Gene - upregulates - Anatomy (GuA) - معکوس AuG
+            ('Gene::HMGB3', 'Anatomy::Heart', 'GuA'),
+            ('Gene::BRCA1', 'Anatomy::Brain', 'GuA'),
+            
+            # Gene - downregulates - Anatomy (GdA) - معکوس AdG
+            ('Gene::MMP9', 'Anatomy::Liver', 'GdA'),
+            
+            # Gene - associates - Disease (GaD) - معکوس DaG
+            ('Gene::BRCA1', 'Disease::Breast Cancer', 'GaD'),
+            ('Gene::TP53', 'Disease::Breast Cancer', 'GaD'),
+            ('Gene::MMP9', 'Disease::Lung Cancer', 'GaD'),
+            ('Gene::APOE', 'Disease::Alzheimer Disease', 'GaD'),
+            ('Gene::CFTR', 'Disease::Cystic Fibrosis', 'GaD'),
+            
+            # Gene - upregulates - Disease (GuD) - معکوس DuG
+            ('Gene::BID', 'Disease::Breast Cancer', 'GuD'),
+            ('Gene::TP53', 'Disease::Lung Cancer', 'GuD'),
+            
+            # Gene - downregulates - Disease (GdD) - معکوس DdG
+            ('Gene::KCNQ2', 'Disease::Heart Disease', 'GdD'),
+            
+            # Anatomy - localizes - Disease (AlD) - معکوس DlA
+            ('Anatomy::Stomach', 'Disease::Breast Cancer', 'AlD'),
+            ('Anatomy::Lung', 'Disease::Lung Cancer', 'AlD'),
+            ('Anatomy::Heart', 'Disease::Heart Disease', 'AlD'),
+            
+            # Symptom - presents - Disease (SpD) - معکوس DpS
+            ('Symptom::Pain', 'Disease::Breast Cancer', 'SpD'),
+            ('Symptom::Cough', 'Disease::Lung Cancer', 'SpD'),
+            ('Symptom::Fatigue', 'Disease::Heart Disease', 'SpD'),
+            
+            # Gene - binds - Compound (GbC) - معکوس CbG
+            ('Gene::TP53', 'Compound::Caffeine', 'GbC'),
+            ('Gene::BRCA1', 'Compound::Vitamin C', 'GbC'),
+            ('Gene::APOE', 'Compound::Metformin', 'GbC'),
+            
+            # Disease - treated_by - Compound (DtC) - معکوس CtD
+            ('Disease::Heart Disease', 'Compound::Aspirin', 'DtC'),
+            ('Disease::Breast Cancer', 'Compound::Metformin', 'DtC'),
+            
+            # Disease - palliated_by - Compound (DpC) - معکوس CpD
+            ('Disease::Breast Cancer', 'Compound::Ibuprofen', 'DpC'),
+            ('Disease::Lung Cancer', 'Compound::Paracetamol', 'DpC'),
+            
+            # Side Effect - caused_by - Compound (SEcC) - معکوس CcSE
+            ('SideEffect::Nausea', 'Compound::Aspirin', 'SEcC'),
+            ('SideEffect::Headache', 'Compound::Ibuprofen', 'SEcC'),
+            ('SideEffect::Dizziness', 'Compound::Caffeine', 'SEcC'),
+            
+            # Gene - upregulates - Compound (GuC) - معکوس CuG
+            ('Gene::TP53', 'Compound::Vitamin C', 'GuC'),
+            ('Gene::BRCA1', 'Compound::Metformin', 'GuC'),
+            
+            # Gene - downregulates - Compound (GdC) - معکوس CdG
+            ('Gene::MMP9', 'Compound::Caffeine', 'GdC'),
+            
+            # Biological Process - participates - Gene (BPpG) - معکوس GpBP
+            ('BiologicalProcess::Cell Death', 'Gene::BID', 'BPpG'),
+            ('BiologicalProcess::DNA Repair', 'Gene::TP53', 'BPpG'),
+            ('BiologicalProcess::Apoptosis', 'Gene::BRCA1', 'BPpG'),
+            ('BiologicalProcess::Cell Cycle', 'Gene::MMP9', 'BPpG'),
+            
+            # Pathway - participates - Gene (PWpG) - معکوس GpPW
+            ('Pathway::Apoptosis', 'Gene::BRCA1', 'PWpG'),
+            ('Pathway::Cell Cycle', 'Gene::TP53', 'PWpG'),
+            ('Pathway::DNA Repair', 'Gene::BID', 'PWpG'),
+            
+            # Molecular Function - participates - Gene (MFpG) - معکوس GpMF
+            ('MolecularFunction::Enzyme', 'Gene::TP53', 'MFpG'),
+            ('MolecularFunction::Receptor', 'Gene::BRCA1', 'MFpG'),
+            ('MolecularFunction::Transporter', 'Gene::CFTR', 'MFpG'),
+            
+            # Cellular Component - participates - Gene (CCpG) - معکوس GpCC
+            ('CellularComponent::Nucleus', 'Gene::BRCA1', 'CCpG'),
+            ('CellularComponent::Mitochondria', 'Gene::TP53', 'CCpG'),
+            ('CellularComponent::Cell Membrane', 'Gene::CFTR', 'CCpG'),
+            
+            # Compound - includes - Pharmacologic Class (CiPC) - معکوس PCiC
+            ('Compound::Aspirin', 'PharmacologicClass::NSAID', 'CiPC'),
+            ('Compound::Ibuprofen', 'PharmacologicClass::NSAID', 'CiPC'),
+            ('Compound::Metformin', 'PharmacologicClass::Antibiotic', 'CiPC')
+        ]
+        
+        for source, target, metaedge in reverse_edges_data:
+            self.G.add_edge(source, target, metaedge=metaedge, relation=metaedge)
+        
+        print(f"✅ گراف نمونه بر اساس Hetionet ایجاد شد: {self.G.number_of_nodes()} نود، {self.G.number_of_edges()} یال")
+        print(f"📊 شامل {len([n for n, d in self.G.nodes(data=True) if d.get('metanode') == 'Gene'])} ژن، {len([n for n, d in self.G.nodes(data=True) if d.get('metanode') == 'Anatomy'])} آناتومی")
+        print(f"🔗 شامل {len([e for e in self.G.edges(data=True) if e[2].get('metaedge') == 'AeG'])} یال AeG (Anatomy-expresses-Gene)")
+        print(f"🔄 شامل {len([e for e in self.G.edges(data=True) if e[2].get('metaedge') == 'GeA'])} یال GeA (Gene-expressed_in-Anatomy) - معکوس")
     
     def load_graph_from_file(self):
         """بارگذاری گراف از فایل"""
@@ -175,161 +422,468 @@ class GraphRAGService:
         # موجودیت‌های نام‌دار
         for ent in doc.ents:
             if ent.label_ not in {"DATE", "TIME", "PERCENT", "MONEY", "QUANTITY", "ORDINAL", "CARDINAL"}:
-                keywords.add(ent.text.lower())
+                # حذف علائم نگارشی از موجودیت‌ها
+                clean_text = ''.join(c for c in ent.text.lower() if c.isalnum() or c.isspace())
+                if clean_text.strip():
+                    keywords.add(clean_text.strip())
         
         # اسم‌ها و اسم خاص‌ها
         for token in doc:
             if (token.pos_ in {"NOUN", "PROPN"} and 
                 token.text.lower() not in STOP_WORDS and 
                 token.is_alpha and len(token.text) > 2):
-                keywords.add(token.text.lower())
+                # حذف علائم نگارشی
+                clean_text = ''.join(c for c in token.text.lower() if c.isalnum() or c.isspace())
+                if clean_text.strip():
+                    keywords.add(clean_text.strip())
         
         return sorted(keywords)
     
     def analyze_question_intent(self, query: str) -> Dict[str, Any]:
-        """تحلیل عمیق سوال و استخراج قصد کاربر"""
+        """تحلیل مفهومی سوال و استخراج قصد کاربر بر اساس جدول نگاشت Hetionet"""
         query_lower = query.lower()
         
-        # تشخیص نوع سوال
-        question_type = self._analyze_question_type(query_lower)
+        # 1. تشخیص نوع سوال بر اساس جدول نگاشت
+        question_patterns = {
+            # بیان ژن در بافت
+            'anatomy_expression': {
+                'patterns': ['expressed in', 'expression in', 'genes in', 'expressed by', 'genes are expressed', 'what genes are expressed'],
+                'metaedges': ['AeG'],
+                'description': 'کدام ژن‌ها در [بافت] بیان می‌شوند؟'
+            },
+            # بیان ژن در مکان خاص
+            'gene_expression_location': {
+                'patterns': ['where is', 'expressed in', 'found in', 'located in', 'where does'],
+                'metaedges': ['GeA'],
+                'description': 'ژن [X] در کجا بیان می‌شود؟'
+            },
+            # مشارکت در فرآیند زیستی
+            'biological_participation': {
+                'patterns': ['participates in', 'involved in', 'role in', 'part of', 'participate'],
+                'metaedges': ['GpBP', 'GpMF', 'GpCC'],
+                'description': 'ژن‌هایی که در [فرآیند زیستی] شرکت دارند؟'
+            },
+            # تعامل ژن‌ها
+            'gene_interaction': {
+                'patterns': ['interacts', 'interaction', 'binds', 'binding', 'interact with', 'which genes interact'],
+                'metaedges': ['GiG'],
+                'description': 'ژنی که با ژن [X] تعامل دارد؟'
+            },
+            # تنظیم ژن توسط بیماری
+            'disease_gene_regulation': {
+                'patterns': ['regulates', 'upregulates', 'downregulates', 'associated', 'associates'],
+                'metaedges': ['DuG', 'DdG', 'DaG'],
+                'description': 'ژن‌هایی که بیماری [Y] را تنظیم می‌کنند؟'
+            },
+            # درمان بیماری
+            'disease_treatment': {
+                'patterns': ['treats', 'treatment', 'therapy', 'therapeutic', 'treat'],
+                'metaedges': ['CtD'],
+                'description': 'دارویی که بیماری را درمان می‌کند؟'
+            },
+            # تنظیم ژن توسط دارو
+            'compound_gene_regulation': {
+                'patterns': ['upregulates', 'downregulates', 'binds to', 'regulates'],
+                'metaedges': ['CuG', 'CdG', 'CbG'],
+                'description': 'دارویی که ژن را تنظیم می‌کند؟'
+            },
+            # بیماری‌های مرتبط با بافت
+            'anatomy_disease': {
+                'patterns': ['diseases in', 'affects', 'localized to', 'disease in'],
+                'metaedges': ['DlA'],
+                'description': 'بیماری‌هایی که به [بافت] مربوطند؟'
+            },
+            # اثر بیماری بر بافت‌ها (جدید)
+            'disease_tissue_effect': {
+                'patterns': ['how does', 'affect', 'affects', 'effect on', 'effects on', 'tissue', 'tissues'],
+                'metaedges': ['DlA', 'DuG', 'DdG', 'AeG', 'AuG', 'AdG', 'GpBP'],
+                'description': 'چگونه بیماری بر بافت‌های مختلف اثر می‌گذارد؟'
+            },
+            # علائم بیماری
+            'disease_symptom': {
+                'patterns': ['symptoms', 'presents', 'signs', 'manifestation', 'symptom'],
+                'metaedges': ['DpS'],
+                'description': 'علائم بیماری [Z] چیست؟'
+            },
+            # بیماری‌های مشابه
+            'disease_similarity': {
+                'patterns': ['similar', 'resembles', 'alike', 'related', 'similar to'],
+                'metaedges': ['DrD'],
+                'description': 'بیماری‌های شبیه به بیماری [X]؟'
+            },
+            # عوارض دارو
+            'compound_side_effect': {
+                'patterns': ['side effect', 'adverse', 'reaction', 'causes', 'side effects'],
+                'metaedges': ['CcSE'],
+                'description': 'عوارض داروی [X] چیست؟'
+            },
+            # مسیرهای ژن
+            'gene_pathway': {
+                'patterns': ['pathway', 'signaling', 'metabolic', 'cascade', 'pathways'],
+                'metaedges': ['GpPW'],
+                'description': 'فرآیندهایی که ژن در آنها نقش دارد؟'
+            },
+            # تنظیم ژن توسط ژن دیگر
+            'gene_regulation': {
+                'patterns': ['regulates', 'controls', 'regulation', 'regulate'],
+                'metaedges': ['Gr>G'],
+                'description': 'ژن‌هایی که ژن [X] را تنظیم می‌کنند؟'
+            },
+            # همبستگی ژن‌ها
+            'gene_covariation': {
+                'patterns': ['covaries', 'correlated', 'correlation', 'evolutionary'],
+                'metaedges': ['GcG'],
+                'description': 'ژن‌هایی که با ژن [X] همبستگی دارند؟'
+            }
+        }
         
-        # استخراج موجودیت‌های اصلی
-        main_entities = []
+        # تشخیص نوع سوال
+        detected_type = "general"
+        detected_metaedges = []
+        
+        for qtype, config in question_patterns.items():
+            for pattern in config['patterns']:
+                if pattern in query_lower:
+                    detected_type = qtype
+                    detected_metaedges.extend(config['metaedges'])
+                    break
+            if detected_type != "general":
+                break
+        
+        # 2. شناسایی موجودیت‌ها بر اساس metanodes Hetionet
+        entity_mapping = {
+            'Gene': ['gene', 'genes', 'protein', 'proteins', 'dna', 'rna', 'mrna', 'genetic', 'molecular', 'tp53', 'brca1', 'apoe', 'cftr', 'mmp9', 'bid', 'kcnq2', 'hmgb3'],
+            'Anatomy': ['anatomy', 'organ', 'tissue', 'heart', 'brain', 'liver', 'lung', 'kidney', 'stomach', 'breast'],
+            'Disease': ['disease', 'disorder', 'condition', 'syndrome', 'cancer', 'tumor', 'alzheimer', 'diabetes', 'cystic fibrosis', 'breast cancer', 'lung cancer', 'heart disease'],
+            'Compound': ['compound', 'drug', 'medication', 'medicine', 'chemical', 'molecule', 'aspirin', 'insulin', 'caffeine', 'vitamin c', 'metformin', 'ibuprofen', 'paracetamol'],
+            'Biological Process': ['process', 'biological', 'cellular', 'metabolic', 'apoptosis', 'inflammation', 'cell death', 'dna repair', 'cell cycle'],
+            'Pathway': ['pathway', 'signaling', 'metabolic', 'cascade', 'wnt', 'notch', 'apoptosis pathway'],
+            'Symptom': ['symptom', 'sign', 'manifestation', 'presentation', 'pain', 'fever', 'cough', 'fatigue'],
+            'Side Effect': ['side effect', 'adverse', 'reaction', 'toxicity', 'nausea', 'headache', 'dizziness'],
+            'Molecular Function': ['function', 'molecular', 'catalytic', 'binding', 'enzyme', 'receptor', 'transporter'],
+            'Cellular Component': ['component', 'cellular', 'organelle', 'structure', 'nucleus', 'mitochondria', 'cell membrane'],
+            'Pharmacologic Class': ['class', 'pharmacologic', 'therapeutic', 'antibiotic', 'antiviral', 'nsaid']
+        }
+        
+        # شناسایی موجودیت‌ها
+        detected_entities = []
         entity_types = []
         
-        # کلمات کلیدی مرتبط با انواع موجودیت‌ها
-        entity_keywords = {
-            'Gene': ['ژن', 'gene', 'protein', 'پروتئین', 'dna', 'rna', 'mrna'],
-            'Disease': ['بیماری', 'disease', 'disorder', 'syndrome', 'cancer', 'سرطان', 'diabetes', 'دیابت'],
-            'Drug': ['دارو', 'drug', 'medicine', 'medication', 'treatment', 'درمان'],
-            'Anatomy': ['قلب', 'heart', 'brain', 'مغز', 'liver', 'کبد', 'lung', 'ریه', 'kidney', 'کلیه'],
-            'Biological_Process': ['process', 'فرآیند', 'pathway', 'مسیر', 'metabolism', 'متابولیسم'],
-            'Compound': ['compound', 'ترکیب', 'chemical', 'شیمیایی', 'molecule', 'مولکول']
-        }
-        
-        # تشخیص موجودیت‌های اصلی
-        for entity_type, keywords in entity_keywords.items():
+        for entity_type, keywords in entity_mapping.items():
             for keyword in keywords:
                 if keyword in query_lower:
-                    main_entities.append(keyword)
-                    entity_types.append(entity_type)
-                    break
+                    if entity_type not in entity_types:
+                        entity_types.append(entity_type)
+                    if keyword not in detected_entities:
+                        detected_entities.append(keyword)
         
-        # تشخیص روابط
-        relationships = []
-        relationship_keywords = {
-            'interacts_with': ['تعامل', 'interact', 'interaction', 'تعامل می‌کند'],
-            'associates': ['مرتبط', 'associate', 'association', 'ارتباط'],
-            'treats': ['درمان', 'treat', 'treatment', 'cure', 'شفا'],
-            'causes': ['سبب', 'cause', 'causation', 'علت'],
-            'expressed_in': ['بیان', 'express', 'expression', 'بیان می‌شود'],
-            'regulates': ['تنظیم', 'regulate', 'regulation', 'کنترل']
-        }
+        # 3. استخراج کلمات کلیدی با استفاده از تابع بهبود یافته
+        keywords = self.extract_keywords(query)
         
-        for rel_type, keywords in relationship_keywords.items():
-            for keyword in keywords:
-                if keyword in query_lower:
-                    relationships.append(rel_type)
-                    break
-        
-        # تشخیص سوال‌های خاص
-        question_patterns = {
-            'what_genes': ['چه ژن', 'what gene', 'which gene'],
-            'what_diseases': ['چه بیماری', 'what disease', 'which disease'],
-            'what_drugs': ['چه دارو', 'what drug', 'which drug'],
-            'how_treat': ['چگونه درمان', 'how treat', 'how cure'],
-            'what_causes': ['چه سبب', 'what cause', 'what causes'],
-            'where_expressed': ['کجا بیان', 'where express', 'where expressed']
-        }
-        
-        detected_patterns = []
-        for pattern_name, patterns in question_patterns.items():
-            for pattern in patterns:
-                if pattern in query_lower:
-                    detected_patterns.append(pattern_name)
-                    break
+        # 4. تشخیص جهت رابطه
+        direction = "forward"
+        if any(word in query_lower for word in ['where', 'location', 'found in', 'expressed in', 'where is', 'where does']):
+            direction = "reverse"
         
         return {
-            'question_type': question_type,
-            'main_entities': main_entities,
+            'question_type': detected_type,
+            'metaedges': list(set(detected_metaedges)),  # حذف تکرار
+            'entities': detected_entities,
             'entity_types': entity_types,
-            'relationships': relationships,
-            'patterns': detected_patterns,
-            'keywords': self.extract_keywords(query)
+            'keywords': keywords,
+            'direction': direction,
+            'query': query,
+            'query_lower': query_lower,
+            'description': question_patterns.get(detected_type, {}).get('description', 'سوال عمومی')
         }
     
     def intelligent_semantic_search(self, query: str, max_depth: int = 3) -> List[Tuple[str, int, float, str]]:
-        """جستجوی معنایی هوشمند بر اساس تحلیل سوال"""
+        """جستجوی معنایی هوشمند بر اساس جدول نگاشت Hetionet"""
         if not self.G:
             return []
         
-        # تحلیل سوال
+        # تحلیل مفهومی سوال
         intent = self.analyze_question_intent(query)
-        print(f"تحلیل سوال: {intent}")
+        print(f"🔍 تحلیل مفهومی سوال: {intent['question_type']}")
+        print(f"📊 موجودیت‌ها: {intent['entity_types']}")
+        print(f"🔗 metaedges: {intent['metaedges']}")
+        print(f"📝 توضیح: {intent['description']}")
         
         # استخراج کلمات کلیدی
         keywords = intent['keywords']
-        main_entities = intent['main_entities']
+        print(f"🔑 کلمات کلیدی: {keywords}")
         
-        # تطبیق با نودهای گراف
-        matched_nodes = self.match_tokens_to_nodes(keywords + main_entities)
+        # تطبیق توکن‌ها با نودها
+        matched_nodes = self.match_tokens_to_nodes(keywords)
+        print(f"🎯 نودهای تطبیق یافته: {matched_nodes}")
         
+        # اگر هیچ نودی تطبیق نکرد، سعی کن همه توکن‌ها را تطبیق دهی
         if not matched_nodes:
-            print("هیچ نودی تطبیق نیافت")
-            return []
+            print("⚠️ هیچ نودی تطبیق نکرد، تلاش برای تطبیق همه توکن‌ها")
+            all_tokens = query.lower().split()
+            matched_nodes = self.match_tokens_to_nodes(all_tokens)
+            print(f"🎯 نودهای تطبیق یافته (تلاش دوم): {matched_nodes}")
         
-        print(f"نودهای تطبیق یافته: {matched_nodes}")
-        
-        # جستجوی هوشمند بر اساس نوع سوال
         results = []
         
+        # بر اساس نوع سوال و metaedges، روش جستجوی مناسب را انتخاب کن
         if intent['question_type'] == 'anatomy_expression':
-            # سوالات مربوط به بیان ژن در آناتومی
-            results = self._search_anatomy_expression(matched_nodes, intent, max_depth)
-        elif intent['question_type'] == 'disease_info':
-            # سوالات مربوط به بیماری‌ها
-            results = self._search_disease_related(matched_nodes, intent, max_depth)
-        elif intent['question_type'] == 'drug_treatment':
-            # سوالات مربوط به داروها - بررسی اینکه آیا بیماری در matched_nodes وجود دارد
-            if any(self.G.nodes[node_id]['kind'] == 'Disease' for node_id in matched_nodes.values()):
-                # اگر بیماری وجود دارد، داروهای درمانی آن را جستجو کن
-                results = self._search_disease_related(matched_nodes, intent, max_depth)
-            else:
-                # اگر دارو وجود دارد، بیماری‌های درمان شده توسط آن را جستجو کن
-                results = self._search_drug_related(matched_nodes, intent, max_depth)
-        elif intent['question_type'] == 'gene_function':
-            # سوالات مربوط به عملکرد ژن‌ها
-            results = self._search_gene_function(matched_nodes, intent, max_depth)
+            print("🫀 تشخیص نوع سوال: بیان ژن در آناتومی")
+            results = self._search_by_metaedges(matched_nodes, intent, ['AeG'], max_depth)
+            
+        elif intent['question_type'] == 'gene_expression_location':
+            print("📍 تشخیص نوع سوال: مکان بیان ژن")
+            results = self._search_by_metaedges(matched_nodes, intent, ['GeA'], max_depth)
+            
+        elif intent['question_type'] == 'biological_participation':
+            print("🧬 تشخیص نوع سوال: مشارکت در فرآیند زیستی")
+            results = self._search_by_metaedges(matched_nodes, intent, ['GpBP', 'GpMF', 'GpCC'], max_depth)
+            
+        elif intent['question_type'] == 'gene_interaction':
+            print("🔗 تشخیص نوع سوال: تعامل ژن‌ها")
+            results = self._search_by_metaedges(matched_nodes, intent, ['GiG'], max_depth)
+            
+        elif intent['question_type'] == 'disease_gene_regulation':
+            print("🏥 تشخیص نوع سوال: تنظیم ژن توسط بیماری")
+            results = self._search_by_metaedges(matched_nodes, intent, ['DuG', 'DdG', 'DaG'], max_depth)
+            
+        elif intent['question_type'] == 'disease_treatment':
+            print("💊 تشخیص نوع سوال: درمان بیماری")
+            results = self._search_by_metaedges(matched_nodes, intent, ['CtD'], max_depth)
+            
+        elif intent['question_type'] == 'compound_gene_regulation':
+            print("🧪 تشخیص نوع سوال: تنظیم ژن توسط دارو")
+            results = self._search_by_metaedges(matched_nodes, intent, ['CuG', 'CdG', 'CbG'], max_depth)
+            
+        elif intent['question_type'] == 'anatomy_disease':
+            print("🏥 تشخیص نوع سوال: بیماری‌های مرتبط با بافت")
+            results = self._search_by_metaedges(matched_nodes, intent, ['DlA'], max_depth)
+            
+        elif intent['question_type'] == 'disease_symptom':
+            print("🤒 تشخیص نوع سوال: علائم بیماری")
+            results = self._search_by_metaedges(matched_nodes, intent, ['DpS'], max_depth)
+            
+        elif intent['question_type'] == 'disease_similarity':
+            print("🔄 تشخیص نوع سوال: بیماری‌های مشابه")
+            results = self._search_by_metaedges(matched_nodes, intent, ['DrD'], max_depth)
+            
+        elif intent['question_type'] == 'compound_side_effect':
+            print("⚠️ تشخیص نوع سوال: عوارض دارو")
+            results = self._search_by_metaedges(matched_nodes, intent, ['CcSE'], max_depth)
+            
+        elif intent['question_type'] == 'gene_pathway':
+            print("🛤️ تشخیص نوع سوال: مسیرهای ژن")
+            results = self._search_by_metaedges(matched_nodes, intent, ['GpPW'], max_depth)
+            
+        elif intent['question_type'] == 'gene_regulation':
+            print("🎛️ تشخیص نوع سوال: تنظیم ژن توسط ژن دیگر")
+            results = self._search_by_metaedges(matched_nodes, intent, ['Gr>G'], max_depth)
+            
+        elif intent['question_type'] == 'gene_covariation':
+            print("📈 تشخیص نوع سوال: همبستگی ژن‌ها")
+            results = self._search_by_metaedges(matched_nodes, intent, ['GcG'], max_depth)
+            
         else:
-            # جستجوی عمومی
-            results = self._search_general(matched_nodes, intent, max_depth)
+            print("🔍 تشخیص نوع سوال: عمومی")
+            # استفاده از تمام metaedges موجود
+            all_metaedges = ['AeG', 'GeA', 'GpBP', 'GpMF', 'GpCC', 'GpPW', 'GiG', 'Gr>G', 'GcG', 
+                           'DuG', 'DdG', 'DaG', 'DlA', 'DpS', 'DrD', 'CtD', 'CuG', 'CdG', 'CbG', 'CcSE']
+            results = self._search_by_metaedges(matched_nodes, intent, all_metaedges, max_depth)
         
-        return results
+        # حذف تکرار و مرتب‌سازی بر اساس امتیاز
+        unique_results = {}
+        for node_id, depth, score, explanation in results:
+            if node_id not in unique_results or score > unique_results[node_id][2]:
+                unique_results[node_id] = (node_id, depth, score, explanation)
+        
+        final_results = sorted(unique_results.values(), key=lambda x: x[2], reverse=True)
+        
+        print(f"✅ جستجوی هوشمند کامل شد: {len(final_results)} نتیجه")
+        return final_results
     
-    def _search_anatomy_expression(self, matched_nodes: Dict[str, str], intent: Dict, max_depth: int) -> List[Tuple[str, int, float, str]]:
-        """جستجوی بیان ژن در آناتومی"""
+    def _search_genes_expressed_in_anatomy(self, matched_nodes: Dict[str, str], intent: Dict, max_depth: int = 2) -> List[Tuple[str, int, float, str]]:
+        """
+        جستجو می‌کند که کدام ژن‌ها از طریق روابط مختلف در یک اندام خاص بیان می‌شوند.
+        بر اساس Hetionet: AeG (expresses), AuG (upregulates), AdG (downregulates)
+
+        Args:
+            matched_nodes (dict): نگاشت توکن‌ها به نودها
+            intent (dict): نتیجه intent detection
+            max_depth (int): حداکثر عمق جستجو
+
+        Returns:
+            List[Tuple[str, int, float, str]]: لیست نودهای ژن پیدا شده با عمق و نمره
+        """
         results = []
         
         for token, node_id in matched_nodes.items():
             if self.G.nodes[node_id]['kind'] == 'Anatomy':
-                # یافتن ژن‌هایی که در این آناتومی بیان می‌شوند
+                anatomy_name = self.G.nodes[node_id]['name']
+                print(f"🔍 جستجوی ژن‌های مرتبط با {anatomy_name} در Hetionet")
+                
+                # بررسی تمام روابط مرتبط با بیان ژن
+                expression_relations = ['AeG', 'AuG', 'AdG']  # Anatomy -> Gene relations
+                
+                for relation in expression_relations:
+                    relation_name = {
+                        'AeG': 'expresses',
+                        'AuG': 'upregulates', 
+                        'AdG': 'downregulates'
+                    }.get(relation, relation)
+                    
+                    print(f"  🔍 بررسی رابطه {relation} ({relation_name})")
+                    
+                    for neighbor in self.G.neighbors(node_id):
+                        if self.G.nodes[neighbor]['kind'] == 'Gene':
+                            edge_data = self.G.get_edge_data(node_id, neighbor)
+                            if edge_data and edge_data.get('metaedge') == relation:
+                                gene_name = self.G.nodes[neighbor]['name']
+                                
+                                # امتیازدهی بر اساس نوع رابطه
+                                if relation == 'AeG':
+                                    score = 5.0  # بیان مستقیم
+                                    explanation = f"{gene_name} is expressed in {anatomy_name}"
+                                elif relation == 'AuG':
+                                    score = 4.5  # تنظیم مثبت
+                                    explanation = f"{gene_name} is upregulated in {anatomy_name}"
+                                elif relation == 'AdG':
+                                    score = 4.0  # تنظیم منفی
+                                    explanation = f"{gene_name} is downregulated in {anatomy_name}"
+                                else:
+                                    score = 3.5
+                                    explanation = f"{gene_name} is related to {anatomy_name} via {relation}"
+                                
+                                results.append((neighbor, 1, score, explanation))
+                                print(f"    ✅ {gene_name} - {relation_name} در {anatomy_name} (امتیاز: {score})")
+                
+                # جستجوی معکوس (Gene -> Anatomy) اگر وجود داشته باشد
+                print(f"  🔍 بررسی روابط معکوس (Gene -> {anatomy_name})")
+                reverse_relations = ['GeA', 'GuA', 'GdA']  # Gene -> Anatomy relations
+                
+                for gene_node, gene_attrs in self.G.nodes(data=True):
+                    if gene_attrs.get('kind') == 'Gene':
+                        for neighbor in self.G.neighbors(gene_node):
+                            if neighbor == node_id:
+                                edge_data = self.G.get_edge_data(gene_node, neighbor)
+                                if edge_data:
+                                    relation = edge_data.get('metaedge')
+                                    if relation in reverse_relations:
+                                        gene_name = gene_attrs['name']
+                                        
+                                        # امتیازدهی برای روابط معکوس
+                                        if relation == 'GeA':
+                                            score = 4.0
+                                            explanation = f"{gene_name} expresses in {anatomy_name}"
+                                        elif relation == 'GuA':
+                                            score = 3.5
+                                            explanation = f"{gene_name} upregulates in {anatomy_name}"
+                                        elif relation == 'GdA':
+                                            score = 3.0
+                                            explanation = f"{gene_name} downregulates in {anatomy_name}"
+                                        else:
+                                            score = 2.5
+                                            explanation = f"{gene_name} related to {anatomy_name} via {relation}"
+                                        
+                                        results.append((gene_node, 1, score, explanation))
+                                        print(f"    ✅ {gene_name} - رابطه معکوس {relation} با {anatomy_name} (امتیاز: {score})")
+                
+                # جستجوی عمیق با فیلتر روابط بیان
+                print(f"  🔍 جستجوی عمیق با فیلتر روابط بیان")
+                for depth in range(2, max_depth + 1):
+                    for relation in expression_relations:
+                        dfs_results = self.dfs_search(node_id, depth, relation_filter=relation)
+                        for gene_node, gene_depth in dfs_results:
+                            if self.G.nodes[gene_node]['kind'] == 'Gene':
+                                gene_name = self.G.nodes[gene_node]['name']
+                                score = 4.0 / gene_depth  # کاهش امتیاز با افزایش عمق
+                                explanation = f"{gene_name} related to {anatomy_name} via {relation} (depth {gene_depth})"
+                                results.append((gene_node, gene_depth, score, explanation))
+                                print(f"    ✅ {gene_name} - عمق {gene_depth} با رابطه {relation} (امتیاز: {score:.2f})")
+        
+        # حذف تکراری‌ها و مرتب‌سازی بر اساس امتیاز
+        unique_results = {}
+        for node_id, depth, score, explanation in results:
+            if node_id not in unique_results or score > unique_results[node_id][1]:
+                unique_results[node_id] = (depth, score, explanation)
+        
+        # مرتب‌سازی بر اساس امتیاز
+        sorted_results = sorted(unique_results.items(), key=lambda x: x[1][1], reverse=True)
+        
+        final_results = [(node_id, depth, score, explanation) for node_id, (depth, score, explanation) in sorted_results]
+        
+        print(f"📊 مجموع {len(final_results)} ژن منحصر به فرد یافت شد")
+        return final_results
+    
+    def _add_node_if_not_exists(self, node_id: str):
+        """اضافه کردن نود به گراف اگر وجود نداشته باشد"""
+        if not self.G.has_node(node_id):
+            # ایجاد نود با اطلاعات پیش‌فرض
+            self.G.add_node(node_id, name=node_id, kind='Unknown')
+            print(f"  ➕ نود اضافه شد: {node_id}")
+    
+    def _add_edge_if_not_exists(self, source: str, target: str, relation: str = 'Unknown'):
+        """اضافه کردن یال به گراف اگر وجود نداشته باشد"""
+        if not self.G.has_edge(source, target):
+            self.G.add_edge(source, target, metaedge=relation, relation=relation)
+            print(f"  ➕ یال اضافه شد: {source} → {target} ({relation})")
+    
+    def _search_anatomy_expression(self, matched_nodes: Dict[str, str], intent: Dict, max_depth: int) -> List[Tuple[str, int, float, str]]:
+        """جستجوی بیان ژن در آناتومی با تمرکز بر روابط AeG (Anatomy → expresses → Gene)"""
+        results = []
+        
+        for token, node_id in matched_nodes.items():
+            if self.G.nodes[node_id]['kind'] == 'Anatomy':
+                anatomy_name = self.G.nodes[node_id]['name']
+                print(f"🔍 جستجوی بیان ژن در {anatomy_name} با استفاده از رابطه AeG")
+                
+                # روش 1: یافتن مستقیم ژن‌های بیان شده (Anatomy → expresses → Gene)
                 for neighbor in self.G.neighbors(node_id):
                     if self.G.nodes[neighbor]['kind'] == 'Gene':
-                        # بررسی رابطه بیان
                         edge_data = self.G.get_edge_data(node_id, neighbor)
-                        if edge_data and 'expressed_in' in edge_data.get('metaedge', ''):
-                            results.append((neighbor, 1, 5.0, f"بیان در {self.G.nodes[node_id]['name']}"))
+                        if edge_data and edge_data.get('metaedge') == 'AeG':
+                            results.append((neighbor, 1, 5.0, f"{self.G.nodes[neighbor]['name']} expressed in {anatomy_name}"))
+                            print(f"  ✅ {self.G.nodes[neighbor]['name']} - بیان مستقیم در {anatomy_name} (AeG)")
                 
-                # جستجوی عمیق‌تر
+                # روش 2: جستجوی معکوس (Gene → expresses → Anatomy) - اگر وجود داشته باشد
+                for gene_node, gene_attrs in self.G.nodes(data=True):
+                    if gene_attrs.get('kind') == 'Gene':
+                        for neighbor in self.G.neighbors(gene_node):
+                            if neighbor == node_id:
+                                edge_data = self.G.get_edge_data(gene_node, neighbor)
+                                if edge_data and edge_data.get('metaedge') == 'GeA':
+                                    results.append((gene_node, 1, 4.5, f"{gene_attrs['name']} expressed in {anatomy_name}"))
+                                    print(f"  ✅ {gene_attrs['name']} - بیان معکوس در {anatomy_name} (GeA)")
+                
+                # روش 3: جستجوی عمیق با فیلتر دقیق AeG
                 for depth in range(2, max_depth + 1):
-                    for path in nx.single_source_shortest_path(self.G, node_id, cutoff=depth).values():
-                        if len(path) == depth + 1:
-                            target_node = path[-1]
-                            if self.G.nodes[target_node]['kind'] == 'Gene':
-                                score = 5.0 / depth
-                                results.append((target_node, depth, score, f"مسیر {depth} سطحی"))
+                    # استفاده از DFS با فیلتر دقیق
+                    dfs_results = self.dfs_search(node_id, depth, relation_filter='AeG')
+                    for gene_node, gene_depth in dfs_results:
+                        if self.G.nodes[gene_node]['kind'] == 'Gene':
+                            score = 4.0 / gene_depth
+                            results.append((gene_node, gene_depth, score, f"{self.G.nodes[gene_node]['name']} expressed in {anatomy_name} (depth {gene_depth})"))
+                            print(f"  ✅ {self.G.nodes[gene_node]['name']} - عمق {gene_depth} (AeG)")
+                
+                # روش 4: جستجوی بر اساس کلمات کلیدی در نام‌ها (برای قلب)
+                if 'heart' in token.lower() or 'heart' in anatomy_name.lower():
+                    for gene_node, gene_attrs in self.G.nodes(data=True):
+                        if gene_attrs.get('kind') == 'Gene':
+                            gene_name = gene_attrs['name'].lower()
+                            # جستجوی ژن‌های مرتبط با قلب
+                            if any(keyword in gene_name for keyword in ['cardiac', 'heart', 'myocardial', 'cardio']):
+                                results.append((gene_node, 2, 3.5, f"ژن مرتبط با قلب: {gene_attrs['name']}"))
+                                print(f"  ✅ {gene_attrs['name']} - مرتبط با قلب")
         
-        return results
+        # حذف تکراری‌ها و مرتب‌سازی بر اساس امتیاز
+        unique_results = {}
+        for node_id, depth, score, reason in results:
+            if node_id not in unique_results or score > unique_results[node_id][1]:
+                unique_results[node_id] = (depth, score, reason)
+        
+        # مرتب‌سازی بر اساس امتیاز
+        sorted_results = sorted(unique_results.items(), key=lambda x: x[1][1], reverse=True)
+        
+        return [(node_id, depth, score, reason) for node_id, (depth, score, reason) in sorted_results]
     
     def _search_disease_related(self, matched_nodes: Dict[str, str], intent: Dict, max_depth: int) -> List[Tuple[str, int, float, str]]:
         """جستجوی مرتبط با بیماری‌ها"""
@@ -426,14 +980,128 @@ class GraphRAGService:
         return results
     
     def match_tokens_to_nodes(self, tokens: List[str]) -> Dict[str, str]:
-        """تطبیق توکن‌ها با نودهای گراف"""
+        """تطبیق توکن‌ها با نودهای گراف با پشتیبانی از تطبیق نوع موجودیت بر اساس Hetionet"""
         matched = {}
+        
+        # نگاشت کامل بر اساس metanodes Hetionet
+        fallback_kinds = {
+            # Gene (20945 nodes)
+            'gene': 'Gene', 'genes': 'Gene', 'protein': 'Gene', 'proteins': 'Gene',
+            'dna': 'Gene', 'rna': 'Gene', 'mrna': 'Gene', 'genetic': 'Gene',
+            
+            # Anatomy (402 nodes)
+            'anatomy': 'Anatomy', 'anatomical': 'Anatomy', 'organ': 'Anatomy', 'organs': 'Anatomy',
+            'tissue': 'Anatomy', 'tissues': 'Anatomy', 'body': 'Anatomy', 'body part': 'Anatomy',
+            'heart': 'Anatomy', 'brain': 'Anatomy', 'liver': 'Anatomy', 'lung': 'Anatomy',
+            'kidney': 'Anatomy', 'stomach': 'Anatomy', 'muscle': 'Anatomy', 'bone': 'Anatomy',
+            
+            # Disease (137 nodes)
+            'disease': 'Disease', 'diseases': 'Disease', 'disorder': 'Disease', 'disorders': 'Disease',
+            'syndrome': 'Disease', 'syndromes': 'Disease', 'cancer': 'Disease', 'cancers': 'Disease',
+            'tumor': 'Disease', 'tumors': 'Disease', 'malignancy': 'Disease', 'malignancies': 'Disease',
+            'diabetes': 'Disease', 'alzheimer': 'Disease', 'fibrosis': 'Disease',
+            
+            # Compound (1552 nodes)
+            'compound': 'Compound', 'compounds': 'Compound', 'drug': 'Compound', 'drugs': 'Compound',
+            'medication': 'Compound', 'medications': 'Compound', 'medicine': 'Compound', 'medicines': 'Compound',
+            'chemical': 'Compound', 'chemicals': 'Compound', 'molecule': 'Compound', 'molecules': 'Compound',
+            'aspirin': 'Compound', 'ibuprofen': 'Compound', 'caffeine': 'Compound', 'vitamin': 'Compound',
+            
+            # Biological Process (11381 nodes)
+            'process': 'Biological Process', 'processes': 'Biological Process', 'biological': 'Biological Process',
+            'pathway': 'Biological Process', 'pathways': 'Biological Process', 'mechanism': 'Biological Process',
+            'function': 'Biological Process', 'functions': 'Biological Process', 'activity': 'Biological Process',
+            'apoptosis': 'Biological Process', 'cell cycle': 'Biological Process', 'dna repair': 'Biological Process',
+            
+            # Pathway (1822 nodes)
+            'pathway': 'Pathway', 'pathways': 'Pathway', 'signaling': 'Pathway', 'metabolic': 'Pathway',
+            'cascade': 'Pathway', 'cascades': 'Pathway', 'network': 'Pathway', 'networks': 'Pathway',
+            
+            # Symptom (438 nodes)
+            'symptom': 'Symptom', 'symptoms': 'Symptom', 'sign': 'Symptom', 'signs': 'Symptom',
+            'manifestation': 'Symptom', 'manifestations': 'Symptom', 'indication': 'Symptom',
+            'pain': 'Symptom', 'fever': 'Symptom', 'cough': 'Symptom', 'fatigue': 'Symptom',
+            
+            # Side Effect (5734 nodes)
+            'side effect': 'Side Effect', 'side effects': 'Side Effect', 'adverse': 'Side Effect',
+            'reaction': 'Side Effect', 'reactions': 'Side Effect', 'toxicity': 'Side Effect',
+            'nausea': 'Side Effect', 'headache': 'Side Effect', 'dizziness': 'Side Effect',
+            
+            # Molecular Function (2884 nodes)
+            'molecular': 'Molecular Function', 'function': 'Molecular Function', 'functions': 'Molecular Function',
+            'activity': 'Molecular Function', 'activities': 'Molecular Function', 'enzymatic': 'Molecular Function',
+            'enzyme': 'Molecular Function', 'receptor': 'Molecular Function', 'transporter': 'Molecular Function',
+            
+            # Cellular Component (1391 nodes)
+            'cellular': 'Cellular Component', 'component': 'Cellular Component', 'components': 'Cellular Component',
+            'organelle': 'Cellular Component', 'organelles': 'Cellular Component', 'structure': 'Cellular Component',
+            'nucleus': 'Cellular Component', 'mitochondria': 'Cellular Component', 'membrane': 'Cellular Component',
+            
+            # Pharmacologic Class (345 nodes)
+            'pharmacologic': 'Pharmacologic Class', 'pharmacological': 'Pharmacologic Class', 'class': 'Pharmacologic Class',
+            'category': 'Pharmacologic Class', 'categories': 'Pharmacologic Class', 'type': 'Pharmacologic Class',
+            'nsaid': 'Pharmacologic Class', 'antibiotic': 'Pharmacologic Class', 'antihypertensive': 'Pharmacologic Class'
+        }
+        
         for token in tokens:
             token_lower = token.lower()
+            found = False
+            
+            # روش 1: جستجوی مستقیم بر اساس نام
             for node_id, attrs in self.G.nodes(data=True):
                 if token_lower in attrs['name'].lower():
                     matched[token] = node_id
+                    found = True
+                    print(f"🔍 تطبیق مستقیم: '{token}' -> {attrs['name']} ({attrs.get('kind', 'Unknown')})")
                     break
+                # تطبیق ژن‌های مشهور
+                elif token.upper() in ['TP53', 'P53'] and 'TP53' in attrs['name'].upper():
+                    matched[token] = node_id
+                    found = True
+                    print(f"🔍 تطبیق ژن مشهور: '{token}' -> {attrs['name']} ({attrs.get('kind', 'Unknown')})")
+                    break
+            
+            # روش 2: جستجو بر اساس نوع موجودیت
+            if not found and token_lower in fallback_kinds:
+                kind = fallback_kinds[token_lower]
+                candidates = [(nid, attrs) for nid, attrs in self.G.nodes(data=True)
+                            if attrs.get('kind') == kind or attrs.get('metanode') == kind]
+                
+                if candidates:
+                    # انتخاب بهترین کاندید بر اساس شباهت نام
+                    best_candidate = None
+                    best_score = 0
+                    
+                    for nid, attrs in candidates:
+                        name_lower = attrs['name'].lower()
+                        # محاسبه امتیاز شباهت
+                        if token_lower in name_lower:
+                            score = len(token_lower) / len(name_lower)
+                        elif any(word in name_lower for word in token_lower.split()):
+                            score = 0.5
+                        else:
+                            score = 0.1
+                        
+                        if score > best_score:
+                            best_score = score
+                            best_candidate = (nid, attrs)
+                    
+                    if best_candidate:
+                        matched[token] = best_candidate[0]
+                        print(f"🔍 تطبیق نوع موجودیت: '{token}' -> {kind} (نمونه: {best_candidate[1]['name']})")
+                        found = True
+            
+            # روش 3: جستجوی جزئی برای کلمات چندبخشی
+            if not found and ' ' in token_lower:
+                words = token_lower.split()
+                for node_id, attrs in self.G.nodes(data=True):
+                    name_lower = attrs['name'].lower()
+                    if all(word in name_lower for word in words):
+                        matched[token] = node_id
+                        found = True
+                        print(f"🔍 تطبیق جزئی: '{token}' -> {attrs['name']} ({attrs.get('kind', 'Unknown')})")
+                        break
+        
         return matched
     
     def bfs_search(self, start_node: str, max_depth: int = 2) -> List[Tuple[str, int]]:
@@ -454,8 +1122,8 @@ class GraphRAGService:
         
         return result
     
-    def dfs_search(self, start_node: str, max_depth: int = 2) -> List[Tuple[str, int]]:
-        """جستجوی عمیق اول"""
+    def dfs_search(self, start_node: str, max_depth: int = 2, relation_filter: str = None) -> List[Tuple[str, int]]:
+        """جستجوی عمیق اول با امکان فیلتر بر اساس نوع رابطه"""
         visited = set()
         result = []
         
@@ -464,9 +1132,16 @@ class GraphRAGService:
                 return
             visited.add(node)
             result.append((node, depth))
+            
             for neighbor in self.G.neighbors(node):
                 if neighbor not in visited:
-                    dfs(neighbor, depth + 1)
+                    # اگر فیلتر رابطه مشخص شده، فقط یال‌های مرتبط را بررسی کن
+                    if relation_filter:
+                        edge_data = self.G.get_edge_data(node, neighbor)
+                        if edge_data and relation_filter.lower() in edge_data.get('relation', '').lower():
+                            dfs(neighbor, depth + 1)
+                    else:
+                        dfs(neighbor, depth + 1)
         
         dfs(start_node, 0)
         return result
@@ -585,16 +1260,60 @@ class GraphRAGService:
         
         return sorted(sorted_results, key=lambda x: x[2], reverse=True)
     
-    def adaptive_search(self, nodes: List[str], max_depth: int = 2) -> List[Tuple[str, int, str]]:
-        """جستجوی تطبیقی - انتخاب روش بر اساس نوع نود"""
+    def adaptive_search(self, nodes: List[str], max_depth: int = 2, query: str = "") -> List[Tuple[str, int, str]]:
+        """جستجوی تطبیقی - انتخاب روش بر اساس نوع نود و سوال"""
         all_results = []
+        query_lower = query.lower()
+        
+        # تشخیص نوع سوال
+        is_expression_question = any(word in query_lower for word in ['expressed', 'expression', 'express', 'genes'])
+        is_relationship_question = any(word in query_lower for word in ['relationship', 'related', 'connection', 'link'])
+        is_function_question = any(word in query_lower for word in ['function', 'role', 'purpose', 'effect'])
+        
+        print(f"🔍 تشخیص نوع سوال: expression={is_expression_question}, relationship={is_relationship_question}, function={is_function_question}")
         
         for node in nodes:
             node_kind = self.G.nodes[node]['kind']
+            node_name = self.G.nodes[node]['name']
+            print(f"  📍 پردازش نود: {node_name} ({node_kind})")
             
-            # انتخاب روش بر اساس نوع نود
-            if node_kind in ['Gene', 'Disease']:
+            # انتخاب روش بر اساس نوع نود و سوال
+            if node_kind == 'Anatomy' and is_expression_question:
+                # برای سوالات بیان در آناتومی، از جستجوی تخصصی استفاده کن
+                print(f"    🫀 استفاده از جستجوی تخصصی آناتومی برای {node_name}")
+                
+                # جستجوی مستقیم ژن‌های بیان شده
+                for neighbor in self.G.neighbors(node):
+                    if self.G.nodes[neighbor]['kind'] == 'Gene':
+                        edge_data = self.G.get_edge_data(node, neighbor)
+                        if edge_data:
+                            relation = edge_data.get('metaedge', '')
+                            if relation == 'AeG':
+                                all_results.append((neighbor, 1, 'Expression-Direct'))
+                                print(f"      ✅ {self.G.nodes[neighbor]['name']} - بیان مستقیم (AeG)")
+                
+                # جستجوی معکوس
+                for gene_node, gene_attrs in self.G.nodes(data=True):
+                    if gene_attrs.get('kind') == 'Gene':
+                        for neighbor in self.G.neighbors(gene_node):
+                            if neighbor == node:
+                                edge_data = self.G.get_edge_data(gene_node, neighbor)
+                                if edge_data:
+                                    relation = edge_data.get('metaedge', '')
+                                    if relation == 'GeA':
+                                        all_results.append((gene_node, 1, 'Expression-Reverse'))
+                                        print(f"      ✅ {gene_attrs['name']} - بیان معکوس (GeA)")
+                
+                # جستجوی عمیق با فیلتر
+                dfs_result = self.dfs_search(node, max_depth, relation_filter='AeG')
+                for n, depth in dfs_result:
+                    if self.G.nodes[n]['kind'] == 'Gene':
+                        all_results.append((n, depth, 'Expression-DFS'))
+                        print(f"      ✅ {self.G.nodes[n]['name']} - عمق {depth}")
+            
+            elif node_kind in ['Gene', 'Disease']:
                 # برای ژن‌ها و بیماری‌ها از BFS و همسایه‌ها
+                print(f"    🧬 استفاده از BFS برای {node_name}")
                 bfs_result = self.bfs_search(node, max_depth)
                 for n, depth in bfs_result:
                     all_results.append((n, depth, 'BFS'))
@@ -605,12 +1324,14 @@ class GraphRAGService:
             
             elif node_kind in ['Drug', 'Compound']:
                 # برای داروها از DFS و کوتاه‌ترین مسیر
+                print(f"    💊 استفاده از DFS برای {node_name}")
                 dfs_result = self.dfs_search(node, max_depth)
                 for n, depth in dfs_result:
                     all_results.append((n, depth, 'DFS'))
             
-            elif node_kind in ['Anatomy', 'Biological Process']:
-                # برای آناتومی و فرآیندهای زیستی از همه روش‌ها
+            elif node_kind in ['Biological Process', 'Pathway']:
+                # برای فرآیندهای زیستی از همه روش‌ها
+                print(f"    ⚙️ استفاده از روش‌های ترکیبی برای {node_name}")
                 bfs_result = self.bfs_search(node, max_depth)
                 for n, depth in bfs_result:
                     all_results.append((n, depth, 'BFS'))
@@ -621,19 +1342,42 @@ class GraphRAGService:
             
             else:
                 # برای بقیه از روش ترکیبی
+                print(f"    🔄 استفاده از روش ترکیبی برای {node_name}")
                 hybrid_result = self.hybrid_search([node], max_depth)
                 for n, depth in hybrid_result:
                     all_results.append((n, depth, 'Hybrid'))
         
-        # حذف تکراری‌ها
+        # حذف تکراری‌ها و امتیازدهی
         unique_results = {}
         for node, depth, method in all_results:
             if node not in unique_results:
-                unique_results[node] = (depth, method)
-            elif depth < unique_results[node][0]:
-                unique_results[node] = (depth, method)
+                unique_results[node] = (depth, method, 1)
+            else:
+                # افزایش امتیاز برای تکرار
+                unique_results[node] = (min(depth, unique_results[node][0]), 
+                                      method, unique_results[node][2] + 1)
         
-        return [(node, depth, method) for node, (depth, method) in unique_results.items()]
+        # مرتب‌سازی بر اساس عمق و امتیاز
+        sorted_results = []
+        for node, (depth, method, count) in unique_results.items():
+            # امتیازدهی بر اساس روش
+            method_score = {
+                'Expression-Direct': 5.0,
+                'Expression-Reverse': 4.5,
+                'Expression-DFS': 4.0,
+                'BFS': 3.5,
+                'DFS': 3.0,
+                'Neighbors': 2.5,
+                'Hybrid': 2.0
+            }.get(method, 1.0)
+            
+            final_score = method_score * (1 + 0.1 * count) / (depth + 1)
+            sorted_results.append((node, depth, method, final_score))
+        
+        # مرتب‌سازی بر اساس امتیاز نهایی
+        sorted_results.sort(key=lambda x: x[3], reverse=True)
+        
+        return [(node, depth, method) for node, depth, method, score in sorted_results]
     
     def retrieve_information(self, query: str, method: RetrievalMethod, 
                            max_depth: int = 2, max_nodes: int = 10) -> RetrievalResult:
@@ -746,9 +1490,9 @@ class GraphRAGService:
                 ))
         
         elif method == RetrievalMethod.ADAPTIVE:
-            # جستجوی تطبیقی
+            # جستجوی تطبیقی با پاس دادن query
             node_ids = list(matches.values())
-            adaptive_result = self.adaptive_search(node_ids, max_depth)
+            adaptive_result = self.adaptive_search(node_ids, max_depth, query)
             for node, depth, method in adaptive_result[:max_nodes]:
                 nodes.append(GraphNode(
                     id=node,
@@ -821,8 +1565,16 @@ class GraphRAGService:
                         relation=edge_data['metaedge']
                     ))
         
-        # ایجاد متن زمینه
-        context_text = self.create_context_text(nodes, edges, paths)
+        # ایجاد متن زمینه بهبود یافته
+        retrieval_result = RetrievalResult(
+            nodes=nodes,
+            edges=edges,
+            paths=paths,
+            context_text="",
+            method=method.value,
+            query=query
+        )
+        context_text = self._create_enhanced_context_text(retrieval_result)
         
         return RetrievalResult(
             nodes=nodes,
@@ -835,79 +1587,734 @@ class GraphRAGService:
     
     def create_context_text(self, nodes: List[GraphNode], edges: List[GraphEdge], 
                            paths: List[List[str]]) -> str:
-        """ایجاد متن زمینه بهبود یافته از نتایج بازیابی"""
+        """ایجاد متن زمینه بهبود یافته با اطلاعات زیستی غنی شده"""
+        # استفاده از تابع جدید برای غنی‌سازی
+        retrieval_result = RetrievalResult(
+            nodes=nodes,
+            edges=edges,
+            paths=paths,
+            context_text="",
+            method="Enhanced",
+            query=""
+        )
+        return self._create_enhanced_context_text(retrieval_result)
+    
+    def _enrich_retrieved_data(self, nodes: List[GraphNode], edges: List[GraphEdge], query: str) -> Dict[str, Any]:
+        """
+        غنی‌سازی داده‌های بازیابی شده با اطلاعات زیستی و روابط معنادار
+        """
+        enriched_data = {
+            'biological_context': {},
+            'relationship_details': [],
+            'tissue_specific_info': {},
+            'gene_functions': {},
+            'disease_associations': {},
+            'pathway_information': {}
+        }
+        
+        # 1. استخراج اطلاعات بافت‌محور
+        anatomy_nodes = [n for n in nodes if n.kind == 'Anatomy']
+        gene_nodes = [n for n in nodes if n.kind == 'Gene']
+        
+        for anatomy in anatomy_nodes:
+            enriched_data['tissue_specific_info'][anatomy.name] = {
+                'genes_expressed': [],
+                'genes_upregulated': [],
+                'genes_downregulated': [],
+                'biological_significance': self._get_anatomy_significance(anatomy.name)
+            }
+            
+            # یافتن ژن‌های مرتبط با این بافت
+            for edge in edges:
+                if edge.source == anatomy.id and edge.target in [g.id for g in gene_nodes]:
+                    gene_name = next((g.name for g in gene_nodes if g.id == edge.target), edge.target)
+                    if edge.relation == 'AeG':
+                        enriched_data['tissue_specific_info'][anatomy.name]['genes_expressed'].append(gene_name)
+                    elif edge.relation == 'AuG':
+                        enriched_data['tissue_specific_info'][anatomy.name]['genes_upregulated'].append(gene_name)
+                    elif edge.relation == 'AdG':
+                        enriched_data['tissue_specific_info'][anatomy.name]['genes_downregulated'].append(gene_name)
+        
+        # 2. استخراج اطلاعات عملکرد ژن‌ها
+        for gene in gene_nodes:
+            enriched_data['gene_functions'][gene.name] = {
+                'biological_processes': [],
+                'molecular_functions': [],
+                'cellular_components': [],
+                'pathways': [],
+                'disease_associations': []
+            }
+            
+            # یافتن فرآیندهای زیستی مرتبط
+            for edge in edges:
+                if edge.source == gene.id:
+                    target_node = next((n for n in nodes if n.id == edge.target), None)
+                    if target_node:
+                        if edge.relation == 'GpBP':
+                            enriched_data['gene_functions'][gene.name]['biological_processes'].append(target_node.name)
+                        elif edge.relation == 'GpMF':
+                            enriched_data['gene_functions'][gene.name]['molecular_functions'].append(target_node.name)
+                        elif edge.relation == 'GpCC':
+                            enriched_data['gene_functions'][gene.name]['cellular_components'].append(target_node.name)
+                        elif edge.relation == 'GpPW':
+                            enriched_data['gene_functions'][gene.name]['pathways'].append(target_node.name)
+                        elif edge.relation == 'DaG':
+                            enriched_data['gene_functions'][gene.name]['disease_associations'].append(target_node.name)
+        
+        # 3. ایجاد متن توصیفی زیستی
+        enriched_data['biological_context'] = self._create_biological_context(enriched_data, query)
+        
+        return enriched_data
+    
+    def _get_anatomy_significance(self, anatomy_name: str) -> str:
+        """
+        دریافت اهمیت زیستی بافت‌ها
+        """
+        significance_map = {
+            'heart': 'عضله قلب، مسئول پمپاژ خون و عملکرد سیستم قلبی-عروقی',
+            'brain': 'مرکز کنترل سیستم عصبی، مسئول تفکر، حافظه و عملکردهای شناختی',
+            'liver': 'مرکز متابولیسم بدن، مسئول سم‌زدایی و تولید پروتئین‌های ضروری',
+            'kidney': 'تصفیه خون و تنظیم تعادل الکترولیت‌ها',
+            'lung': 'تبادل گازهای تنفسی و اکسیژن‌رسانی به بدن',
+            'muscle': 'حرکت و انقباض، تولید انرژی و حفظ وضعیت بدن',
+            'blood': 'انتقال مواد مغذی، اکسیژن و سلول‌های ایمنی',
+            'skin': 'محافظت از بدن، تنظیم دما و حس لمس'
+        }
+        return significance_map.get(anatomy_name.lower(), f'بافت {anatomy_name} با عملکردهای زیستی متعدد')
+    
+    def _create_biological_context(self, enriched_data: Dict, query: str) -> str:
+        """
+        ایجاد متن توصیفی زیستی بر اساس داده‌های غنی شده
+        """
         context_parts = []
         
-        # دسته‌بندی نودها بر اساس نوع
-        nodes_by_type = {}
-        for node in nodes:
-            if node.kind not in nodes_by_type:
-                nodes_by_type[node.kind] = []
-            nodes_by_type[node.kind].append(node)
+        # تحلیل بافت‌های موجود
+        for tissue, info in enriched_data['tissue_specific_info'].items():
+            if info['genes_expressed'] or info['genes_upregulated'] or info['genes_downregulated']:
+                context_parts.append(f"**{tissue}:** {info['biological_significance']}")
+                
+                if info['genes_expressed']:
+                    context_parts.append(f"ژن‌های بیان شده: {', '.join(info['genes_expressed'][:5])}")
+                if info['genes_upregulated']:
+                    context_parts.append(f"ژن‌های تنظیم مثبت: {', '.join(info['genes_upregulated'][:3])}")
+                if info['genes_downregulated']:
+                    context_parts.append(f"ژن‌های تنظیم منفی: {', '.join(info['genes_downregulated'][:3])}")
+                context_parts.append("")
         
-        # اطلاعات نودها به صورت دسته‌بندی شده
-        context_parts.append("📊 ENTITIES FOUND IN KNOWLEDGE GRAPH:")
-        context_parts.append("=" * 50)
+        # تحلیل عملکرد ژن‌ها
+        for gene, functions in enriched_data['gene_functions'].items():
+            if any(functions.values()):
+                context_parts.append(f"**{gene}:**")
+                if functions['biological_processes']:
+                    context_parts.append(f"فرآیندهای زیستی: {', '.join(functions['biological_processes'][:3])}")
+                if functions['pathways']:
+                    context_parts.append(f"مسیرهای زیستی: {', '.join(functions['pathways'][:3])}")
+                if functions['disease_associations']:
+                    context_parts.append(f"ارتباط با بیماری‌ها: {', '.join(functions['disease_associations'][:3])}")
+                context_parts.append("")
         
-        for kind, kind_nodes in nodes_by_type.items():
-            context_parts.append(f"\n🔹 {kind.upper()} ({len(kind_nodes)} entities):")
-            for node in kind_nodes:
-                score_info = f" [Score: {node.score:.2f}]" if hasattr(node, 'score') and node.score != 1.0 else ""
-                depth_info = f" [Depth: {node.depth}]" if node.depth > 0 else ""
-                context_parts.append(f"  • {node.name}{score_info}{depth_info}")
+        return "\n".join(context_parts) if context_parts else "اطلاعات زیستی محدودی در دسترس است."
+    
+    def _create_enhanced_context_text(self, retrieval_result: RetrievalResult) -> str:
+        """
+        ایجاد متن زمینه خلاصه و کاربردی
+        """
+        # استفاده از روش جدید بازیابی هدفمند
+        intent = self.analyze_question_intent(retrieval_result.query)
+        retrieval_data = self._targeted_retrieval_for_question(retrieval_result.query, intent)
         
-        # روابط با جزئیات بیشتر
-        if edges:
-            context_parts.append(f"\n🔗 RELATIONSHIPS ({len(edges)} connections):")
-            context_parts.append("=" * 50)
-            
-            # دسته‌بندی روابط بر اساس نوع
-            relations_by_type = {}
-            for edge in edges:
-                if edge.relation not in relations_by_type:
-                    relations_by_type[edge.relation] = []
-                relations_by_type[edge.relation].append(edge)
-            
-            for relation, relation_edges in relations_by_type.items():
-                context_parts.append(f"\n📌 {relation.upper()} ({len(relation_edges)} connections):")
-                for edge in relation_edges[:10]:  # حداکثر 10 رابطه از هر نوع
-                    source_name = next(n.name for n in nodes if n.id == edge.source)
-                    target_name = next(n.name for n in nodes if n.id == edge.target)
-                    source_kind = next(n.kind for n in nodes if n.id == edge.source)
-                    target_kind = next(n.kind for n in nodes if n.id == edge.target)
-                    context_parts.append(f"  • {source_name} ({source_kind}) → {target_name} ({target_kind})")
+        # ایجاد متن ساختاریافته خلاصه
+        structured_text = self._create_structured_text_for_model(retrieval_data, retrieval_result.query)
         
-        # مسیرهای مهم
-        if paths:
-            context_parts.append(f"\n🛤️ IMPORTANT PATHS ({len(paths)} paths):")
-            context_parts.append("=" * 50)
-            for i, path in enumerate(paths[:5], 1):  # حداکثر 5 مسیر
-                path_names = [self.G.nodes[node]['name'] for node in path]
-                path_kinds = [self.G.nodes[node]['kind'] for node in path]
-                context_parts.append(f"\nPath {i} ({len(path)} steps):")
-                for j, (name, kind) in enumerate(zip(path_names, path_kinds)):
-                    context_parts.append(f"  {j+1}. {name} ({kind})")
+        # اضافه کردن اطلاعات آماری کوتاه
+        context_parts = []
+        context_parts.append("📊 **آمار بازیابی:**")
+        context_parts.append(f"• نودها: {len(retrieval_result.nodes)}, روابط: {len(retrieval_result.edges)}")
+        context_parts.append(f"• ژن‌های اصلی: {len(retrieval_data['primary_genes'])}")
+        context_parts.append("")
         
-        # آمار کلی
-        context_parts.append(f"\n📈 SUMMARY:")
-        context_parts.append("=" * 50)
-        context_parts.append(f"• Total entities: {len(nodes)}")
-        context_parts.append(f"• Total relationships: {len(edges)}")
-        context_parts.append(f"• Entity types: {len(nodes_by_type)}")
-        context_parts.append(f"• Relationship types: {len(set(e.relation for e in edges))}")
-        if paths:
-            context_parts.append(f"• Important paths: {len(paths)}")
-        
-        # راهنمای تفسیر
-        context_parts.append(f"\n💡 INTERPRETATION GUIDE:")
-        context_parts.append("=" * 50)
-        context_parts.append("• Genes often participate in biological processes")
-        context_parts.append("• Drugs can treat diseases and interact with genes")
-        context_parts.append("• Diseases are associated with specific genes and symptoms")
-        context_parts.append("• Anatomy expresses genes and can be affected by diseases")
-        context_parts.append("• Compounds can interact with genes and biological processes")
+        # اضافه کردن متن ساختاریافته
+        context_parts.append("🧬 **داده‌های کلیدی:**")
+        context_parts.append(structured_text)
         
         return "\n".join(context_parts)
+    
+    def _targeted_retrieval_for_question(self, query: str, intent: Dict) -> Dict[str, Any]:
+        """
+        بازیابی هدفمند بر اساس نوع سوال و metaedge های مرتبط
+        """
+        matched_nodes = self.match_tokens_to_nodes(self.extract_keywords(query))
+        question_type = intent.get('question_type', 'general')
+        
+        retrieval_data = {
+            'primary_genes': [],
+            'secondary_genes': [],
+            'biological_processes': [],
+            'pathways': [],
+            'diseases': [],
+            'drugs': [],
+            'anatomy': [],
+            'metaedges_used': [],
+            'relationships': []
+        }
+        
+        # تعیین metaedge های هدف بر اساس نوع سوال
+        target_metaedges = self._get_target_metaedges_for_question(question_type, query)
+        retrieval_data['metaedges_used'] = target_metaedges
+        
+        print(f"🎯 بازیابی هدفمند برای سوال: {question_type}")
+        print(f"📋 Metaedge های هدف: {target_metaedges}")
+        
+        # بازیابی اولیه بر اساس metaedge های اصلی
+        for metaedge in target_metaedges:
+            results = self._search_by_metaedges(matched_nodes, intent, [metaedge], max_depth=2)
+            
+            for node_id, depth, score, explanation in results:
+                node_name = self.G.nodes[node_id]['name']
+                node_kind = self.G.nodes[node_id]['kind']
+                
+                # دسته‌بندی نتایج بر اساس نوع
+                if node_kind == 'Gene':
+                    if metaedge in ['AeG', 'AuG', 'AdG', 'DaG', 'DuG', 'DdG']:
+                        retrieval_data['primary_genes'].append({
+                            'name': node_name,
+                            'metaedge': metaedge,
+                            'score': score,
+                            'explanation': explanation
+                        })
+                    else:
+                        retrieval_data['secondary_genes'].append({
+                            'name': node_name,
+                            'metaedge': metaedge,
+                            'score': score,
+                            'explanation': explanation
+                        })
+                elif node_kind == 'Biological Process':
+                    retrieval_data['biological_processes'].append({
+                        'name': node_name,
+                        'metaedge': metaedge,
+                        'score': score
+                    })
+                elif node_kind == 'Pathway':
+                    retrieval_data['pathways'].append({
+                        'name': node_name,
+                        'metaedge': metaedge,
+                        'score': score
+                    })
+                elif node_kind == 'Disease':
+                    retrieval_data['diseases'].append({
+                        'name': node_name,
+                        'metaedge': metaedge,
+                        'score': score
+                    })
+                elif node_kind == 'Compound':
+                    retrieval_data['drugs'].append({
+                        'name': node_name,
+                        'metaedge': metaedge,
+                        'score': score
+                    })
+                elif node_kind == 'Anatomy':
+                    retrieval_data['anatomy'].append({
+                        'name': node_name,
+                        'metaedge': metaedge,
+                        'score': score
+                    })
+        
+        # غنی‌سازی با اطلاعات اضافی برای ژن‌های اصلی
+        retrieval_data = self._enrich_primary_genes(retrieval_data)
+        
+        # برای سوالات مربوط به اثر بیماری بر بافت‌ها، مسیرهای ترکیبی را اضافه کن
+        if 'DlA' in target_metaedges:
+            retrieval_data = self._add_tissue_disease_paths(retrieval_data, matched_nodes)
+        
+        # برای سوالات مربوط به درمان بیماری، مسیرهای درمانی را اضافه کن
+        if 'CtD' in target_metaedges:
+            retrieval_data = self._add_treatment_paths(retrieval_data, matched_nodes)
+        
+        return retrieval_data
+    
+    def _add_tissue_disease_paths(self, retrieval_data: Dict[str, Any], matched_nodes: Dict[str, str]) -> Dict[str, Any]:
+        """
+        اضافه کردن مسیرهای ترکیبی بیماری→بافت→ژن برای سوالات مربوط به اثر بیماری بر بافت‌ها
+        """
+        tissue_disease_paths = []
+        
+        # یافتن بیماری‌ها در matched_nodes
+        disease_nodes = []
+        for token, node_id in matched_nodes.items():
+            node_attrs = self.G.nodes[node_id]
+            if node_attrs.get('kind') == 'Disease':
+                disease_nodes.append((node_id, node_attrs['name']))
+        
+        # برای هر بیماری، بافت‌های مرتبط و ژن‌های بیان شده در آن بافت‌ها را پیدا کن
+        for disease_id, disease_name in disease_nodes:
+            # یافتن بافت‌های مرتبط با بیماری (DlA)
+            for neighbor in self.G.neighbors(disease_id):
+                neighbor_attrs = self.G.nodes[neighbor]
+                edge_data = self.G.get_edge_data(disease_id, neighbor)
+                
+                if edge_data and edge_data.get('metaedge') == 'DlA' and neighbor_attrs.get('kind') == 'Anatomy':
+                    tissue_name = neighbor_attrs['name']
+                    tissue_id = neighbor
+                    
+                    # یافتن ژن‌های بیان شده در این بافت (AeG)
+                    tissue_genes = []
+                    for gene_neighbor in self.G.neighbors(tissue_id):
+                        gene_attrs = self.G.nodes[gene_neighbor]
+                        gene_edge_data = self.G.get_edge_data(tissue_id, gene_neighbor)
+                        
+                        if gene_edge_data and gene_edge_data.get('metaedge') == 'AeG' and gene_attrs.get('kind') == 'Gene':
+                            gene_name = gene_attrs['name']
+                            
+                            # یافتن فرآیندهای زیستی مرتبط با این ژن (GpBP)
+                            biological_processes = []
+                            for bp_neighbor in self.G.neighbors(gene_neighbor):
+                                bp_attrs = self.G.nodes[bp_neighbor]
+                                bp_edge_data = self.G.get_edge_data(gene_neighbor, bp_neighbor)
+                                
+                                if bp_edge_data and bp_edge_data.get('metaedge') == 'GpBP' and bp_attrs.get('kind') == 'Biological Process':
+                                    biological_processes.append(bp_attrs['name'])
+                            
+                            tissue_genes.append({
+                                'gene_name': gene_name,
+                                'biological_processes': biological_processes[:2]  # حداکثر 2 فرآیند
+                            })
+                    
+                    # اضافه کردن مسیر کامل
+                    if tissue_genes:
+                        tissue_disease_paths.append({
+                            'disease': disease_name,
+                            'tissue': tissue_name,
+                            'genes': tissue_genes[:3]  # حداکثر 3 ژن
+                        })
+        
+        retrieval_data['tissue_disease_paths'] = tissue_disease_paths
+        return retrieval_data
+    
+    def _add_treatment_paths(self, retrieval_data: Dict[str, Any], matched_nodes: Dict[str, str]) -> Dict[str, Any]:
+        """
+        اضافه کردن مسیرهای درمانی Compound→Disease→Gene برای سوالات مربوط به درمان
+        """
+        treatment_paths = []
+        
+        # یافتن بیماری‌ها در matched_nodes
+        disease_nodes = []
+        for token, node_id in matched_nodes.items():
+            node_attrs = self.G.nodes[node_id]
+            if node_attrs.get('kind') == 'Disease':
+                disease_nodes.append((node_id, node_attrs['name']))
+        
+        # برای هر بیماری، داروهای درمانی و ژن‌های مرتبط را پیدا کن
+        for disease_id, disease_name in disease_nodes:
+            # یافتن داروهای درمانی (CtD)
+            for neighbor in self.G.neighbors(disease_id):
+                neighbor_attrs = self.G.nodes[neighbor]
+                edge_data = self.G.get_edge_data(disease_id, neighbor)
+                
+                if edge_data and edge_data.get('metaedge') == 'CtD' and neighbor_attrs.get('kind') == 'Compound':
+                    drug_name = neighbor_attrs['name']
+                    drug_id = neighbor
+                    
+                    # یافتن ژن‌های تنظیم شده توسط این دارو (CuG, CdG)
+                    drug_genes = []
+                    for gene_neighbor in self.G.neighbors(drug_id):
+                        gene_attrs = self.G.nodes[gene_neighbor]
+                        gene_edge_data = self.G.get_edge_data(drug_id, gene_neighbor)
+                        
+                        if gene_edge_data and gene_edge_data.get('metaedge') in ['CuG', 'CdG'] and gene_attrs.get('kind') == 'Gene':
+                            gene_name = gene_attrs['name']
+                            
+                            # یافتن فرآیندهای زیستی مرتبط با این ژن (GpBP)
+                            biological_processes = []
+                            for bp_neighbor in self.G.neighbors(gene_neighbor):
+                                bp_attrs = self.G.nodes[bp_neighbor]
+                                bp_edge_data = self.G.get_edge_data(gene_neighbor, bp_neighbor)
+                                
+                                if bp_edge_data and bp_edge_data.get('metaedge') == 'GpBP' and bp_attrs.get('kind') == 'Biological Process':
+                                    biological_processes.append(bp_attrs['name'])
+                            
+                            drug_genes.append({
+                                'gene_name': gene_name,
+                                'regulation': gene_edge_data.get('metaedge'),
+                                'biological_processes': biological_processes[:2]  # حداکثر 2 فرآیند
+                            })
+                    
+                    # اضافه کردن مسیر کامل
+                    if drug_genes:
+                        treatment_paths.append({
+                            'disease': disease_name,
+                            'drug': drug_name,
+                            'genes': drug_genes[:3]  # حداکثر 3 ژن
+                        })
+        
+        retrieval_data['treatment_paths'] = treatment_paths
+        return retrieval_data
+    
+    def _get_target_metaedges_for_question(self, question_type: str, query: str) -> List[str]:
+        """
+        تعیین metaedge های هدف بر اساس نوع سوال
+        """
+        query_lower = query.lower()
+        
+        # سوالات مربوط به بیان ژن در بافت‌ها
+        if any(word in query_lower for word in ['expressed', 'express', 'expression']):
+            if any(word in query_lower for word in ['heart', 'cardiac', 'myocardium']):
+                return ['AeG', 'AuG', 'AdG']  # بیان، تنظیم مثبت، تنظیم منفی
+            elif any(word in query_lower for word in ['brain', 'neural', 'cerebral']):
+                return ['AeG', 'AuG', 'AdG']
+            elif any(word in query_lower for word in ['liver', 'hepatic']):
+                return ['AeG', 'AuG', 'AdG']
+            else:
+                return ['AeG', 'AuG', 'AdG']
+        
+        # سوالات مربوط به ژن‌ها و بیماری‌ها
+        elif any(word in query_lower for word in ['disease', 'cancer', 'diabetes', 'alzheimer']):
+            # بررسی سوالات مربوط به اثر بیماری بر بافت‌ها
+            if any(word in query_lower for word in ['tissue', 'tissues', 'affect', 'effect', 'localize']):
+                return ['DlA', 'DuG', 'DdG', 'AeG', 'AuG', 'AdG', 'GpBP']  # بیماری→بافت، تنظیم ژن، بیان ژن، فرآیند زیستی
+            else:
+                return ['DaG', 'DuG', 'DdG']  # مرتبط، تنظیم مثبت، تنظیم منفی
+        
+        # سوالات مربوط به داروها و درمان
+        elif any(word in query_lower for word in ['drug', 'treat', 'compound', 'medication']):
+            return ['CtD', 'CuG', 'CdG', 'CbG']  # درمان، تنظیم مثبت، تنظیم منفی، اتصال
+        
+        # سوالات مربوط به فرآیندهای زیستی
+        elif any(word in query_lower for word in ['process', 'function', 'biological']):
+            return ['GpBP', 'GpMF', 'GpCC']  # فرآیند، عملکرد، اجزای سلولی
+        
+        # سوالات مربوط به مسیرهای زیستی
+        elif any(word in query_lower for word in ['pathway', 'signaling', 'metabolism']):
+            return ['GpPW']  # مسیرهای زیستی
+        
+        # سوالات مربوط به تعامل ژن‌ها
+        elif any(word in query_lower for word in ['interact', 'regulate', 'covary']):
+            return ['GiG', 'Gr>G', 'GcG']  # تعامل، تنظیم، همبستگی
+        
+        # سوالات مربوط به علائم و عوارض
+        elif any(word in query_lower for word in ['symptom', 'side effect', 'adverse']):
+            return ['DpS', 'CcSE']  # علائم بیماری، عوارض جانبی
+        
+        # سوالات پیچیده و چندمرحله‌ای
+        else:
+            return ['AeG', 'DaG', 'GpBP', 'GpPW', 'GiG']  # ترکیبی از روابط مهم
+    
+    def _enrich_primary_genes(self, retrieval_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        غنی‌سازی ژن‌های اصلی با اطلاعات اضافی
+        """
+        enriched_genes = []
+        
+        for gene_info in retrieval_data['primary_genes']:
+            gene_name = gene_info['name']
+            gene_id = None
+            
+            # یافتن ID ژن
+            for node_id, attrs in self.G.nodes(data=True):
+                if attrs.get('name') == gene_name and attrs.get('kind') == 'Gene':
+                    gene_id = node_id
+                    break
+            
+            if gene_id:
+                enriched_gene = {
+                    **gene_info,
+                    'biological_processes': [],
+                    'pathways': [],
+                    'diseases': [],
+                    'interacting_genes': [],
+                    'molecular_functions': [],
+                    'cellular_components': []
+                }
+                
+                # یافتن فرآیندهای زیستی مرتبط
+                for neighbor in self.G.neighbors(gene_id):
+                    neighbor_attrs = self.G.nodes[neighbor]
+                    edge_data = self.G.get_edge_data(gene_id, neighbor)
+                    
+                    if edge_data:
+                        metaedge = edge_data.get('metaedge', '')
+                        
+                        if metaedge == 'GpBP' and neighbor_attrs.get('kind') == 'Biological Process':
+                            enriched_gene['biological_processes'].append(neighbor_attrs['name'])
+                        elif metaedge == 'GpPW' and neighbor_attrs.get('kind') == 'Pathway':
+                            enriched_gene['pathways'].append(neighbor_attrs['name'])
+                        elif metaedge == 'DaG' and neighbor_attrs.get('kind') == 'Disease':
+                            enriched_gene['diseases'].append(neighbor_attrs['name'])
+                        elif metaedge == 'GiG' and neighbor_attrs.get('kind') == 'Gene':
+                            enriched_gene['interacting_genes'].append(neighbor_attrs['name'])
+                        elif metaedge == 'GpMF' and neighbor_attrs.get('kind') == 'Molecular Function':
+                            enriched_gene['molecular_functions'].append(neighbor_attrs['name'])
+                        elif metaedge == 'GpCC' and neighbor_attrs.get('kind') == 'Cellular Component':
+                            enriched_gene['cellular_components'].append(neighbor_attrs['name'])
+                
+                enriched_genes.append(enriched_gene)
+        
+        retrieval_data['primary_genes'] = enriched_genes
+        return retrieval_data
+    
+    def _create_structured_text_for_model(self, retrieval_data: Dict[str, Any], query: str) -> str:
+        """
+        ایجاد متن ساختاریافته بهبود یافته برای ارسال به مدل زبانی
+        """
+        context_parts = []
+        
+        # 1. سوال اصلی
+        context_parts.append(f"🧬 **Query:** {query}")
+        context_parts.append("")
+        
+        # 2. خلاصه آماری دقیق
+        total_genes_in_graph = 14010  # تعداد کل ژن‌ها در Hetionet
+        primary_genes = len(retrieval_data['primary_genes'])
+        secondary_genes = len(retrieval_data['secondary_genes'])
+        total_found = primary_genes + secondary_genes
+        
+        context_parts.append("📊 **Graph Summary:**")
+        context_parts.append(f"• Total genes in Hetionet: {total_genes_in_graph:,}")
+        context_parts.append(f"• Genes found for this query: {total_found}")
+        context_parts.append(f"• Primary genes (direct relationships): {primary_genes}")
+        context_parts.append(f"• Secondary genes (indirect relationships): {secondary_genes}")
+        
+        # نمایش روابط استفاده شده
+        if retrieval_data['metaedges_used']:
+            metaedge_descriptions = {
+                'AeG': 'Anatomy–expresses–Gene',
+                'AuG': 'Anatomy–upregulates–Gene',
+                'AdG': 'Anatomy–downregulates–Gene',
+                'DaG': 'Disease–associates–Gene',
+                'DuG': 'Disease–upregulates–Gene',
+                'DdG': 'Disease–downregulates–Gene',
+                'CtD': 'Compound–treats–Disease',
+                'CuG': 'Compound–upregulates–Gene',
+                'CdG': 'Compound–downregulates–Gene',
+                'CbG': 'Compound–binds–Gene',
+                'GpBP': 'Gene–participates–Biological Process',
+                'GpPW': 'Gene–participates–Pathway',
+                'GpMF': 'Gene–participates–Molecular Function',
+                'GpCC': 'Gene–participates–Cellular Component',
+                'GiG': 'Gene–interacts–Gene',
+                'Gr>G': 'Gene–regulates–Gene',
+                'GcG': 'Gene–covaries–Gene',
+                'DpS': 'Disease–presents–Symptom',
+                'DlA': 'Disease–localizes–Anatomy',
+                'CcSE': 'Compound–causes–Side Effect'
+            }
+            
+            relationships_used = []
+            for metaedge in retrieval_data['metaedges_used']:
+                desc = metaedge_descriptions.get(metaedge, metaedge)
+                relationships_used.append(f"{metaedge}: {desc}")
+            
+            context_parts.append(f"• Relationships used: {len(retrieval_data['metaedges_used'])} ({', '.join(relationships_used)})")
+        
+        context_parts.append("")
+        
+        # 3. ژن‌های کلیدی با اطلاعات غنی (حداکثر 3 ژن)
+        if retrieval_data['primary_genes']:
+            context_parts.append("🔍 **Key Results:**")
+            context_parts.append("The following genes were identified:")
+            context_parts.append("")
+            
+            for gene in retrieval_data['primary_genes'][:3]:  # حداکثر 3 ژن
+                relation_desc = {
+                    'AeG': 'expressed in',
+                    'AuG': 'upregulated in',
+                    'AdG': 'downregulated in',
+                    'DaG': 'associated with disease',
+                    'DuG': 'upregulated in disease',
+                    'DdG': 'downregulated in disease'
+                }.get(gene['metaedge'], gene['metaedge'])
+                
+                # اطلاعات اصلی ژن (خلاصه‌تر)
+                gene_info = f"• **{gene['name']}** – {relation_desc}"
+                
+                # اضافه کردن مهم‌ترین اطلاعات زیستی
+                if gene.get('biological_processes'):
+                    gene_info += f" ({gene['biological_processes'][0]})"
+                elif gene.get('diseases'):
+                    gene_info += f" ({gene['diseases'][0]})"
+                elif gene.get('pathways'):
+                    gene_info += f" ({gene['pathways'][0]})"
+                
+                context_parts.append(gene_info)
+            context_parts.append("")
+        
+        # 4. فرآیندهای زیستی مرتبط
+        if retrieval_data['biological_processes']:
+            context_parts.append("⚙️ **Related Biological Processes:**")
+            for process in retrieval_data['biological_processes'][:3]:
+                context_parts.append(f"• {process['name']}")
+            context_parts.append("")
+        
+        # 5. مسیرهای زیستی مرتبط
+        if retrieval_data['pathways']:
+            context_parts.append("🛤️ **Related Pathways:**")
+            for pathway in retrieval_data['pathways'][:3]:
+                context_parts.append(f"• {pathway['name']}")
+            context_parts.append("")
+        
+        # 6. بیماری‌های مرتبط
+        if retrieval_data['diseases']:
+            context_parts.append("🏥 **Related Diseases:**")
+            for disease in retrieval_data['diseases'][:3]:
+                context_parts.append(f"• {disease['name']}")
+            context_parts.append("")
+        
+        # 7. داروهای مرتبط
+        if retrieval_data['drugs']:
+            context_parts.append("💊 **Related Drugs/Compounds:**")
+            for drug in retrieval_data['drugs'][:3]:
+                context_parts.append(f"• {drug['name']}")
+            context_parts.append("")
+        
+        # 8. مسیرهای ترکیبی بیماری→بافت→ژن (برای سوالات مربوط به اثر بیماری بر بافت‌ها)
+        if retrieval_data.get('tissue_disease_paths'):
+            context_parts.append("🔄 **Disease-Tissue-Gene Pathways:**")
+            context_parts.append("The following pathways show how diseases affect specific tissues and their genes:")
+            context_parts.append("")
+            
+            for path in retrieval_data['tissue_disease_paths'][:3]:  # حداکثر 3 مسیر
+                context_parts.append(f"• **{path['disease']}** → affects → **{path['tissue']}**")
+                for gene_info in path['genes']:
+                    gene_desc = f"  - **{gene_info['gene_name']}**"
+                    if gene_info['biological_processes']:
+                        gene_desc += f" ({gene_info['biological_processes'][0]})"
+                    context_parts.append(gene_desc)
+                context_parts.append("")
+        
+        # 9. مسیرهای درمانی دارو→بیماری→ژن (برای سوالات مربوط به درمان)
+        if retrieval_data.get('treatment_paths'):
+            context_parts.append("💊 **Treatment-Disease-Gene Pathways:**")
+            context_parts.append("The following pathways show how drugs treat diseases by regulating genes:")
+            context_parts.append("")
+            
+            for path in retrieval_data['treatment_paths'][:3]:  # حداکثر 3 مسیر
+                context_parts.append(f"• **{path['drug']}** → treats → **{path['disease']}**")
+                for gene_info in path['genes']:
+                    regulation = "upregulates" if gene_info['regulation'] == 'CuG' else "downregulates"
+                    gene_desc = f"  - **{gene_info['gene_name']}** ({regulation})"
+                    if gene_info['biological_processes']:
+                        gene_desc += f" ({gene_info['biological_processes'][0]})"
+                    context_parts.append(gene_desc)
+                context_parts.append("")
+        
+        # 10. دستورالعمل کوتاه و کاربردی
+        context_parts.append("📌 **Instructions:** Analyze biological relevance and clinical importance of these genes.")
+        
+        return "\n".join(context_parts)
+    
+    def test_targeted_retrieval(self, query: str) -> Dict[str, Any]:
+        """
+        تست بازیابی هدفمند و نمایش نتایج
+        """
+        print(f"🧪 تست بازیابی هدفمند برای سوال: {query}")
+        print("=" * 60)
+        
+        # تحلیل سوال
+        intent = self.analyze_question_intent(query)
+        print(f"📋 نوع سوال تشخیص داده شده: {intent.get('question_type', 'unknown')}")
+        
+        # بازیابی هدفمند
+        retrieval_data = self._targeted_retrieval_for_question(query, intent)
+        
+        # نمایش نتایج
+        print(f"\n📊 نتایج بازیابی:")
+        print(f"• ژن‌های اصلی: {len(retrieval_data['primary_genes'])}")
+        print(f"• ژن‌های ثانویه: {len(retrieval_data['secondary_genes'])}")
+        print(f"• فرآیندهای زیستی: {len(retrieval_data['biological_processes'])}")
+        print(f"• مسیرهای زیستی: {len(retrieval_data['pathways'])}")
+        print(f"• بیماری‌ها: {len(retrieval_data['diseases'])}")
+        print(f"• داروها: {len(retrieval_data['drugs'])}")
+        print(f"• بافت‌ها: {len(retrieval_data['anatomy'])}")
+        
+        # نمایش ژن‌های اصلی با جزئیات
+        if retrieval_data['primary_genes']:
+            print(f"\n🧬 ژن‌های اصلی یافت شده:")
+            for i, gene in enumerate(retrieval_data['primary_genes'][:5], 1):
+                print(f"{i}. {gene['name']} ({gene['metaedge']}) - امتیاز: {gene['score']:.2f}")
+                
+                if gene.get('biological_processes'):
+                    print(f"   فرآیندهای زیستی: {', '.join(gene['biological_processes'][:2])}")
+                if gene.get('pathways'):
+                    print(f"   مسیرهای زیستی: {', '.join(gene['pathways'][:2])}")
+                if gene.get('diseases'):
+                    print(f"   بیماری‌های مرتبط: {', '.join(gene['diseases'][:2])}")
+                if gene.get('interacting_genes'):
+                    print(f"   ژن‌های تعاملی: {', '.join(gene['interacting_genes'][:3])}")
+                print()
+        
+        # نمایش متن ساختاریافته
+        structured_text = self._create_structured_text_for_model(retrieval_data, query)
+        print(f"📝 متن ساختاریافته برای مدل:")
+        print("-" * 40)
+        print(structured_text)
+        print("-" * 40)
+        
+        return {
+            'query': query,
+            'intent': intent,
+            'retrieval_data': retrieval_data,
+            'structured_text': structured_text
+        }
+    
+    def test_compact_retrieval(self, query: str) -> Dict[str, Any]:
+        """
+        تست بازیابی خلاصه و نمایش متن کوتاه
+        """
+        print(f"🧪 تست بازیابی خلاصه برای سوال: {query}")
+        print("=" * 50)
+        
+        # تحلیل سوال
+        intent = self.analyze_question_intent(query)
+        print(f"📋 نوع سوال: {intent.get('question_type', 'unknown')}")
+        
+        # بازیابی هدفمند
+        retrieval_data = self._targeted_retrieval_for_question(query, intent)
+        
+        # نمایش خلاصه نتایج
+        print(f"\n📊 خلاصه نتایج:")
+        print(f"• ژن‌های اصلی: {len(retrieval_data['primary_genes'])}")
+        print(f"• فرآیندهای زیستی: {len(retrieval_data['biological_processes'])}")
+        print(f"• مسیرهای زیستی: {len(retrieval_data['pathways'])}")
+        print(f"• بیماری‌ها: {len(retrieval_data['diseases'])}")
+        print(f"• داروها: {len(retrieval_data['drugs'])}")
+        
+        # نمایش متن ساختاریافته بهبود یافته
+        structured_text = self._create_structured_text_for_model(retrieval_data, query)
+        print(f"\n📝 متن بهبود یافته برای مدل:")
+        print("-" * 50)
+        print(structured_text)
+        print("-" * 50)
+        
+        # محاسبه طول متن
+        text_length = len(structured_text)
+        print(f"\n📏 طول متن: {text_length} کاراکتر")
+        
+        # تحلیل کیفیت متن
+        if text_length > 1500:
+            print("⚠️ متن خیلی طولانی است!")
+        elif text_length > 800:
+            print("⚠️ متن متوسط است")
+        elif text_length > 400:
+            print("✅ متن مناسب است")
+        else:
+            print("✅ متن کوتاه و عالی است")
+        
+        # بررسی کیفیت محتوا
+        if retrieval_data['primary_genes']:
+            genes_with_info = sum(1 for gene in retrieval_data['primary_genes'] 
+                                if gene.get('biological_processes') or gene.get('pathways') or gene.get('diseases'))
+            print(f"📊 کیفیت محتوا: {genes_with_info}/{len(retrieval_data['primary_genes'])} ژن با اطلاعات زیستی")
+        
+        if retrieval_data['metaedges_used']:
+            print(f"🔗 روابط استفاده شده: {len(retrieval_data['metaedges_used'])} نوع")
+        
+        return {
+            'query': query,
+            'intent': intent,
+            'retrieval_data': retrieval_data,
+            'structured_text': structured_text,
+            'text_length': text_length
+        }
     
     def generate_answer(self, retrieval_result: RetrievalResult, 
                        model: GenerationModel) -> GenerationResult:
@@ -1316,32 +2723,92 @@ class GraphRAGService:
         return "\n".join(answer_parts)
     
     def _generate_intelligent_anatomy_answer(self, retrieval_result: RetrievalResult, anatomy_nodes, gene_nodes) -> str:
-        """تولید پاسخ هوشمند برای سوالات آناتومی"""
-        answer_parts = ["🫀 **تحلیل آناتومیک:**\n"]
+        """تولید پاسخ مبتنی بر شواهد برای سوالات آناتومی"""
+        answer_parts = []
         
+        # استخراج نام آناتومی
+        anatomy_name = "unknown anatomy"
         if anatomy_nodes:
-            answer_parts.append("**ساختارهای آناتومیک:**")
-            for anatomy in anatomy_nodes[:5]:
-                answer_parts.append(f"• {anatomy.name}")
+            anatomy_name = anatomy_nodes[0].name
+        
+        # استخراج ژن‌های بیان شده
+        gene_names = [gene.name for gene in gene_nodes if gene.kind == 'Gene']
+        
+        if not gene_names:
+            return "متأسفانه هیچ ژن بیان شده‌ای برای این آناتومی یافت نشد."
+        
+        # 📌 بخش 1: پرسش اصلی
+        answer_parts.append(f"**📌 پرسش:** {retrieval_result.query}")
+        answer_parts.append("")
+        
+        # ✅ بخش 2: پاسخ کلیدی
+        answer_parts.append(f"**✅ پاسخ کلیدی:**")
+        answer_parts.append(f"بر اساس تحلیل داده‌های زیستی، {len(gene_names)} ژن در بافت {anatomy_name} بیان می‌شوند:")
+        
+        for i, gene_name in enumerate(gene_names[:10], 1):  # حداکثر 10 ژن
+            answer_parts.append(f"• {gene_name}")
+        
+        if len(gene_names) > 10:
+            answer_parts.append(f"• و {len(gene_names) - 10} ژن دیگر")
+        
             answer_parts.append("")
         
-        if gene_nodes:
-            answer_parts.append("**ژن‌های بیان شده:**")
-            for gene in gene_nodes[:5]:
-                answer_parts.append(f"• {gene.name}")
-            answer_parts.append("")
+        # 🔎 بخش 3: مسیرهای استناد
+        answer_parts.append("**🔎 مسیرهای استناد:**")
         
-        # روابط بیان
-        expression_edges = [e for e in retrieval_result.edges if 'express' in e.relation.lower()]
-        if expression_edges:
-            answer_parts.append("**روابط بیان ژن:**")
-            for edge in expression_edges[:5]:
-                source_name = next(n.name for n in retrieval_result.nodes if n.id == edge.source)
-                target_name = next(n.name for n in retrieval_result.nodes if n.id == edge.target)
-                answer_parts.append(f"• {source_name} بیان می‌کند: {target_name}")
+        # یافتن یال‌های AeG
+        aeG_edges = [e for e in retrieval_result.edges if e.relation == 'AeG']
+        if aeG_edges:
+            answer_parts.append("روابط بیان مستقیم (Anatomy → expresses → Gene):")
+            for edge in aeG_edges[:5]:  # حداکثر 5 رابطه
+                source_name = next((n.name for n in retrieval_result.nodes if n.id == edge.source), edge.source)
+                target_name = next((n.name for n in retrieval_result.nodes if n.id == edge.target), edge.target)
+                answer_parts.append(f"• {source_name} → {target_name} (AeG)")
+        else:
+            answer_parts.append("• روابط بیان از طریق جستجوی هوشمند شناسایی شد")
         
-        if not anatomy_nodes:
-            answer_parts.append("❌ اطلاعات آناتومیک در نتایج یافت نشد.")
+        # یافتن یال‌های AuG و AdG
+        auG_edges = [e for e in retrieval_result.edges if e.relation == 'AuG']
+        adG_edges = [e for e in retrieval_result.edges if e.relation == 'AdG']
+        
+        if auG_edges:
+            answer_parts.append("روابط تنظیم مثبت (Anatomy → upregulates → Gene):")
+            for edge in auG_edges[:3]:
+                source_name = next((n.name for n in retrieval_result.nodes if n.id == edge.source), edge.source)
+                target_name = next((n.name for n in retrieval_result.nodes if n.id == edge.target), edge.target)
+                answer_parts.append(f"• {source_name} → {target_name} (AuG)")
+        
+        if adG_edges:
+            answer_parts.append("روابط تنظیم منفی (Anatomy → downregulates → Gene):")
+            for edge in adG_edges[:3]:
+                source_name = next((n.name for n in retrieval_result.nodes if n.id == edge.source), edge.source)
+                target_name = next((n.name for n in retrieval_result.nodes if n.id == edge.target), edge.target)
+                answer_parts.append(f"• {source_name} → {target_name} (AdG)")
+        
+        answer_parts.append("")
+        
+        # 📚 بخش 4: منبع داده
+        answer_parts.append("**📚 منبع داده:**")
+        answer_parts.append("• **داده‌های بیان ژن:** پایگاه‌های Bgee و TISSUES")
+        answer_parts.append("• **روابط زیستی:** Hetionet (شبکه دانش زیستی)")
+        answer_parts.append("• **اطلاعات آناتومیکی:** Uberon (آناتومی یکپارچه)")
+        answer_parts.append("• **روش جستجو:** Intelligent Semantic Search با فیلتر metaedge")
+        answer_parts.append("")
+        
+        # 💬 بخش 5: تحلیل زیستی
+        answer_parts.append("**💬 تحلیل زیستی:**")
+        answer_parts.append(f"• **عملکرد طبیعی:** ژن‌های بیان شده در {anatomy_name} در عملکرد فیزیولوژیک این اندام نقش دارند.")
+        answer_parts.append(f"• **اهمیت بالینی:** تغییرات در بیان این ژن‌ها ممکن است با بیماری‌های {anatomy_name} مرتبط باشد.")
+        answer_parts.append("• **پتانسیل درمانی:** این ژن‌ها می‌توانند اهداف درمانی جدیدی برای بیماری‌های مرتبط باشند.")
+        answer_parts.append("• **نشانگر زیستی:** برخی از این ژن‌ها می‌توانند به عنوان نشانگرهای زیستی برای تشخیص بیماری‌ها استفاده شوند.")
+        answer_parts.append("")
+        
+        # 🔬 بخش 6: پیشنهادات پژوهشی
+        answer_parts.append("**🔬 پیشنهادات پژوهشی:**")
+        answer_parts.append("• مطالعه مکانیسم‌های تنظیم بیان این ژن‌ها در شرایط مختلف")
+        answer_parts.append("• بررسی ارتباط بین تغییرات بیان و بیماری‌های مرتبط")
+        answer_parts.append("• توسعه روش‌های درمانی مبتنی بر تنظیم بیان ژن")
+        answer_parts.append("• پژوهش در زمینه نشانگرهای زیستی برای تشخیص زودهنگام")
         
         return "\n".join(answer_parts)
     
@@ -1773,10 +3240,13 @@ class GraphRAGService:
             return self._fallback_generation(retrieval_result, "Gemini")
     
     def _create_advanced_prompt(self, retrieval_result: RetrievalResult) -> str:
-        """ایجاد متن ورودی پیشرفته برای مدل‌های AI"""
+        """ایجاد متن ورودی پیشرفته برای مدل‌های AI با اطلاعات زیستی غنی شده"""
         query = retrieval_result.query
         context = retrieval_result.context_text
         method = retrieval_result.method
+        
+        # غنی‌سازی داده‌ها با اطلاعات زیستی
+        enriched_data = self._enrich_retrieved_data(retrieval_result.nodes, retrieval_result.edges, query)
         
         # تحلیل نوع سوال
         question_type = self._analyze_question_type(query.lower())
@@ -1819,55 +3289,41 @@ class GraphRAGService:
             """
             
         else:
-            # با اطلاعات گراف
-            system_prompt = """You are a biomedical knowledge graph expert analyzing data from a comprehensive
-            biological knowledge graph containing information about:
-            - Genes, proteins, and their functions
-            - Diseases and their molecular mechanisms
-            - Drugs, compounds, and their therapeutic effects
-            - Biological processes and pathways
-            - Anatomical structures and gene expression
-            - Clinical relationships and treatment outcomes
-            
-            Your task is to analyze the retrieved information from the knowledge graph and provide:
-            - Comprehensive interpretation of the data
-            - Biological significance and implications
-            - Clinical relevance and applications
-            - Research insights and recommendations
-            - Quality assessment of the retrieved information
-            
-            IMPORTANT: If the retrieved information is insufficient or limited, supplement your analysis
-            with your general biomedical knowledge to provide a comprehensive and useful answer.
-            Focus on providing valuable insights even when graph data is limited.
-            
-            Always answer in Persian with proper formatting and structure your response with clear sections.
-            Do not use emojis in your response."""
+            # با اطلاعات گراف و داده‌های غنی شده
+            system_prompt = """You are a biomedical knowledge graph expert analyzing data from Hetionet, a comprehensive
+                biological knowledge graph containing information about:
+                - Genes, proteins, and their functions
+                - Diseases and their molecular mechanisms
+                - Drugs, compounds, and their therapeutic effects
+                - Biological processes and pathways
+                - Anatomical structures and gene expression
+                - Clinical relationships and treatment outcomes
+
+                Your task is to provide precise, actionable analysis based on the retrieved graph data:
+                - Evaluate biological relevance of genes to the specific query context
+                - Assess clinical significance and potential therapeutic applications
+                - Identify genes that are most likely to be clinically actionable
+                - Provide specific insights rather than generic statements
+                - Consider pathway involvement and disease associations
+                - Focus on actionable insights and specific biological relevance
+
+                IMPORTANT: 
+                - Base your analysis primarily on the provided graph data
+                - Supplement with your biomedical knowledge when needed
+                - Provide specific, actionable insights rather than general statements
+                - Focus on clinical relevance and therapeutic potential
+                - Be precise about biological functions and mechanisms
+
+                Always answer in Persian with proper formatting and structure your response with clear sections.
+                Do not use emojis in your response."""
             
             user_prompt = f"""
-            **سوال پزشکی-زیستی:**
-            {query}
+            **سوال:** {query}
             
-            **اطلاعات بازیابی شده از گراف دانش زیستی:**
-            روش بازیابی: {method}
-            
+            **داده‌های بازیابی شده:**
             {context}
             
-            **دستورالعمل تحلیل:**
-            بر اساس اطلاعات بازیابی شده از گراف دانش، تحلیل جامع و دقیقی ارائه دهید که شامل:
-            
-            1. **خلاصه آماری:** آمار کلی اطلاعات بازیابی شده
-            2. **تحلیل روابط:** بررسی روابط و ارتباطات یافت شده
-            3. **اهمیت زیستی:** تفسیر اهمیت زیستی و پزشکی یافته‌ها
-            4. **جنبه‌های درمانی:** کاربردهای درمانی و دارویی
-            5. **کیفیت داده‌ها:** ارزیابی کیفیت و اعتبار اطلاعات
-            6. **توصیه‌های کاربردی:** پیشنهادات برای پژوهش و کاربرد
-            7. **مسیرهای آینده:** جهت‌گیری‌های تحقیقاتی پیشنهادی
-            
-            **نکته مهم:** اگر اطلاعات بازیابی شده محدود یا ناکافی باشد، از دانش عمومی خود در زمینه علوم زیستی
-            برای تکمیل تحلیل استفاده کنید و پاسخ جامع و مفیدی ارائه دهید. هدف ارائه اطلاعات ارزشمند
-            به کاربر است، حتی اگر داده‌های گراف محدود باشند.
-            
-            پاسخ را به صورت ساختاریافته و با فرمت‌بندی مناسب ارائه دهید.
+            **دستورالعمل:** بر اساس داده‌های بالا، پاسخ دقیق و کاربردی ارائه دهید. بر اهمیت زیستی و بالینی تمرکز کنید.
             """
         
         return f"{system_prompt}\n\n{user_prompt}"
@@ -1896,6 +3352,503 @@ class GraphRAGService:
         """تنظیم API Key برای Google Gemini"""
         self.gemini_api_key = api_key
         print("✅ Gemini API Key تنظیم شد")
+    
+    def _search_by_metaedges(self, matched_nodes: Dict[str, str], intent: Dict, target_metaedges: List[str], max_depth: int = 2) -> List[Tuple[str, int, float, str]]:
+        """
+        جستجو بر اساس metaedges مشخص شده
+        """
+        results = []
+        
+        print(f"🔍 جستجو با metaedges: {target_metaedges}")
+        
+        for token, node_id in matched_nodes.items():
+            node_name = self.G.nodes[node_id]['name']
+            node_kind = self.G.nodes[node_id]['kind']
+            print(f"  بررسی نود: {node_name} ({node_kind})")
+            
+            # جستجوی مستقیم بر اساس metaedges
+            for metaedge in target_metaedges:
+                print(f"    بررسی metaedge: {metaedge}")
+                
+                # جستجوی همسایه‌ها با metaedge مشخص
+                for neighbor in self.G.neighbors(node_id):
+                    edge_data = self.G.get_edge_data(node_id, neighbor)
+                    if edge_data and edge_data.get('metaedge') == metaedge:
+                        neighbor_name = self.G.nodes[neighbor]['name']
+                        neighbor_kind = self.G.nodes[neighbor]['kind']
+                        
+                        # امتیازدهی بر اساس نوع metaedge
+                        score = self._calculate_metaedge_score(metaedge, 1)
+                        explanation = f"{neighbor_name} ({neighbor_kind}) connected to {node_name} via {metaedge}"
+                        
+                        results.append((neighbor, 1, score, explanation))
+                        print(f"      ✅ {neighbor_name} - {metaedge} (امتیاز: {score})")
+                
+                # جستجوی معکوس (اگر metaedge معکوس وجود دارد)
+                reverse_metaedges = self._get_reverse_metaedges(metaedge)
+                for reverse_metaedge in reverse_metaedges:
+                    print(f"    بررسی metaedge معکوس: {reverse_metaedge}")
+                    for other_node, other_attrs in self.G.nodes(data=True):
+                        if other_node != node_id:
+                            for neighbor in self.G.neighbors(other_node):
+                                if neighbor == node_id:
+                                    edge_data = self.G.get_edge_data(other_node, neighbor)
+                                    if edge_data and edge_data.get('metaedge') == reverse_metaedge:
+                                        other_name = other_attrs['name']
+                                        other_kind = other_attrs['kind']
+                                        
+                                        score = self._calculate_metaedge_score(reverse_metaedge, 1) * 0.8  # امتیاز کمتر برای معکوس
+                                        explanation = f"{other_name} ({other_kind}) connected to {node_name} via {reverse_metaedge}"
+                                        
+                                        results.append((other_node, 1, score, explanation))
+                                        print(f"      ✅ {other_name} - {reverse_metaedge} معکوس (امتیاز: {score})")
+                
+                # جستجوی معکوس (اگر metaedge معکوس وجود دارد)
+                reverse_metaedges = self._get_reverse_metaedges(metaedge)
+                for reverse_metaedge in reverse_metaedges:
+                    print(f"    بررسی metaedge معکوس: {reverse_metaedge}")
+                    for other_node, other_attrs in self.G.nodes(data=True):
+                        if other_node != node_id:
+                            for neighbor in self.G.neighbors(other_node):
+                                if neighbor == node_id:
+                                    edge_data = self.G.get_edge_data(other_node, neighbor)
+                                    if edge_data and edge_data.get('metaedge') == reverse_metaedge:
+                                        other_name = other_attrs['name']
+                                        other_kind = other_attrs['kind']
+                                        
+                                        score = self._calculate_metaedge_score(reverse_metaedge, 1) * 0.8  # امتیاز کمتر برای معکوس
+                                        explanation = f"{other_name} ({other_kind}) connected to {node_name} via {reverse_metaedge}"
+                                        
+                                        results.append((other_node, 1, score, explanation))
+                                        print(f"      ✅ {other_name} - {reverse_metaedge} معکوس (امتیاز: {score})")
+            
+            # جستجوی عمیق با فیلتر metaedges
+            if max_depth > 1:
+                print(f"    جستجوی عمیق تا عمق {max_depth}")
+                for metaedge in target_metaedges:
+                    dfs_results = self.dfs_search(node_id, max_depth, relation_filter=metaedge)
+                    for found_node, depth in dfs_results:
+                        if found_node != node_id:
+                            found_name = self.G.nodes[found_node]['name']
+                            found_kind = self.G.nodes[found_node]['kind']
+                            
+                            score = self._calculate_metaedge_score(metaedge, depth)
+                            explanation = f"{found_name} ({found_kind}) related to {node_name} via {metaedge} (depth {depth})"
+                            
+                            results.append((found_node, depth, score, explanation))
+                            print(f"      ✅ {found_name} - عمق {depth} با {metaedge} (امتیاز: {score:.2f})")
+        
+        # حذف تکرار و مرتب‌سازی
+        unique_results = {}
+        for node_id, depth, score, explanation in results:
+            if node_id not in unique_results or score > unique_results[node_id][2]:
+                unique_results[node_id] = (node_id, depth, score, explanation)
+        
+        final_results = sorted(unique_results.values(), key=lambda x: x[2], reverse=True)
+        
+        print(f"  📊 نتایج نهایی: {len(final_results)} نود منحصر به فرد")
+        return final_results
+    
+    def _calculate_metaedge_score(self, metaedge: str, depth: int) -> float:
+        """
+        محاسبه امتیاز بر اساس نوع metaedge و عمق - بهبود یافته
+        """
+        # امتیازات پایه بر اساس اهمیت و فراوانی در Hetionet
+        base_scores = {
+            # بیان ژن در آناتومی - بسیار مهم
+            'AeG': 6.0,  # Anatomy expresses Gene (526,407 edges)
+            'GeA': 5.5,  # Gene expressed in Anatomy
+            
+            # تعاملات ژن‌ها - مهم
+            'GiG': 5.0,  # Gene interacts with Gene (147,164 edges)
+            'Gr>G': 4.5, # Gene regulates Gene (265,672 edges)
+            'GcG': 4.0,  # Gene covaries with Gene (61,690 edges)
+            
+            # مشارکت در فرآیندهای زیستی - مهم
+            'GpBP': 5.0, # Gene participates in Biological Process (559,504 edges)
+            'GpPW': 4.5, # Gene participates in Pathway (84,372 edges)
+            'GpMF': 4.0, # Gene participates in Molecular Function (97,222 edges)
+            'GpCC': 4.0, # Gene participates in Cellular Component (73,566 edges)
+            
+            # تنظیم ژن توسط آناتومی
+            'AuG': 4.5,  # Anatomy upregulates Gene (97,848 edges)
+            'AdG': 4.5,  # Anatomy downregulates Gene (102,240 edges)
+            'GuA': 4.0,  # Gene upregulates Anatomy
+            'GdA': 4.0,  # Gene downregulates Anatomy
+            
+            # بیماری‌ها و ژن‌ها
+            'DaG': 4.5,  # Disease associates with Gene (12,623 edges)
+            'DuG': 4.0,  # Disease upregulates Gene (7,731 edges)
+            'DdG': 4.0,  # Disease downregulates Gene (7,623 edges)
+            'GaD': 4.0,  # Gene associates Disease
+            'GuD': 3.5,  # Gene upregulates Disease
+            'GdD': 3.5,  # Gene downregulates Disease
+            
+            # داروها و درمان
+            'CtD': 4.5,  # Compound treats Disease (755 edges)
+            'CpD': 4.0,  # Compound palliates Disease (390 edges)
+            'DtC': 4.0,  # Disease treats Compound
+            'DpC': 3.5,  # Disease palliates Compound
+            
+            # تنظیم ژن توسط دارو
+            'CuG': 4.0,  # Compound upregulates Gene (18,756 edges)
+            'CdG': 4.0,  # Compound downregulates Gene (21,102 edges)
+            'CbG': 4.5,  # Compound binds Gene (11,571 edges)
+            'GuC': 3.5,  # Gene upregulates Compound
+            'GdC': 3.5,  # Gene downregulates Compound
+            'GbC': 4.0,  # Gene binds Compound
+            
+            # بیماری‌ها و آناتومی
+            'DlA': 4.0,  # Disease localizes to Anatomy (3,602 edges)
+            'AlD': 3.5,  # Anatomy localizes Disease
+            
+            # علائم و عوارض
+            'DpS': 4.0,  # Disease presents Symptom (3,357 edges)
+            'SpD': 3.5,  # Symptom presents Disease
+            'CcSE': 3.5, # Compound causes Side Effect (138,944 edges)
+            'SEcC': 3.0, # Side Effect causes Compound
+            
+            # تشابه‌ها
+            'DrD': 3.5,  # Disease resembles Disease (543 edges)
+            'CrC': 3.5,  # Compound resembles Compound (6,486 edges)
+            
+            # کلاس‌های دارویی
+            'PCiC': 3.0, # Pharmacologic Class includes Compound (1,029 edges)
+            'CiPC': 2.5  # Compound includes Pharmacologic Class
+        }
+        
+        base_score = base_scores.get(metaedge, 2.5)
+        
+        # بهبود محاسبه جریمه عمق
+        if depth == 1:
+            depth_penalty = 1.0
+        elif depth == 2:
+            depth_penalty = 0.7
+        elif depth == 3:
+            depth_penalty = 0.5
+        else:
+            depth_penalty = 0.3
+        
+        # اضافه کردن بونوس برای metaedges مهم
+        importance_bonus = 1.0
+        if metaedge in ['AeG', 'GiG', 'GpBP', 'DaG', 'CtD']:
+            importance_bonus = 1.2
+        elif metaedge in ['Gr>G', 'GpPW', 'CbG']:
+            importance_bonus = 1.1
+        
+        return base_score * depth_penalty * importance_bonus
+    
+    def _get_reverse_metaedges(self, metaedge: str) -> List[str]:
+        """
+        دریافت metaedges معکوس
+        """
+        reverse_mapping = {
+            'AeG': ['GeA'],  # Anatomy expresses Gene ↔ Gene expressed in Anatomy
+            'GeA': ['AeG'],
+            'AuG': ['GuA'],  # Anatomy upregulates Gene ↔ Gene upregulates Anatomy
+            'GuA': ['AuG'],
+            'AdG': ['GdA'],  # Anatomy downregulates Gene ↔ Gene downregulates Anatomy
+            'GdA': ['AdG'],
+            'DaG': ['GaD'],  # Disease associates Gene ↔ Gene associates Disease
+            'GaD': ['DaG'],
+            'DuG': ['GuD'],  # Disease upregulates Gene ↔ Gene upregulates Disease
+            'GuD': ['DuG'],
+            'DdG': ['GdD'],  # Disease downregulates Gene ↔ Gene downregulates Disease
+            'GdD': ['DdG'],
+            'CtD': ['DtC'],  # Compound treats Disease ↔ Disease treats Compound
+            'DtC': ['CtD'],
+            'CuG': ['GuC'],  # Compound upregulates Gene ↔ Gene upregulates Compound
+            'GuC': ['CuG'],
+            'CdG': ['GdC'],  # Compound downregulates Gene ↔ Gene downregulates Compound
+            'GdC': ['CdG'],
+            'CbG': ['GbC'],  # Compound binds Gene ↔ Gene binds Compound
+            'GbC': ['CbG'],
+            'DlA': ['AlD'],  # Disease localizes Anatomy ↔ Anatomy localizes Disease
+            'AlD': ['DlA'],
+            'DpS': ['SpD'],  # Disease presents Symptom ↔ Symptom presents Disease
+            'SpD': ['DpS'],
+            'CcSE': ['SEcC'], # Compound causes Side Effect ↔ Side Effect causes Compound
+            'SEcC': ['CcSE'],
+            'GpBP': ['BPpG'], # Gene participates Biological Process ↔ Biological Process participates Gene
+            'BPpG': ['GpBP'],
+            'GpMF': ['MFpG'], # Gene participates Molecular Function ↔ Molecular Function participates Gene
+            'MFpG': ['GpMF'],
+            'GpCC': ['CCpG'], # Gene participates Cellular Component ↔ Cellular Component participates Gene
+            'CCpG': ['GpCC'],
+            'GpPW': ['PWpG'], # Gene participates Pathway ↔ Pathway participates Gene
+            'PWpG': ['GpPW'],
+            'PCiC': ['CiPC'], # Pharmacologic Class includes Compound ↔ Compound includes Pharmacologic Class
+            'CiPC': ['PCiC']
+        }
+        
+        return reverse_mapping.get(metaedge, [])
+    
+    def multi_hop_search(self, query: str, max_depth: int = 3) -> List[Tuple[str, int, float, str, List[str]]]:
+        """
+        جستجوی چندمرحله‌ای برای سوالات پیچیده
+        Returns: (node_id, depth, score, explanation, path)
+        """
+        print(f"🔄 جستجوی چندمرحله‌ای: {query}")
+        
+        # تحلیل سوال
+        intent = self.analyze_question_intent(query)
+        print(f"  تشخیص نوع: {intent['question_type']}")
+        print(f"  Metaedges: {intent['metaedges']}")
+        
+        # استخراج کلمات کلیدی
+        keywords = intent['keywords']
+        matched_nodes = self.match_tokens_to_nodes(keywords)
+        
+        if not matched_nodes:
+            print("  ❌ هیچ نودی تطبیق نکرد")
+            return []
+        
+        results = []
+        
+        # بر اساس نوع سوال، مسیرهای چندمرحله‌ای را تعریف کن
+        multi_hop_patterns = {
+            'anatomy_expression': [
+                # Anatomy → AeG → Gene
+                ['AeG'],
+                # Anatomy → AuG → Gene  
+                ['AuG'],
+                # Anatomy → AdG → Gene
+                ['AdG']
+            ],
+            'compound_gene_regulation': [
+                # Compound → CuG → Gene
+                ['CuG'],
+                # Compound → CdG → Gene
+                ['CdG'],
+                # Compound → CbG → Gene
+                ['CbG']
+            ],
+            'disease_gene_regulation': [
+                # Disease → DuG → Gene
+                ['DuG'],
+                # Disease → DdG → Gene
+                ['DdG'],
+                # Disease → DaG → Gene
+                ['DaG']
+            ],
+            'complex_expression': [
+                # Anatomy → AeG → Gene → CuG → Compound
+                ['AeG', 'CuG'],
+                # Anatomy → AeG → Gene → CdG → Compound
+                ['AeG', 'CdG'],
+                # Gene → GeA → Anatomy → Compound (معکوس)
+                ['GeA', 'GuC'],
+                # Gene → GeA → Anatomy → Compound (معکوس)
+                ['GeA', 'GdC'],
+                # Compound → CdG → Gene → GeA → Anatomy (معکوس)
+                ['CdG', 'GeA'],
+                # Compound → CuG → Gene → GeA → Anatomy (معکوس)
+                ['CuG', 'GeA']
+            ],
+            'complex_disease': [
+                # Disease → DaG → Gene → GiG → Gene
+                ['DaG', 'GiG'],
+                # Disease → DuG → Gene → GpBP → Biological Process
+                ['DuG', 'GpBP'],
+                # Disease → DlA → Anatomy → AeG → Gene
+                ['DlA', 'AeG'],
+                # Gene → GaD → Disease → GpBP → Biological Process
+                ['GaD', 'GpBP']
+            ],
+            'complex_treatment': [
+                # Compound → CtD → Disease → DaG → Gene
+                ['CtD', 'DaG'],
+                # Compound → CuG → Gene → GaD → Disease
+                ['CuG', 'GaD'],
+                # Compound → CdG → Gene → GaD → Disease
+                ['CdG', 'GaD'],
+                # Disease → DtC → Compound → CuG → Gene
+                ['DtC', 'CuG'],
+                # Gene → GuC → Compound → CtD → Disease
+                ['GuC', 'CtD']
+            ],
+            'complex_function': [
+                # Gene → GpBP → Biological Process → BPpG → Gene
+                ['GpBP', 'BPpG'],
+                # Gene → GpPW → Pathway → PWpG → Gene
+                ['GpPW', 'PWpG'],
+                # Gene → GiG → Gene → GpBP → Biological Process
+                ['GiG', 'GpBP'],
+                # Gene → Gr>G → Gene → GpMF → Molecular Function
+                ['Gr>G', 'GpMF']
+            ]
+        }
+        
+        # تشخیص نوع سوال پیچیده
+        complex_type = self._detect_complex_question_type(intent)
+        print(f"  نوع سوال پیچیده: {complex_type}")
+        
+        if complex_type in multi_hop_patterns:
+            patterns = multi_hop_patterns[complex_type]
+            
+            for pattern in patterns:
+                print(f"  بررسی الگو: {' → '.join(pattern)}")
+                pattern_results = self._search_multi_hop_pattern(matched_nodes, pattern, max_depth)
+                results.extend(pattern_results)
+        
+        # حذف تکرار و مرتب‌سازی
+        unique_results = {}
+        for node_id, depth, score, explanation, path in results:
+            if node_id not in unique_results or score > unique_results[node_id][2]:
+                unique_results[node_id] = (node_id, depth, score, explanation, path)
+        
+        final_results = sorted(unique_results.values(), key=lambda x: x[2], reverse=True)
+        
+        print(f"  ✅ {len(final_results)} نتیجه چندمرحله‌ای یافت شد")
+        return final_results
+    
+    def _detect_complex_question_type(self, intent: Dict) -> str:
+        """تشخیص نوع سوال پیچیده"""
+        query_lower = intent['query_lower']
+        
+        # سوالات پیچیده که نیاز به چند مرحله دارند
+        if any(word in query_lower for word in ['upregulate', 'downregulate', 'regulate']) and \
+           any(word in query_lower for word in ['expressed', 'expression']):
+            return 'complex_expression'
+        
+        if any(word in query_lower for word in ['interact', 'interaction']) and \
+           any(word in query_lower for word in ['disease', 'associated']):
+            return 'complex_disease'
+        
+        if any(word in query_lower for word in ['treat', 'treatment', 'therapy']) and \
+           any(word in query_lower for word in ['compound', 'drug', 'medicine']):
+            return 'complex_treatment'
+        
+        if any(word in query_lower for word in ['function', 'process', 'pathway']) and \
+           any(word in query_lower for word in ['gene', 'protein']):
+            return 'complex_function'
+        
+        # تشخیص بر اساس metaedges موجود
+        metaedges = intent.get('metaedges', [])
+        if 'AeG' in metaedges and ('CuG' in metaedges or 'CdG' in metaedges):
+            return 'complex_expression'
+        if 'DaG' in metaedges and ('GiG' in metaedges or 'GpBP' in metaedges):
+            return 'complex_disease'
+        if 'CtD' in metaedges and ('DaG' in metaedges or 'CuG' in metaedges):
+            return 'complex_treatment'
+        if 'GpBP' in metaedges or 'GpPW' in metaedges:
+            return 'complex_function'
+        
+        # سوالات ساده‌تر
+        if intent['question_type'] == 'anatomy_expression':
+            return 'anatomy_expression'
+        elif intent['question_type'] == 'compound_gene_regulation':
+            return 'compound_gene_regulation'
+        elif intent['question_type'] == 'disease_gene_regulation':
+            return 'disease_gene_regulation'
+        
+        return 'general'
+    
+    def _search_multi_hop_pattern(self, matched_nodes: Dict[str, str], pattern: List[str], max_depth: int) -> List[Tuple[str, int, float, str, List[str]]]:
+        """جستجو بر اساس الگوی چندمرحله‌ای"""
+        results = []
+        
+        for token, start_node in matched_nodes.items():
+            print(f"    شروع از نود: {self.G.nodes[start_node]['name']}")
+            
+            # جستجوی مسیرهای چندمرحله‌ای
+            paths = self._find_paths_with_pattern(start_node, pattern, max_depth)
+            
+            for path, path_metaedges in paths:
+                if len(path) > 1:  # حداقل 2 نود
+                    target_node = path[-1]
+                    depth = len(path) - 1
+                    
+                    # محاسبه امتیاز بر اساس الگو
+                    score = self._calculate_pattern_score(pattern, path_metaedges, depth)
+                    
+                    # ایجاد توضیح
+                    path_names = [self.G.nodes[node]['name'] for node in path]
+                    explanation = f"مسیر: {' → '.join(path_names)} (الگو: {' → '.join(pattern)})"
+                    
+                    results.append((target_node, depth, score, explanation, path))
+        
+        return results
+    
+    def _find_paths_with_pattern(self, start_node: str, pattern: List[str], max_depth: int) -> List[Tuple[List[str], List[str]]]:
+        """یافتن مسیرهایی که با الگوی مشخص شده مطابقت دارند"""
+        paths = []
+        
+        def dfs_with_pattern(node: str, current_path: List[str], current_metaedges: List[str], depth: int):
+            if depth >= max_depth:
+                return
+            
+            current_path.append(node)
+            
+            # بررسی اینکه آیا مسیر فعلی با الگو مطابقت دارد
+            if len(current_metaedges) == len(pattern):
+                paths.append((current_path.copy(), current_metaedges.copy()))
+            
+            # جستجوی همسایه‌ها
+            for neighbor in self.G.neighbors(node):
+                if neighbor not in current_path:  # جلوگیری از حلقه
+                    edge_data = self.G.get_edge_data(node, neighbor)
+                    if edge_data and edge_data.get('relation'):
+                        metaedge = edge_data.get('relation')
+                        
+                        # بررسی اینکه آیا این metaedge در الگو است
+                        if len(current_metaedges) < len(pattern) and metaedge == pattern[len(current_metaedges)]:
+                            new_metaedges = current_metaedges + [metaedge]
+                            dfs_with_pattern(neighbor, current_path, new_metaedges, depth + 1)
+                        elif metaedge in pattern:  # جستجوی آزادتر
+                            new_metaedges = current_metaedges + [metaedge]
+                            dfs_with_pattern(neighbor, current_path, new_metaedges, depth + 1)
+            
+            current_path.pop()
+        
+        # شروع از نود اول
+        dfs_with_pattern(start_node, [], [], 0)
+        
+        # اگر مسیری پیدا نشد، سعی کن از نودهای دیگر شروع کنی
+        if not paths:
+            print(f"    ⚠️ هیچ مسیری از {start_node} پیدا نشد، تلاش از نودهای دیگر...")
+            
+            # برای الگوهای چندمرحله‌ای، سعی کن از نودهای میانی شروع کنی
+            if len(pattern) > 1:
+                # برای الگوهای AeG → CuG/CdG، از نودهای Compound شروع کن
+                if 'CuG' in pattern or 'CdG' in pattern:
+                    compound_nodes = [nid for nid, attrs in self.G.nodes(data=True) 
+                                    if attrs.get('kind') == 'Compound' or attrs.get('metanode') == 'Compound']
+                    
+                    for compound_node in compound_nodes[:3]:  # 3 نود اول
+                        if compound_node != start_node:
+                            print(f"    تلاش از نود: {self.G.nodes[compound_node]['name']}")
+                            dfs_with_pattern(compound_node, [], [], 0)
+                
+                # از نودهای ژن شروع کن (برای الگوهای دیگر)
+                else:
+                    gene_nodes = [nid for nid, attrs in self.G.nodes(data=True) 
+                                 if attrs.get('kind') == 'Gene' or attrs.get('metanode') == 'Gene']
+                    
+                    for gene_node in gene_nodes[:5]:  # 5 نود اول
+                        if gene_node != start_node:
+                            print(f"    تلاش از نود: {self.G.nodes[gene_node]['name']}")
+                            dfs_with_pattern(gene_node, [], [], 0)
+        
+        return paths
+    
+    def _calculate_pattern_score(self, pattern: List[str], path_metaedges: List[str], depth: int) -> float:
+        """محاسبه امتیاز بر اساس تطابق الگو"""
+        base_score = 5.0
+        
+        # امتیاز برای تطابق کامل الگو
+        if path_metaedges == pattern:
+            base_score += 2.0
+        elif all(me in path_metaedges for me in pattern):
+            base_score += 1.0
+        
+        # کاهش امتیاز با افزایش عمق
+        depth_penalty = 1.0 / (depth + 1)
+        
+        # امتیاز برای طول مسیر
+        length_bonus = len(path_metaedges) * 0.5
+        
+        return (base_score + length_bonus) * depth_penalty
 
 # نمونه استفاده
 if __name__ == "__main__":
