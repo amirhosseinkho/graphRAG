@@ -626,8 +626,12 @@ class GraphRAGService:
         
         results = []
         
+        # تشخیص سوالات خاص ژن-سرطان
+        if self._is_gene_cancer_question(query, matched_nodes):
+            print("🎯 تشخیص سوال ژن-سرطان")
+            results = self._search_gene_cancer_relationships(query, matched_nodes, max_depth)
         # بر اساس نوع سوال و metaedges، روش جستجوی مناسب را انتخاب کن
-        if intent['question_type'] == 'anatomy_expression':
+        elif intent['question_type'] == 'anatomy_expression':
             print("🫀 تشخیص نوع سوال: بیان ژن در آناتومی")
             results = self._search_by_metaedges(matched_nodes, intent, ['AeG'], max_depth)
             
@@ -698,8 +702,102 @@ class GraphRAGService:
         
         final_results = sorted(unique_results.values(), key=lambda x: x[2], reverse=True)
         
-        print(f"✅ جستجوی هوشمند کامل شد: {len(final_results)} نتیجه")
         return final_results
+    
+    def _is_gene_cancer_question(self, query: str, matched_nodes: Dict[str, str]) -> bool:
+        """تشخیص سوالات ژن-سرطان"""
+        query_lower = query.lower()
+        cancer_keywords = ['cancer', 'tumor', 'malignancy', 'oncology', 'carcinoma', 'sarcoma', 'leukemia', 'lymphoma']
+        
+        # بررسی وجود کلمات سرطان
+        has_cancer = any(keyword in query_lower for keyword in cancer_keywords)
+        
+        # بررسی وجود ژن‌ها
+        has_gene = any(self.G.nodes[node_id].get('kind') == 'Gene' for node_id in matched_nodes.values())
+        
+        return has_cancer and has_gene
+    
+    def _search_gene_cancer_relationships(self, query: str, matched_nodes: Dict[str, str], max_depth: int) -> List[Tuple[str, int, float, str]]:
+        """جستجوی روابط ژن-سرطان"""
+        results = []
+        
+        # شناسایی ژن‌ها و بیماری‌های سرطان
+        gene_nodes = []
+        cancer_nodes = []
+        
+        for token, node_id in matched_nodes.items():
+            node_attrs = self.G.nodes[node_id]
+            if node_attrs.get('kind') == 'Gene':
+                gene_nodes.append((token, node_id))
+            elif node_attrs.get('kind') == 'Disease':
+                # بررسی اینکه آیا بیماری سرطان است
+                node_name_lower = node_attrs['name'].lower()
+                cancer_keywords = ['cancer', 'tumor', 'malignancy', 'carcinoma', 'sarcoma', 'leukemia', 'lymphoma']
+                if any(keyword in node_name_lower for keyword in cancer_keywords):
+                    cancer_nodes.append((token, node_id))
+        
+        print(f"🧬 ژن‌های یافت شده: {[name for name, _ in gene_nodes]}")
+        print(f"🏥 سرطان‌های یافت شده: {[name for name, _ in cancer_nodes]}")
+        
+        # جستجوی روابط مستقیم ژن-سرطان
+        for gene_token, gene_node_id in gene_nodes:
+            gene_name = self.G.nodes[gene_node_id]['name']
+            print(f"🔍 جستجوی روابط برای ژن: {gene_name}")
+            
+            # جستجوی همسایه‌های بیماری
+            for neighbor in self.G.neighbors(gene_node_id):
+                neighbor_attrs = self.G.nodes[neighbor]
+                if neighbor_attrs.get('kind') == 'Disease':
+                    edge_data = self.G.get_edge_data(gene_node_id, neighbor)
+                    if edge_data:
+                        metaedge = edge_data.get('metaedge', 'Unknown')
+                        # امتیاز بالاتر برای روابط سرطان
+                        neighbor_name_lower = neighbor_attrs['name'].lower()
+                        cancer_score = 2.0 if any(keyword in neighbor_name_lower for keyword in ['cancer', 'tumor', 'malignancy']) else 1.0
+                        
+                        score = self._calculate_metaedge_score(metaedge, 1) * cancer_score
+                        explanation = f"{gene_name} related to {neighbor_attrs['name']} via {metaedge}"
+                        
+                        results.append((neighbor, 1, score, explanation))
+                        print(f"  ✅ {neighbor_attrs['name']} - {metaedge} (امتیاز: {score})")
+            
+            # جستجوی معکوس (بیماری‌ها که به ژن متصل هستند)
+            for other_node, other_attrs in self.G.nodes(data=True):
+                if other_attrs.get('kind') == 'Disease' and other_node != gene_node_id:
+                    for neighbor in self.G.neighbors(other_node):
+                        if neighbor == gene_node_id:
+                            edge_data = self.G.get_edge_data(other_node, neighbor)
+                            if edge_data:
+                                metaedge = edge_data.get('metaedge', 'Unknown')
+                                # امتیاز بالاتر برای روابط سرطان
+                                other_name_lower = other_attrs['name'].lower()
+                                cancer_score = 2.0 if any(keyword in other_name_lower for keyword in ['cancer', 'tumor', 'malignancy']) else 1.0
+                                
+                                score = self._calculate_metaedge_score(metaedge, 1) * cancer_score * 0.8  # امتیاز کمتر برای معکوس
+                                explanation = f"{other_attrs['name']} related to {gene_name} via {metaedge}"
+                                
+                                results.append((other_node, 1, score, explanation))
+                                print(f"  ✅ {other_attrs['name']} - {metaedge} معکوس (امتیاز: {score})")
+        
+        # جستجوی عمیق برای روابط غیرمستقیم
+        if max_depth > 1:
+            for gene_token, gene_node_id in gene_nodes:
+                print(f"🔍 جستجوی عمیق برای ژن: {self.G.nodes[gene_node_id]['name']}")
+                dfs_results = self.dfs_search(gene_node_id, max_depth)
+                for found_node, depth in dfs_results:
+                    found_attrs = self.G.nodes[found_node]
+                    if found_attrs.get('kind') == 'Disease':
+                        # امتیاز بر اساس عمق و نوع بیماری
+                        neighbor_name_lower = found_attrs['name'].lower()
+                        cancer_score = 1.5 if any(keyword in neighbor_name_lower for keyword in ['cancer', 'tumor', 'malignancy']) else 1.0
+                        
+                        score = self._calculate_metaedge_score('Unknown', depth) * cancer_score * (1.0 / depth)
+                        explanation = f"{found_attrs['name']} found at depth {depth} from {self.G.nodes[gene_node_id]['name']}"
+                        
+                        results.append((found_node, depth, score, explanation))
+                        print(f"  ✅ {found_attrs['name']} در عمق {depth} (امتیاز: {score})")
+        
+        return results
     
     def _search_genes_expressed_in_anatomy(self, matched_nodes: Dict[str, str], intent: Dict, max_depth: int = 2) -> List[Tuple[str, int, float, str]]:
         """
@@ -1043,25 +1141,53 @@ class GraphRAGService:
             'nsaid': 'Pharmacologic Class', 'antibiotic': 'Pharmacologic Class', 'antihypertensive': 'Pharmacologic Class'
         }
         
+        # نگاشت ژن‌های مشهور و نام‌های مختلف آنها
+        famous_genes = {
+            'tp53': ['TP53', 'P53', 'p53', 'Tumor Protein P53', 'Tumor Suppressor P53'],
+            'brca1': ['BRCA1', 'Breast Cancer 1', 'BRCA1 Gene'],
+            'brca2': ['BRCA2', 'Breast Cancer 2', 'BRCA2 Gene'],
+            'apoe': ['APOE', 'Apolipoprotein E', 'APOE Gene'],
+            'cftr': ['CFTR', 'Cystic Fibrosis Transmembrane Conductance Regulator'],
+            'mmp9': ['MMP9', 'Matrix Metallopeptidase 9'],
+            'bid': ['BID', 'BH3 Interacting Domain Death Agonist'],
+            'kcnq2': ['KCNQ2', 'Potassium Voltage-Gated Channel Subfamily Q Member 2'],
+            'hmgb3': ['HMGB3', 'High Mobility Group Box 3']
+        }
+        
         for token in tokens:
             token_lower = token.lower()
             found = False
             
-            # روش 1: جستجوی مستقیم بر اساس نام
-            for node_id, attrs in self.G.nodes(data=True):
-                if token_lower in attrs['name'].lower():
-                    matched[token] = node_id
-                    found = True
-                    print(f"🔍 تطبیق مستقیم: '{token}' -> {attrs['name']} ({attrs.get('kind', 'Unknown')})")
-                    break
-                # تطبیق ژن‌های مشهور
-                elif token.upper() in ['TP53', 'P53'] and 'TP53' in attrs['name'].upper():
-                    matched[token] = node_id
-                    found = True
-                    print(f"🔍 تطبیق ژن مشهور: '{token}' -> {attrs['name']} ({attrs.get('kind', 'Unknown')})")
-                    break
+            # روش 1: تطبیق ژن‌های مشهور
+            if token_lower in famous_genes:
+                gene_variants = famous_genes[token_lower]
+                for variant in gene_variants:
+                    for node_id, attrs in self.G.nodes(data=True):
+                        if (attrs.get('kind') == 'Gene' and 
+                            variant.upper() in attrs['name'].upper()):
+                            matched[token] = node_id
+                            found = True
+                            print(f"🔍 تطبیق ژن مشهور: '{token}' -> {attrs['name']} ({attrs.get('kind', 'Unknown')})")
+                            break
+                    if found:
+                        break
             
-            # روش 2: جستجو بر اساس نوع موجودیت
+            # روش 2: جستجوی مستقیم بر اساس نام
+            if not found:
+                for node_id, attrs in self.G.nodes(data=True):
+                    if token_lower in attrs['name'].lower():
+                        matched[token] = node_id
+                        found = True
+                        print(f"🔍 تطبیق مستقیم: '{token}' -> {attrs['name']} ({attrs.get('kind', 'Unknown')})")
+                        break
+                    # تطبیق ژن‌های مشهور
+                    elif token.upper() in ['TP53', 'P53'] and 'TP53' in attrs['name'].upper():
+                        matched[token] = node_id
+                        found = True
+                        print(f"🔍 تطبیق ژن مشهور: '{token}' -> {attrs['name']} ({attrs.get('kind', 'Unknown')})")
+                        break
+            
+            # روش 3: جستجو بر اساس نوع موجودیت
             if not found and token_lower in fallback_kinds:
                 kind = fallback_kinds[token_lower]
                 candidates = [(nid, attrs) for nid, attrs in self.G.nodes(data=True)
@@ -1091,7 +1217,7 @@ class GraphRAGService:
                         print(f"🔍 تطبیق نوع موجودیت: '{token}' -> {kind} (نمونه: {best_candidate[1]['name']})")
                         found = True
             
-            # روش 3: جستجوی جزئی برای کلمات چندبخشی
+            # روش 4: جستجوی جزئی برای کلمات چندبخشی
             if not found and ' ' in token_lower:
                 words = token_lower.split()
                 for node_id, attrs in self.G.nodes(data=True):
@@ -1101,6 +1227,23 @@ class GraphRAGService:
                         found = True
                         print(f"🔍 تطبیق جزئی: '{token}' -> {attrs['name']} ({attrs.get('kind', 'Unknown')})")
                         break
+            
+            # روش 5: جستجوی فازی برای ژن‌ها
+            if not found and len(token) >= 3:
+                for node_id, attrs in self.G.nodes(data=True):
+                    if attrs.get('kind') == 'Gene':
+                        name_lower = attrs['name'].lower()
+                        # تطبیق فازی برای ژن‌ها
+                        if (token_lower in name_lower or 
+                            name_lower in token_lower or
+                            any(word in name_lower for word in token_lower.split())):
+                            matched[token] = node_id
+                            found = True
+                            print(f"🔍 تطبیق فازی ژن: '{token}' -> {attrs['name']} ({attrs.get('kind', 'Unknown')})")
+                            break
+            
+            if not found:
+                print(f"❌ تطبیق نشد: '{token}'")
         
         return matched
     
@@ -2582,6 +2725,10 @@ class GraphRAGService:
         anatomy_nodes = [n for n in retrieval_result.nodes if n.kind == 'Anatomy']
         process_nodes = [n for n in retrieval_result.nodes if n.kind == 'Biological Process']
         
+        # تشخیص سوالات ژن-سرطان
+        if self._is_gene_cancer_question_from_context(retrieval_result):
+            return self._generate_gene_cancer_answer(retrieval_result, gene_nodes, disease_nodes)
+        
         # تولید پاسخ بر اساس نوع سوال
         if question_type == "relationship":
             return self._generate_intelligent_relationship_answer(retrieval_result, gene_nodes, disease_nodes, drug_nodes)
@@ -2667,9 +2814,10 @@ class GraphRAGService:
             answer_parts.append("**ژن‌های مهم یافت شده:**")
             # مرتب‌سازی بر اساس امتیاز
             sorted_genes = sorted(gene_nodes, key=lambda x: getattr(x, 'score', 1.0), reverse=True)
+            
             for gene in sorted_genes[:5]:
                 score_info = f" (امتیاز: {gene.score:.2f})" if hasattr(gene, 'score') and gene.score != 1.0 else ""
-                answer_parts.append(f"• {gene.name}{score_info}")
+                answer_parts.append(f"• **{gene.name}**{score_info}")
             answer_parts.append("")
         
         if process_nodes:
@@ -2679,16 +2827,30 @@ class GraphRAGService:
             answer_parts.append("")
         
         # روابط ژن-فرآیند
-        gene_process_edges = [e for e in retrieval_result.edges if 'participate' in e.relation.lower() or 'regulate' in e.relation.lower()]
+        gene_process_edges = [e for e in retrieval_result.edges 
+                            if any(n.id == e.source for n in gene_nodes) and 
+                               any(n.id == e.target for n in process_nodes)]
+        
         if gene_process_edges:
             answer_parts.append("**روابط ژن-فرآیند:**")
             for edge in gene_process_edges[:5]:
                 source_name = next(n.name for n in retrieval_result.nodes if n.id == edge.source)
                 target_name = next(n.name for n in retrieval_result.nodes if n.id == edge.target)
-                answer_parts.append(f"• {source_name} → {target_name}")
+                answer_parts.append(f"• {source_name} → {target_name} ({edge.relation})")
+            answer_parts.append("")
+        
+        # تحلیل آماری
+        total_genes = len(gene_nodes)
+        total_processes = len(process_nodes)
+        total_relationships = len(retrieval_result.edges)
+        
+        answer_parts.append("**آمار کلی:**")
+        answer_parts.append(f"• ژن‌های یافت شده: {total_genes}")
+        answer_parts.append(f"• فرآیندهای زیستی: {total_processes}")
+        answer_parts.append(f"• روابط کل: {total_relationships}")
         
         if not gene_nodes:
-            answer_parts.append("❌ اطلاعات ژنتیکی در نتایج یافت نشد.")
+            answer_parts.append("\n❌ ژن مرتبطی در نتایج یافت نشد.")
         
         return "\n".join(answer_parts)
     
@@ -2814,6 +2976,12 @@ class GraphRAGService:
     
     def _generate_intelligent_general_answer(self, retrieval_result: RetrievalResult, gene_nodes, disease_nodes, drug_nodes, anatomy_nodes, process_nodes) -> str:
         """تولید پاسخ هوشمند عمومی"""
+        query_lower = retrieval_result.query.lower()
+        
+        # تشخیص سوالات ژن-سرطان
+        if self._is_gene_cancer_question_from_context(retrieval_result):
+            return self._generate_gene_cancer_answer(retrieval_result, gene_nodes, disease_nodes)
+        
         answer_parts = ["📊 **تحلیل جامع:**\n"]
         
         # خلاصه آماری
@@ -2870,6 +3038,96 @@ class GraphRAGService:
         
         if not retrieval_result.nodes:
             answer_parts.append("❌ اطلاعات مرتبطی در گراف دانش یافت نشد.")
+        
+        return "\n".join(answer_parts)
+    
+    def _is_gene_cancer_question_from_context(self, retrieval_result: RetrievalResult) -> bool:
+        """تشخیص سوالات ژن-سرطان از محتوای بازیابی شده"""
+        query_lower = retrieval_result.query.lower()
+        cancer_keywords = ['cancer', 'tumor', 'malignancy', 'oncology', 'carcinoma', 'sarcoma', 'leukemia', 'lymphoma']
+        
+        # بررسی وجود کلمات سرطان در سوال
+        has_cancer_in_query = any(keyword in query_lower for keyword in cancer_keywords)
+        
+        # بررسی وجود ژن‌ها و بیماری‌های سرطان در نتایج
+        gene_nodes = [n for n in retrieval_result.nodes if n.kind == 'Gene']
+        disease_nodes = [n for n in retrieval_result.nodes if n.kind == 'Disease']
+        
+        has_genes = len(gene_nodes) > 0
+        has_cancer_diseases = any(
+            any(keyword in disease.name.lower() for keyword in cancer_keywords)
+            for disease in disease_nodes
+        )
+        
+        return has_cancer_in_query and has_genes and has_cancer_diseases
+    
+    def _generate_gene_cancer_answer(self, retrieval_result: RetrievalResult, gene_nodes, disease_nodes) -> str:
+        """تولید پاسخ تخصصی برای سوالات ژن-سرطان"""
+        answer_parts = ["🧬 **تحلیل تخصصی ژن-سرطان:**\n"]
+        
+        # شناسایی ژن‌های اصلی
+        primary_genes = []
+        for gene in gene_nodes:
+            gene_name_lower = gene.name.lower()
+            # بررسی ژن‌های مشهور
+            famous_genes = ['tp53', 'p53', 'brca1', 'brca2', 'apoe', 'cftr', 'mmp9', 'bid', 'kcnq2', 'hmgb3']
+            if any(famous in gene_name_lower for famous in famous_genes):
+                primary_genes.append(gene)
+        
+        if primary_genes:
+            answer_parts.append("**ژن‌های اصلی یافت شده:**")
+            for gene in primary_genes:
+                score_info = f" (امتیاز: {gene.score:.2f})" if hasattr(gene, 'score') and gene.score != 1.0 else ""
+                answer_parts.append(f"• **{gene.name}**{score_info}")
+            answer_parts.append("")
+        
+        # شناسایی سرطان‌های مرتبط
+        cancer_diseases = []
+        other_diseases = []
+        
+        for disease in disease_nodes:
+            disease_name_lower = disease.name.lower()
+            cancer_keywords = ['cancer', 'tumor', 'malignancy', 'carcinoma', 'sarcoma', 'leukemia', 'lymphoma']
+            if any(keyword in disease_name_lower for keyword in cancer_keywords):
+                cancer_diseases.append(disease)
+            else:
+                other_diseases.append(disease)
+        
+        if cancer_diseases:
+            answer_parts.append("**سرطان‌های مرتبط:**")
+            for cancer in cancer_diseases:
+                answer_parts.append(f"• {cancer.name}")
+            answer_parts.append("")
+        
+        if other_diseases:
+            answer_parts.append("**بیماری‌های دیگر مرتبط:**")
+            for disease in other_diseases[:3]:
+                answer_parts.append(f"• {disease.name}")
+            answer_parts.append("")
+        
+        # تحلیل روابط
+        if retrieval_result.edges:
+            answer_parts.append("**روابط مهم یافت شده:**")
+            relations_count = {}
+            for edge in retrieval_result.edges:
+                relations_count[edge.relation] = relations_count.get(edge.relation, 0) + 1
+            
+            for relation, count in sorted(relations_count.items(), key=lambda x: x[1], reverse=True)[:5]:
+                answer_parts.append(f"• {relation}: {count} رابطه")
+            answer_parts.append("")
+        
+        # تحلیل آماری
+        total_entities = len(retrieval_result.nodes)
+        total_relationships = len(retrieval_result.edges)
+        
+        answer_parts.append("**آمار کلی:**")
+        answer_parts.append(f"• کل موجودیت‌ها: {total_entities}")
+        answer_parts.append(f"• کل روابط: {total_relationships}")
+        answer_parts.append(f"• ژن‌های اصلی: {len(primary_genes)}")
+        answer_parts.append(f"• سرطان‌های مرتبط: {len(cancer_diseases)}")
+        
+        # پیام راهنما
+        answer_parts.append("\n📌 **راهنما:** تحلیل اهمیت زیستی و بالینی این ژن‌ها را بررسی کنید.")
         
         return "\n".join(answer_parts)
     
@@ -3330,6 +3588,7 @@ class GraphRAGService:
     
     def _fallback_generation(self, retrieval_result: RetrievalResult, model_name: str) -> str:
         """تولید پاسخ پشتیبان در صورت خطا"""
+        # استفاده از تحلیل داخلی به جای پیام ساده
         return f"""🤖 **تحلیل با {model_name} (پاسخ پشتیبان):**
 
 {self.gpt_simulation_generation(retrieval_result)}
