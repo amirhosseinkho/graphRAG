@@ -78,10 +78,44 @@ class GraphRAGService:
     """سرویس اصلی GraphRAG"""
     
     def __init__(self, graph_data_path: str = None):
+        """راه‌اندازی سرویس GraphRAG"""
+        self.graph_data_path = graph_data_path or "hetionet_graph.pkl"
         self.G = None
         self.nlp = None
-        self.graph_data_path = graph_data_path
+        
+        # تنظیمات قابل تغییر برای محدودیت‌ها
+        self.config = {
+            'max_nodes': 10,           # حداکثر تعداد نودهای بازیابی شده
+            'max_edges': 20,           # حداکثر تعداد یال‌های بازیابی شده
+            'max_depth': 3,            # حداکثر عمق جستجو
+            'max_paths': 5,            # حداکثر تعداد مسیرها
+            'max_context_length': 2000, # حداکثر طول متن زمینه (کاراکتر)
+            'max_answer_tokens': 1000,  # حداکثر توکن‌های پاسخ
+            'max_prompt_tokens': 4000,  # حداکثر توکن‌های ورودی
+            'enable_verbose_logging': True,  # نمایش جزئیات
+            'enable_biological_enrichment': True,  # غنی‌سازی زیستی
+            'enable_smart_filtering': True,  # فیلتر هوشمند
+        }
+        
+        # API Keys
+        self.openai_api_key = None
+        self.anthropic_api_key = None
+        self.gemini_api_key = None
+        
         self.initialize()
+    
+    def set_config(self, **kwargs):
+        """تغییر تنظیمات سیستم"""
+        for key, value in kwargs.items():
+            if key in self.config:
+                self.config[key] = value
+                print(f"✅ تنظیم {key} = {value}")
+            else:
+                print(f"⚠️ تنظیم نامعتبر: {key}")
+    
+    def get_config(self):
+        """دریافت تنظیمات فعلی"""
+        return self.config.copy()
     
     def initialize(self):
         """راه‌اندازی سرویس"""
@@ -703,7 +737,7 @@ class GraphRAGService:
             results = self._search_by_metaedges(matched_nodes, intent, ['DlA'], max_depth)
             
         elif intent['question_type'] == 'disease_symptom':
-            print("🤒 تشخیص نوع سوال: علائم بیماری")
+            print(" تشخیص نوع سوال: علائم بیماری")
             results = self._search_by_metaedges(matched_nodes, intent, ['DpS'], max_depth)
             
         elif intent['question_type'] == 'disease_similarity':
@@ -1287,7 +1321,7 @@ class GraphRAGService:
                             any(word in name_lower for word in token_lower.split())):
                             matched[token] = node_id
                             found = True
-                            print(f"🔍 تطبیق فازی ژن: '{token}' -> {attrs['name']} ({attrs.get('kind', 'Unknown')})")
+                            print(f" تطبیق فازی ژن: '{token}' -> {attrs['name']} ({attrs.get('kind', 'Unknown')})")
                             break
             
             if not found:
@@ -1571,7 +1605,13 @@ class GraphRAGService:
         return [(node, depth, method) for node, depth, method, score in sorted_results]
     
     def retrieve_information(self, query: str, method: RetrievalMethod, 
-                           max_depth: int = 2, max_nodes: int = 10) -> RetrievalResult:
+                           max_depth: int = None, max_nodes: int = None) -> RetrievalResult:
+        """بازیابی اطلاعات از گراف"""
+        # استفاده از تنظیمات پیش‌فرض اگر مقدار داده نشده
+        if max_depth is None:
+            max_depth = self.config['max_depth']
+        if max_nodes is None:
+            max_nodes = self.config['max_nodes']
         """بازیابی اطلاعات از گراف"""
         print(f"🔍 بازیابی اطلاعات با روش {method.value if hasattr(method, 'value') else method}...")
         
@@ -3508,7 +3548,7 @@ class GraphRAGService:
                     {"role": "system", "content": "You are a biomedical expert analyzing knowledge graph data. Provide detailed, accurate, and well-structured answers in Persian with proper formatting and emojis."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=800,  # افزایش تعداد توکن‌ها
+                max_tokens=self.config['max_answer_tokens'],  # استفاده از تنظیمات
                 temperature=0.7,
                 presence_penalty=0.1,  # تشویق به تنوع
                 frequency_penalty=0.1   # کاهش تکرار
@@ -3537,7 +3577,7 @@ class GraphRAGService:
             # درخواست به Claude
             response = client.messages.create(
                 model="claude-3-sonnet-20240229",
-                max_tokens=500,
+                max_tokens=self.config['max_answer_tokens'],
                 messages=[
                     {"role": "user", "content": prompt}
                 ]

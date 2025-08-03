@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مدیریت گراف‌ها - GraphRAG</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1><i class="fas fa-list"></i> مدیریت گراف‌ها</h1>
+            <p>مدیریت و انتخاب گراف‌های موجود در سیستم</p>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="nav-menu">
+            <a href="/" class="nav-link">
+                <i class="fas fa-home"></i> صفحه اصلی
+            </a>
+            <a href="/upload_graph" class="nav-link">
+                <i class="fas fa-upload"></i> آپلود گراف
+            </a>
+            <a href="/manage_graphs" class="nav-link active">
+                <i class="fas fa-list"></i> مدیریت گراف‌ها
+            </a>
+            <a href="/evaluation" class="nav-link">
+                <i class="fas fa-chart-bar"></i> ارزیابی
+            </a>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Current Graph Info -->
+            <section class="current-graph-section">
+                <h2><i class="fas fa-info-circle"></i> گراف فعلی</h2>
+                <div class="current-graph-info" id="current-graph-info">
+                    <div class="loading-spinner">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>در حال بارگذاری اطلاعات...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Graphs List -->
+            <section class="graphs-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-project-diagram"></i> گراف‌های موجود</h2>
+                    <button id="refresh-btn" class="btn btn-secondary">
+                        <i class="fas fa-sync-alt"></i> به‌روزرسانی
+                    </button>
+                </div>
+
+                <div class="graphs-container" id="graphs-container">
+                    <div class="loading-spinner">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>در حال بارگذاری لیست گراف‌ها...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Graph Actions -->
+            <section class="actions-section" id="actions-section" style="display: none;">
+                <h2><i class="fas fa-cogs"></i> عملیات</h2>
+                <div class="action-buttons">
+                    <button id="load-graph-btn" class="btn btn-primary">
+                        <i class="fas fa-play"></i> بارگذاری گراف انتخاب شده
+                    </button>
+                    <button id="delete-graph-btn" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> حذف گراف انتخاب شده
+                    </button>
+                </div>
+            </section>
+
+            <!-- Graph Details Modal -->
+            <div id="graph-details-modal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3><i class="fas fa-info-circle"></i> جزئیات گراف</h3>
+                        <span class="close">&times;</span>
+                    </div>
+                    <div class="modal-body">
+                        <div class="graph-details" id="graph-details">
+                            <!-- Graph details will be loaded here -->
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="load-from-modal-btn" class="btn btn-primary">
+                            <i class="fas fa-play"></i> بارگذاری این گراف
+                        </button>
+                        <button id="delete-from-modal-btn" class="btn btn-danger">
+                            <i class="fas fa-trash"></i> حذف این گراف
+                        </button>
+                        <button class="btn btn-secondary close-modal-btn">
+                            <i class="fas fa-times"></i> بستن
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Confirmation Modal -->
+            <div id="confirmation-modal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3><i class="fas fa-exclamation-triangle"></i> تأیید عملیات</h3>
+                        <span class="close">&times;</span>
+                    </div>
+                    <div class="modal-body">
+                        <p id="confirmation-text"></p>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="confirm-btn" class="btn btn-danger">
+                            <i class="fas fa-check"></i> تأیید
+                        </button>
+                        <button class="btn btn-secondary close-modal-btn">
+                            <i class="fas fa-times"></i> لغو
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/manage_graphs.js') }}"></script>
+</body>
+</html> 

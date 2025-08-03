@@ -16,6 +16,22 @@
             <p>سیستم بازیابی مبتنی بر گراف برای علوم زیستی</p>
         </header>
 
+        <!-- Navigation -->
+        <nav class="nav-menu">
+            <a href="/" class="nav-link active">
+                <i class="fas fa-home"></i> صفحه اصلی
+            </a>
+            <a href="/upload_graph" class="nav-link">
+                <i class="fas fa-upload"></i> آپلود گراف
+            </a>
+            <a href="/manage_graphs" class="nav-link">
+                <i class="fas fa-list"></i> مدیریت گراف‌ها
+            </a>
+            <a href="/evaluation" class="nav-link">
+                <i class="fas fa-chart-bar"></i> ارزیابی
+            </a>
+        </nav>
+
         <!-- Main Content -->
         <main class="main-content">
             <!-- Query Section -->
@@ -71,7 +87,137 @@
                         <button id="sample-btn" class="btn btn-secondary">
                             <i class="fas fa-random"></i> سوال نمونه
                         </button>
+                        <button id="config-btn" class="btn btn-info">
+                            <i class="fas fa-cog"></i> تنظیمات
+                        </button>
                     </div>
+                </div>
+            </section>
+
+            <!-- Configuration Modal -->
+            <div id="config-modal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3><i class="fas fa-cog"></i> تنظیمات سیستم</h3>
+                        <span class="close">&times;</span>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Presets Section -->
+                        <div class="presets-section">
+                            <h4><i class="fas fa-preset-bottle"></i> پیش‌تنظیمات</h4>
+                            <div class="preset-buttons">
+                                <button class="preset-btn" data-preset="fast">
+                                    <i class="fas fa-bolt"></i> سریع
+                                </button>
+                                <button class="preset-btn" data-preset="balanced">
+                                    <i class="fas fa-balance-scale"></i> متوازن
+                                </button>
+                                <button class="preset-btn" data-preset="comprehensive">
+                                    <i class="fas fa-search-plus"></i> جامع
+                                </button>
+                                <button class="preset-btn" data-preset="research">
+                                    <i class="fas fa-microscope"></i> تحقیقاتی
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Advanced Settings -->
+                        <div class="advanced-settings">
+                            <h4><i class="fas fa-sliders-h"></i> تنظیمات پیشرفته</h4>
+                            
+                            <div class="settings-grid">
+                                <div class="setting-group">
+                                    <label for="max-nodes">حداکثر نودها:</label>
+                                    <input type="number" id="max-nodes" min="1" max="50" value="10">
+                                    <span class="setting-description">تعداد نودهای بازیابی شده</span>
+                                </div>
+
+                                <div class="setting-group">
+                                    <label for="max-edges">حداکثر یال‌ها:</label>
+                                    <input type="number" id="max-edges" min="1" max="100" value="20">
+                                    <span class="setting-description">تعداد یال‌های بازیابی شده</span>
+                                </div>
+
+                                <div class="setting-group">
+                                    <label for="max-depth-config">حداکثر عمق:</label>
+                                    <input type="number" id="max-depth-config" min="1" max="10" value="3">
+                                    <span class="setting-description">عمق جستجو در گراف</span>
+                                </div>
+
+                                <div class="setting-group">
+                                    <label for="max-paths">حداکثر مسیرها:</label>
+                                    <input type="number" id="max-paths" min="1" max="20" value="5">
+                                    <span class="setting-description">تعداد مسیرهای یافت شده</span>
+                                </div>
+
+                                <div class="setting-group">
+                                    <label for="max-context-length">حداکثر طول متن زمینه:</label>
+                                    <input type="number" id="max-context-length" min="500" max="5000" value="2000">
+                                    <span class="setting-description">طول متن زمینه (کاراکتر)</span>
+                                </div>
+
+                                <div class="setting-group">
+                                    <label for="max-answer-tokens">حداکثر توکن‌های پاسخ:</label>
+                                    <input type="number" id="max-answer-tokens" min="100" max="3000" value="1000">
+                                    <span class="setting-description">طول پاسخ تولید شده</span>
+                                </div>
+
+                                <div class="setting-group">
+                                    <label for="max-prompt-tokens">حداکثر توکن‌های ورودی:</label>
+                                    <input type="number" id="max-prompt-tokens" min="1000" max="10000" value="4000">
+                                    <span class="setting-description">طول متن ورودی به مدل</span>
+                                </div>
+                            </div>
+
+                            <div class="boolean-settings">
+                                <div class="setting-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="enable-verbose-logging" checked>
+                                        <span class="checkmark"></span>
+                                        نمایش جزئیات
+                                    </label>
+                                    <span class="setting-description">نمایش اطلاعات اضافی در خروجی</span>
+                                </div>
+
+                                <div class="setting-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="enable-biological-enrichment" checked>
+                                        <span class="checkmark"></span>
+                                        غنی‌سازی زیستی
+                                    </label>
+                                    <span class="setting-description">اضافه کردن اطلاعات زیستی به پاسخ</span>
+                                </div>
+
+                                <div class="setting-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="enable-smart-filtering" checked>
+                                        <span class="checkmark"></span>
+                                        فیلتر هوشمند
+                                    </label>
+                                    <span class="setting-description">فیلتر کردن نتایج غیرمرتبط</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Current Config Display -->
+                        <div class="current-config">
+                            <h4><i class="fas fa-info-circle"></i> تنظیمات فعلی</h4>
+                            <div id="current-config-display" class="config-display"></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="save-config-btn" class="btn btn-primary">
+                            <i class="fas fa-save"></i> ذخیره تنظیمات
+                        </button>
+                        <button id="reset-config-btn" class="btn btn-secondary">
+                            <i class="fas fa-undo"></i> بازنشانی
+                        </button>
+                        <button id="close-config-btn" class="btn btn-light">
+                            <i class="fas fa-times"></i> بستن
+                        </button>
+                    </div>
+                </div>
+            </div>
                 </div>
             </section>
 

@@ -131,10 +131,10 @@ def rebuild_graph():
             for metaedge, count in sorted(edge_types.items()):
                 f.write(f"{metaedge}: {count}\n")
         
-        print(f"✅ آمار گراف در فایل: {stats_filename}")
+        print(f" آمار گراف در فایل: {stats_filename}")
         
         # تست عملکرد
-        print(f"\n🧪 تست عملکرد گراف...")
+        print(f"\n تست عملکرد گراف...")
         
         # پیدا کردن چند نود نمونه
         sample_nodes = list(G.nodes())[:5]
@@ -144,14 +144,14 @@ def rebuild_graph():
             neighbors = list(G.neighbors(node))
             print(f"نود {G.nodes[node]['name']} ({G.nodes[node]['kind']}): {len(neighbors)} همسایه")
         
-        print(f"\n🎉 گراف با موفقیت بازسازی شد!")
+        print(f"\n گراف با موفقیت بازسازی شد!")
         print(f"فایل گراف: {graph_filename}")
         print(f"فایل آمار: {stats_filename}")
         
         return True
         
     except Exception as e:
-        print(f"❌ خطا در بازسازی گراف: {e}")
+        print(f" خطا در بازسازی گراف: {e}")
         import traceback
         traceback.print_exc()
         return False

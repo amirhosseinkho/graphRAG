@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>آپلود گراف - GraphRAG</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1><i class="fas fa-upload"></i> آپلود گراف</h1>
+            <p>آپلود فایل‌های گراف برای استفاده در سیستم GraphRAG</p>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="nav-menu">
+            <a href="/" class="nav-link">
+                <i class="fas fa-home"></i> صفحه اصلی
+            </a>
+            <a href="/upload_graph" class="nav-link active">
+                <i class="fas fa-upload"></i> آپلود گراف
+            </a>
+            <a href="/manage_graphs" class="nav-link">
+                <i class="fas fa-list"></i> مدیریت گراف‌ها
+            </a>
+            <a href="/evaluation" class="nav-link">
+                <i class="fas fa-chart-bar"></i> ارزیابی
+            </a>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Upload Section -->
+            <section class="upload-section">
+                <div class="upload-form">
+                    <h2><i class="fas fa-cloud-upload-alt"></i> آپلود فایل گراف</h2>
+                    
+                    <div class="upload-info">
+                        <h3><i class="fas fa-info-circle"></i> فرمت‌های پشتیبانی شده:</h3>
+                        <ul class="format-list">
+                            <li><strong>PKL:</strong> فایل‌های Python Pickle (گراف‌های از پیش پردازش شده)</li>
+                            <li><strong>SIF:</strong> Simple Interaction Format (فرمت استاندارد تعاملات زیستی)</li>
+                            <li><strong>TSV:</strong> Tab-Separated Values (داده‌های جدا شده با Tab)</li>
+                            <li><strong>CSV:</strong> Comma-Separated Values (داده‌های جدا شده با کاما)</li>
+                            <li><strong>TXT:</strong> فایل‌های متنی ساده</li>
+                            <li><strong>GZ:</strong> فایل‌های فشرده Gzip</li>
+                        </ul>
+                    </div>
+
+                    <div class="upload-area" id="upload-area">
+                        <div class="upload-content">
+                            <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                            <h3>فایل خود را اینجا بکشید یا کلیک کنید</h3>
+                            <p>حداکثر اندازه فایل: 100 مگابایت</p>
+                            <input type="file" id="graph-file" accept=".pkl,.sif,.tsv,.csv,.txt,.gz" style="display: none;">
+                            <button class="btn btn-primary" onclick="document.getElementById('graph-file').click()">
+                                <i class="fas fa-folder-open"></i> انتخاب فایل
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="file-info" id="file-info" style="display: none;">
+                        <h3><i class="fas fa-file"></i> اطلاعات فایل</h3>
+                        <div class="file-details">
+                            <p><strong>نام فایل:</strong> <span id="file-name"></span></p>
+                            <p><strong>اندازه:</strong> <span id="file-size"></span></p>
+                            <p><strong>نوع:</strong> <span id="file-type"></span></p>
+                        </div>
+                    </div>
+
+                    <div class="upload-actions">
+                        <button id="upload-btn" class="btn btn-primary" style="display: none;">
+                            <i class="fas fa-upload"></i> آپلود فایل
+                        </button>
+                        <button id="cancel-btn" class="btn btn-secondary" style="display: none;">
+                            <i class="fas fa-times"></i> لغو
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Upload Progress -->
+            <section class="progress-section" id="progress-section" style="display: none;">
+                <h3><i class="fas fa-spinner fa-spin"></i> در حال آپلود...</h3>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <p id="progress-text">آماده‌سازی فایل...</p>
+            </section>
+
+            <!-- Upload Result -->
+            <section class="result-section" id="result-section" style="display: none;">
+                <div class="result-content">
+                    <div class="success-message" id="success-message" style="display: none;">
+                        <i class="fas fa-check-circle"></i>
+                        <h3>آپلود موفق!</h3>
+                        <p id="success-text"></p>
+                        <div class="result-actions">
+                            <a href="/manage_graphs" class="btn btn-primary">
+                                <i class="fas fa-list"></i> مشاهده گراف‌ها
+                            </a>
+                            <button class="btn btn-secondary" onclick="resetUpload()">
+                                <i class="fas fa-plus"></i> آپلود فایل دیگر
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="error-message" id="error-message" style="display: none;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <h3>خطا در آپلود!</h3>
+                        <p id="error-text"></p>
+                        <button class="btn btn-primary" onclick="resetUpload()">
+                            <i class="fas fa-redo"></i> تلاش مجدد
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Instructions -->
+            <section class="instructions-section">
+                <h2><i class="fas fa-question-circle"></i> راهنمای آپلود</h2>
+                
+                <div class="instruction-cards">
+                    <div class="instruction-card">
+                        <h3><i class="fas fa-file-code"></i> فرمت SIF</h3>
+                        <p>برای فایل‌های SIF، هر خط باید شامل سه ستون باشد:</p>
+                        <pre>NodeA    interaction_type    NodeB</pre>
+                        <p>مثال: <code>TP53    regulates    CDKN1A</code></p>
+                    </div>
+                    
+                    <div class="instruction-card">
+                        <h3><i class="fas fa-table"></i> فرمت TSV/CSV</h3>
+                        <p>ستون‌های مورد نیاز:</p>
+                        <ul>
+                            <li>ستون 1: نود منبع</li>
+                            <li>ستون 2: نوع رابطه</li>
+                            <li>ستون 3: نود هدف</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="instruction-card">
+                        <h3><i class="fas fa-database"></i> فرمت PKL</h3>
+                        <p>فایل‌های از پیش پردازش شده که شامل:</p>
+                        <ul>
+                            <li>گراف NetworkX</li>
+                            <li>اطلاعات نودها و یال‌ها</li>
+                            <li>متادیتای اضافی</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/upload.js') }}"></script>
+</body>
+</html> 

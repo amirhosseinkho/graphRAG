@@ -18,6 +18,11 @@ class GraphRAGApp {
             this.loadRandomSampleQuery();
         });
 
+        // Config button
+        document.getElementById('config-btn').addEventListener('click', () => {
+            this.openConfigModal();
+        });
+
         // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -30,6 +35,41 @@ class GraphRAGApp {
             if (e.key === 'Enter' && e.ctrlKey) {
                 this.processQuery();
             }
+        });
+
+        // Modal event listeners
+        this.initializeModalEvents();
+    }
+
+    initializeModalEvents() {
+        const modal = document.getElementById('config-modal');
+        const closeBtn = modal.querySelector('.close');
+        const closeConfigBtn = document.getElementById('close-config-btn');
+        const saveConfigBtn = document.getElementById('save-config-btn');
+        const resetConfigBtn = document.getElementById('reset-config-btn');
+
+        // Close modal
+        closeBtn.addEventListener('click', () => this.closeConfigModal());
+        closeConfigBtn.addEventListener('click', () => this.closeConfigModal());
+        
+        // Close modal when clicking outside
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                this.closeConfigModal();
+            }
+        });
+
+        // Save config
+        saveConfigBtn.addEventListener('click', () => this.saveConfig());
+
+        // Reset config
+        resetConfigBtn.addEventListener('click', () => this.resetConfig());
+
+        // Preset buttons
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                this.applyPreset(e.target.dataset.preset);
+            });
         });
     }
 
@@ -304,6 +344,199 @@ class GraphRAGApp {
     }
 
     showError(message) {
+        alert('خطا: ' + message);
+    }
+
+    // Configuration Methods
+    async openConfigModal() {
+        const modal = document.getElementById('config-modal');
+        modal.style.display = 'block';
+        
+        // Load current config
+        await this.loadCurrentConfig();
+        
+        // Load presets
+        await this.loadPresets();
+    }
+
+    closeConfigModal() {
+        const modal = document.getElementById('config-modal');
+        modal.style.display = 'none';
+    }
+
+    async loadCurrentConfig() {
+        try {
+            const response = await fetch('/api/config');
+            const data = await response.json();
+            
+            if (data.success) {
+                this.displayCurrentConfig(data.config);
+                this.populateConfigForm(data.config);
+            }
+        } catch (error) {
+            console.error('Error loading config:', error);
+        }
+    }
+
+    displayCurrentConfig(config) {
+        const display = document.getElementById('current-config-display');
+        display.innerHTML = '';
+        
+        Object.entries(config).forEach(([key, value]) => {
+            const item = document.createElement('div');
+            item.className = 'config-item';
+            item.innerHTML = `
+                <span class="config-key">${this.formatConfigKey(key)}:</span>
+                <span class="config-value">${value}</span>
+            `;
+            display.appendChild(item);
+        });
+    }
+
+    formatConfigKey(key) {
+        const keyMap = {
+            'max_nodes': 'حداکثر نودها',
+            'max_edges': 'حداکثر یال‌ها',
+            'max_depth': 'حداکثر عمق',
+            'max_paths': 'حداکثر مسیرها',
+            'max_context_length': 'حداکثر طول متن زمینه',
+            'max_answer_tokens': 'حداکثر توکن‌های پاسخ',
+            'max_prompt_tokens': 'حداکثر توکن‌های ورودی',
+            'enable_verbose_logging': 'نمایش جزئیات',
+            'enable_biological_enrichment': 'غنی‌سازی زیستی',
+            'enable_smart_filtering': 'فیلتر هوشمند'
+        };
+        return keyMap[key] || key;
+    }
+
+    populateConfigForm(config) {
+        // Populate number inputs
+        document.getElementById('max-nodes').value = config.max_nodes || 10;
+        document.getElementById('max-edges').value = config.max_edges || 20;
+        document.getElementById('max-depth-config').value = config.max_depth || 3;
+        document.getElementById('max-paths').value = config.max_paths || 5;
+        document.getElementById('max-context-length').value = config.max_context_length || 2000;
+        document.getElementById('max-answer-tokens').value = config.max_answer_tokens || 1000;
+        document.getElementById('max-prompt-tokens').value = config.max_prompt_tokens || 4000;
+        
+        // Populate checkboxes
+        document.getElementById('enable-verbose-logging').checked = config.enable_verbose_logging || false;
+        document.getElementById('enable-biological-enrichment').checked = config.enable_biological_enrichment || false;
+        document.getElementById('enable-smart-filtering').checked = config.enable_smart_filtering || false;
+    }
+
+    async loadPresets() {
+        try {
+            const response = await fetch('/api/config/presets');
+            const data = await response.json();
+            this.presets = data.presets;
+        } catch (error) {
+            console.error('Error loading presets:', error);
+        }
+    }
+
+    applyPreset(presetName) {
+        if (!this.presets || !this.presets[presetName]) {
+            console.error('Preset not found:', presetName);
+            return;
+        }
+
+        const preset = this.presets[presetName];
+        const config = preset.config;
+        
+        // Update form values
+        this.populateConfigForm(config);
+        
+        // Update current config display
+        this.displayCurrentConfig(config);
+        
+        // Update active preset button
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.querySelector(`[data-preset="${presetName}"]`).classList.add('active');
+        
+        // Show preset description
+        this.showPresetDescription(preset);
+    }
+
+    showPresetDescription(preset) {
+        // You can add a toast or notification here
+        console.log(`Applied preset: ${preset.name} - ${preset.description}`);
+    }
+
+    async saveConfig() {
+        const config = this.getConfigFromForm();
+        
+        try {
+            const response = await fetch('/api/config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ config })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                this.displayCurrentConfig(data.config);
+                this.showSuccessMessage('تنظیمات با موفقیت ذخیره شد');
+            } else {
+                this.showErrorMessage('خطا در ذخیره تنظیمات: ' + data.error);
+            }
+        } catch (error) {
+            console.error('Error saving config:', error);
+            this.showErrorMessage('خطا در ذخیره تنظیمات');
+        }
+    }
+
+    getConfigFromForm() {
+        return {
+            max_nodes: parseInt(document.getElementById('max-nodes').value),
+            max_edges: parseInt(document.getElementById('max-edges').value),
+            max_depth: parseInt(document.getElementById('max-depth-config').value),
+            max_paths: parseInt(document.getElementById('max-paths').value),
+            max_context_length: parseInt(document.getElementById('max-context-length').value),
+            max_answer_tokens: parseInt(document.getElementById('max-answer-tokens').value),
+            max_prompt_tokens: parseInt(document.getElementById('max-prompt-tokens').value),
+            enable_verbose_logging: document.getElementById('enable-verbose-logging').checked,
+            enable_biological_enrichment: document.getElementById('enable-biological-enrichment').checked,
+            enable_smart_filtering: document.getElementById('enable-smart-filtering').checked
+        };
+    }
+
+    async resetConfig() {
+        // Reset to default values
+        const defaultConfig = {
+            max_nodes: 10,
+            max_edges: 20,
+            max_depth: 3,
+            max_paths: 5,
+            max_context_length: 2000,
+            max_answer_tokens: 1000,
+            max_prompt_tokens: 4000,
+            enable_verbose_logging: true,
+            enable_biological_enrichment: true,
+            enable_smart_filtering: true
+        };
+        
+        this.populateConfigForm(defaultConfig);
+        this.displayCurrentConfig(defaultConfig);
+        
+        // Remove active class from preset buttons
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+    }
+
+    showSuccessMessage(message) {
+        // Simple alert for now, you can replace with a better notification system
+        alert(message);
+    }
+
+    showErrorMessage(message) {
+        // Simple alert for now, you can replace with a better notification system
         alert('خطا: ' + message);
     }
 }

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ارزیابی پاسخ‌ها - GraphRAG</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1><i class="fas fa-chart-bar"></i> ارزیابی پاسخ‌ها</h1>
+            <p>مقایسه پاسخ‌های مختلف با روش‌های متنوع و پیشرفته</p>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="nav-menu">
+            <a href="/" class="nav-link">
+                <i class="fas fa-home"></i> صفحه اصلی
+            </a>
+            <a href="/upload_graph" class="nav-link">
+                <i class="fas fa-upload"></i> آپلود گراف
+            </a>
+            <a href="/manage_graphs" class="nav-link">
+                <i class="fas fa-list"></i> مدیریت گراف‌ها
+            </a>
+            <a href="/evaluation" class="nav-link active">
+                <i class="fas fa-chart-bar"></i> ارزیابی
+            </a>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Query Section -->
+            <section class="query-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-question-circle"></i> سوال مورد نظر</h2>
+                    <p>سوال خود را وارد کنید تا پاسخ‌های مختلف تولید شوند</p>
+                </div>
+                <div class="query-input-container">
+                    <input type="text" id="queryInput" class="query-input" placeholder="سوال خود را اینجا وارد کنید..." value="ژن TP53 چه نقشی در سرطان دارد؟">
+                </div>
+            </section>
+
+            <!-- Answers Section -->
+            <section class="answers-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-comments"></i> پاسخ‌های مقایسه‌شونده</h2>
+                    <p>دو پاسخ مختلف را با روش‌های متفاوت تولید کنید</p>
+                </div>
+                
+                <div class="answers-grid">
+                    <!-- Answer Box 1 -->
+                    <div class="answer-box">
+                        <div class="answer-header">
+                            <h3><i class="fas fa-1"></i> پاسخ اول</h3>
+                            <div class="answer-status" id="status1">
+                                <i class="fas fa-clock"></i> آماده
+                            </div>
+                        </div>
+                        
+                        <div class="method-selectors">
+                            <div class="method-selector">
+                                <label><i class="fas fa-search"></i> روش بازیابی:</label>
+                                <select id="retrieval_method1">
+                                    <option value="NO_RETRIEVAL">بدون بازیابی (فقط مدل)</option>
+                                    <option value="BFS">BFS (جستجوی سطح اول)</option>
+                                    <option value="DFS">DFS (جستجوی عمیق اول)</option>
+                                    <option value="SHORTEST_PATH">کوتاه‌ترین مسیر</option>
+                                    <option value="NEIGHBORS">همسایه‌ها</option>
+                                    <option value="HYBRID">ترکیبی</option>
+                                    <option value="MULTI_METHOD">چند روشی (Multi-Method)</option>
+                                    <option value="ENSEMBLE">گروهی (Ensemble)</option>
+                                    <option value="ADAPTIVE">تطبیقی (Adaptive)</option>
+                                    <option value="INTELLIGENT">جستجوی معنایی هوشمند</option>
+                                </select>
+                            </div>
+                            
+                            <div class="method-selector">
+                                <label><i class="fas fa-brain"></i> مدل تولید متن:</label>
+                                <select id="generation_model1">
+                                    <option value="HUGGINGFACE">HuggingFace Models (رایگان)</option>
+                                    <option value="GPT_SIMULATION">GPT Simulation</option>
+                                    <option value="CUSTOM">Custom Model</option>
+                                    <option value="OPENAI_GPT">OpenAI GPT (فعال ✅)</option>
+                                    <option value="ANTHROPIC_CLAUDE">Anthropic Claude (نیاز به API Key)</option>
+                                    <option value="GOOGLE_GEMINI">Google Gemini (نیاز به API Key)</option>
+                                    <option value="SIMPLE">Simple Template</option>
+                                </select>
+                            </div>
+                            
+                            <div class="method-selector">
+                                <label><i class="fas fa-layer-group"></i> حداکثر عمق:</label>
+                                <input type="number" id="max_depth1" min="1" max="5" value="2">
+                            </div>
+                            
+                            <div class="method-selector">
+                                <label><i class="fas fa-edit"></i> نوع ورودی:</label>
+                                <select id="input_type1">
+                                    <option value="auto">تولید خودکار</option>
+                                    <option value="manual">تایپ دستی</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="answer-content">
+                            <textarea id="answer1" placeholder="پاسخ اول را اینجا وارد کنید یا با انتخاب روش، پاسخ تولید کنید...">ژن TP53 یک ژن سرکوب‌کننده تومور است که نقش مهمی در تنظیم چرخه سلولی و آپوپتوز دارد. جهش‌های این ژن در بسیاری از سرطان‌ها مشاهده می‌شود و منجر به از دست رفتن عملکرد طبیعی آن می‌شود.</textarea>
+                        </div>
+                    </div>
+
+                    <!-- Answer Box 2 -->
+                    <div class="answer-box">
+                        <div class="answer-header">
+                            <h3><i class="fas fa-2"></i> پاسخ دوم</h3>
+                            <div class="answer-status" id="status2">
+                                <i class="fas fa-clock"></i> آماده
+                            </div>
+                        </div>
+                        
+                        <div class="method-selectors">
+                            <div class="method-selector">
+                                <label><i class="fas fa-search"></i> روش بازیابی:</label>
+                                <select id="retrieval_method2">
+                                    <option value="DFS">DFS (جستجوی عمیق اول)</option>
+                                    <option value="BFS">BFS (جستجوی سطح اول)</option>
+                                    <option value="NO_RETRIEVAL">بدون بازیابی (فقط مدل)</option>
+                                    <option value="SHORTEST_PATH">کوتاه‌ترین مسیر</option>
+                                    <option value="NEIGHBORS">همسایه‌ها</option>
+                                    <option value="HYBRID">ترکیبی</option>
+                                    <option value="MULTI_METHOD">چند روشی (Multi-Method)</option>
+                                    <option value="ENSEMBLE">گروهی (Ensemble)</option>
+                                    <option value="ADAPTIVE">تطبیقی (Adaptive)</option>
+                                    <option value="INTELLIGENT">جستجوی معنایی هوشمند</option>
+                                </select>
+                            </div>
+                            
+                            <div class="method-selector">
+                                <label><i class="fas fa-brain"></i> مدل تولید متن:</label>
+                                <select id="generation_model2">
+                                    <option value="OPENAI_GPT">OpenAI GPT (فعال ✅)</option>
+                                    <option value="HUGGINGFACE">HuggingFace Models (رایگان)</option>
+                                    <option value="GPT_SIMULATION">GPT Simulation</option>
+                                    <option value="CUSTOM">Custom Model</option>
+                                    <option value="ANTHROPIC_CLAUDE">Anthropic Claude (نیاز به API Key)</option>
+                                    <option value="GOOGLE_GEMINI">Google Gemini (نیاز به API Key)</option>
+                                    <option value="SIMPLE">Simple Template</option>
+                                </select>
+                            </div>
+                            
+                            <div class="method-selector">
+                                <label><i class="fas fa-layer-group"></i> حداکثر عمق:</label>
+                                <input type="number" id="max_depth2" min="1" max="5" value="2">
+                            </div>
+                            
+                            <div class="method-selector">
+                                <label><i class="fas fa-edit"></i> نوع ورودی:</label>
+                                <select id="input_type2">
+                                    <option value="auto">تولید خودکار</option>
+                                    <option value="manual">تایپ دستی</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="answer-content">
+                            <textarea id="answer2" placeholder="پاسخ دوم را اینجا وارد کنید یا با انتخاب روش، پاسخ تولید کنید...">TP53 یک ژن مهم در پیشگیری از سرطان است که پروتئین p53 را کد می‌کند. این پروتئین در پاسخ به آسیب DNA فعال می‌شود و می‌تواند باعث توقف چرخه سلولی یا مرگ سلولی شود.</textarea>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Comparison Section -->
+            <section class="comparison-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-balance-scale"></i> انتخاب روش مقایسه</h2>
+                    <p>یکی از روش‌های زیر را برای مقایسه پاسخ‌ها انتخاب کنید:</p>
+                </div>
+
+                <div class="comparison-methods">
+                    <div class="method-option" data-method="cosine_tfidf">
+                        <div class="method-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="method-info">
+                            <strong>شباهت کسینوسی (TF-IDF)</strong>
+                            <small>مقایسه بر اساس وزن کلمات</small>
+                        </div>
+                    </div>
+                    
+                    <div class="method-option" data-method="cosine_sbert">
+                        <div class="method-icon">
+                            <i class="fas fa-brain"></i>
+                        </div>
+                        <div class="method-info">
+                            <strong>شباهت کسینوسی (SBERT)</strong>
+                            <small>مقایسه معنایی پیشرفته</small>
+                        </div>
+                    </div>
+                    
+                    <div class="method-option" data-method="jaccard">
+                        <div class="method-icon">
+                            <i class="fas fa-venn-diagram"></i>
+                        </div>
+                        <div class="method-info">
+                            <strong>شباهت جاکارد</strong>
+                            <small>مقایسه بر اساس همپوشانی کلمات</small>
+                        </div>
+                    </div>
+                    
+                    <div class="method-option" data-method="levenshtein">
+                        <div class="method-icon">
+                            <i class="fas fa-edit"></i>
+                        </div>
+                        <div class="method-info">
+                            <strong>شباهت لونشتاین</strong>
+                            <small>مقایسه بر اساس فاصله ویرایشی</small>
+                        </div>
+                    </div>
+                    
+                    <div class="method-option" data-method="sequence_matcher">
+                        <div class="method-icon">
+                            <i class="fas fa-code"></i>
+                        </div>
+                        <div class="method-info">
+                            <strong>Sequence Matcher</strong>
+                            <small>مقایسه توالی کاراکترها</small>
+                        </div>
+                    </div>
+                    
+                    <div class="method-option" data-method="word_overlap">
+                        <div class="method-icon">
+                            <i class="fas fa-words"></i>
+                        </div>
+                        <div class="method-info">
+                            <strong>همپوشانی کلمات</strong>
+                            <small>مقایسه بر اساس کلمات مشترک</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button id="generateBtn" class="btn btn-success">
+                        <i class="fas fa-rocket"></i> تولید خودکار پاسخ‌ها
+                    </button>
+                    <button id="compareBtn" class="btn btn-primary">
+                        <i class="fas fa-search"></i> مقایسه پاسخ‌ها
+                    </button>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section id="resultsSection" class="results-section" style="display: none;">
+                <div class="section-header">
+                    <h2><i class="fas fa-chart-pie"></i> نتایج مقایسه</h2>
+                </div>
+                <div id="resultsContent"></div>
+            </section>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/evaluation.js') }}"></script>
+</body>
+</html> 
