@@ -252,6 +252,7 @@ def process_query():
         query = data.get('query', '')
         retrieval_method = data.get('retrieval_method', 'BFS')
         generation_model = data.get('generation_model', 'GPT_SIMULATION')
+        text_generation_type = data.get('text_generation_type', 'INTELLIGENT')
         max_depth = data.get('max_depth', 2)
         
         # تبدیل رشته به enum
@@ -263,6 +264,7 @@ def process_query():
             query=query,
             retrieval_method=retrieval_enum,
             generation_model=generation_enum,
+            text_generation_type=text_generation_type,
             max_depth=max_depth
         )
         

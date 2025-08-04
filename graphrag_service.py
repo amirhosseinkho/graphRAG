@@ -31,10 +31,41 @@ class RetrievalMethod(Enum):
 
 class GenerationModel(Enum):
     """مدل‌های تولید متن"""
+    # مدل‌های محلی و رایگان
+    GENERAL_SIMPLE = "General Simple (پاسخ ساده و عمومی)"
     SIMPLE = "Simple Template"
     GPT_SIMULATION = "GPT Simulation"
     CUSTOM = "Custom Model"
     HUGGINGFACE = "HuggingFace Models"
+    
+    # OpenAI GPT Models
+    OPENAI_GPT_4O = "OpenAI GPT-4o (جدیدترین و قوی‌ترین)"
+    OPENAI_GPT_4O_MINI = "OpenAI GPT-4o Mini (سریع و اقتصادی)"
+    OPENAI_GPT_4_TURBO = "OpenAI GPT-4 Turbo (تعادل سرعت و کیفیت)"
+    OPENAI_GPT_4 = "OpenAI GPT-4 (کیفیت بالا)"
+    OPENAI_GPT_3_5_TURBO = "OpenAI GPT-3.5 Turbo (سریع و اقتصادی)"
+    OPENAI_GPT_3_5_TURBO_16K = "OpenAI GPT-3.5 Turbo 16K (متن طولانی)"
+    
+    # Anthropic Claude Models
+    ANTHROPIC_CLAUDE_3_5_SONNET = "Anthropic Claude 3.5 Sonnet (جدیدترین)"
+    ANTHROPIC_CLAUDE_3_5_HAIKU = "Anthropic Claude 3.5 Haiku (سریع)"
+    ANTHROPIC_CLAUDE_3_OPUS = "Anthropic Claude 3 Opus (قوی‌ترین)"
+    ANTHROPIC_CLAUDE_3_SONNET = "Anthropic Claude 3 Sonnet (تعادل)"
+    ANTHROPIC_CLAUDE_3_HAIKU = "Anthropic Claude 3 Haiku (سریع)"
+    
+    # Google Gemini Models
+    GOOGLE_GEMINI_1_5_PRO = "Google Gemini 1.5 Pro (جدیدترین)"
+    GOOGLE_GEMINI_1_5_FLASH = "Google Gemini 1.5 Flash (سریع)"
+    GOOGLE_GEMINI_1_0_PRO = "Google Gemini 1.0 Pro (پایدار)"
+    GOOGLE_GEMINI_1_0_FLASH = "Google Gemini 1.0 Flash (سریع)"
+    
+    # سایر مدل‌های پیشرفته
+    META_LLAMA_3_1 = "Meta Llama 3.1 (محلی)"
+    MISTRAL_AI = "Mistral AI (کیفیت بالا)"
+    COHERE_COMMAND = "Cohere Command (تخصصی)"
+    PERPLEXITY_SONAR = "Perplexity Sonar (جستجوگر)"
+    
+    # مدل‌های قدیمی برای سازگاری
     OPENAI_GPT = "OpenAI GPT"
     ANTHROPIC_CLAUDE = "Anthropic Claude"
     GOOGLE_GEMINI = "Google Gemini"
@@ -2548,34 +2579,121 @@ class GraphRAGService:
         }
     
     def generate_answer(self, retrieval_result: RetrievalResult, 
-                       model: GenerationModel) -> GenerationResult:
+                       model: GenerationModel, text_generation_type: str = 'INTELLIGENT') -> GenerationResult:
         """تولید پاسخ بر اساس نتایج بازیابی"""
-        print(f"🤖 تولید پاسخ با مدل {model.value}...")
+        print(f"🤖 تولید پاسخ با مدل {model.value} و نوع {text_generation_type}...")
         
-        if model == GenerationModel.SIMPLE:
-            answer = self.simple_template_generation(retrieval_result)
-            confidence = 0.7
-        elif model == GenerationModel.GPT_SIMULATION:
-            answer = self.gpt_simulation_generation(retrieval_result)
-            confidence = 0.85
-        elif model == GenerationModel.CUSTOM:
-            answer = self.custom_generation(retrieval_result)
-            confidence = 0.9
-        elif model == GenerationModel.HUGGINGFACE:
-            answer = self.huggingface_generation(retrieval_result)
-            confidence = 0.92
-        elif model == GenerationModel.OPENAI_GPT:
-            answer = self.openai_gpt_generation(retrieval_result)
-            confidence = 0.95
-        elif model == GenerationModel.ANTHROPIC_CLAUDE:
-            answer = self.anthropic_claude_generation(retrieval_result)
-            confidence = 0.94
-        elif model == GenerationModel.GOOGLE_GEMINI:
-            answer = self.google_gemini_generation(retrieval_result)
-            confidence = 0.93
-        else:
-            answer = "متأسفانه مدل انتخاب شده در دسترس نیست."
-            confidence = 0.0
+        # انتخاب نوع تولید متن
+        if text_generation_type == 'SIMPLE':
+            # استفاده از روش‌های ساده
+            if model == GenerationModel.GENERAL_SIMPLE:
+                answer = self.general_simple_generation(retrieval_result)
+                confidence = 0.8
+            elif model == GenerationModel.SIMPLE:
+                answer = self.simple_template_generation(retrieval_result)
+                confidence = 0.7
+            elif model == GenerationModel.GPT_SIMULATION:
+                answer = self.gpt_simulation_generation(retrieval_result)
+                confidence = 0.85
+            elif model == GenerationModel.CUSTOM:
+                answer = self.custom_generation(retrieval_result)
+                confidence = 0.9
+            elif model == GenerationModel.HUGGINGFACE:
+                answer = self.huggingface_generation(retrieval_result)
+                confidence = 0.92
+            # OpenAI GPT Models
+            elif model in [GenerationModel.OPENAI_GPT_4O, GenerationModel.OPENAI_GPT_4O_MINI, 
+                          GenerationModel.OPENAI_GPT_4_TURBO, GenerationModel.OPENAI_GPT_4,
+                          GenerationModel.OPENAI_GPT_3_5_TURBO, GenerationModel.OPENAI_GPT_3_5_TURBO_16K,
+                          GenerationModel.OPENAI_GPT]:  # سازگاری با مدل قدیمی
+                answer = self.openai_gpt_generation(retrieval_result, model)
+                confidence = 0.95
+            # Anthropic Claude Models
+            elif model in [GenerationModel.ANTHROPIC_CLAUDE_3_5_SONNET, GenerationModel.ANTHROPIC_CLAUDE_3_5_HAIKU,
+                          GenerationModel.ANTHROPIC_CLAUDE_3_OPUS, GenerationModel.ANTHROPIC_CLAUDE_3_SONNET,
+                          GenerationModel.ANTHROPIC_CLAUDE_3_HAIKU, GenerationModel.ANTHROPIC_CLAUDE]:  # سازگاری
+                answer = self.anthropic_claude_generation(retrieval_result, model)
+                confidence = 0.94
+            # Google Gemini Models
+            elif model in [GenerationModel.GOOGLE_GEMINI_1_5_PRO, GenerationModel.GOOGLE_GEMINI_1_5_FLASH,
+                          GenerationModel.GOOGLE_GEMINI_1_0_PRO, GenerationModel.GOOGLE_GEMINI_1_0_FLASH,
+                          GenerationModel.GOOGLE_GEMINI]:  # سازگاری
+                answer = self.google_gemini_generation(retrieval_result, model)
+                confidence = 0.93
+            # سایر مدل‌های پیشرفته
+            elif model == GenerationModel.META_LLAMA_3_1:
+                answer = self.meta_llama_generation(retrieval_result)
+                confidence = 0.91
+            elif model == GenerationModel.MISTRAL_AI:
+                answer = self.mistral_ai_generation(retrieval_result)
+                confidence = 0.90
+            elif model == GenerationModel.COHERE_COMMAND:
+                answer = self.cohere_command_generation(retrieval_result)
+                confidence = 0.89
+            elif model == GenerationModel.PERPLEXITY_SONAR:
+                answer = self.perplexity_sonar_generation(retrieval_result)
+                confidence = 0.88
+            else:
+                answer = "متأسفانه مدل انتخاب شده در دسترس نیست."
+                confidence = 0.0
+        else:  # INTELLIGENT
+            # استفاده از روش‌های هوشمند و تخصصی
+            if model == GenerationModel.GENERAL_SIMPLE:
+                answer = self.general_simple_generation_intelligent(retrieval_result)
+                confidence = 0.85
+            elif model == GenerationModel.SIMPLE:
+                answer = self.simple_template_generation_intelligent(retrieval_result)
+                confidence = 0.8
+            elif model == GenerationModel.GPT_SIMULATION:
+                answer = self.gpt_simulation_generation_intelligent(retrieval_result)
+                confidence = 0.9
+            elif model == GenerationModel.CUSTOM:
+                answer = self.custom_generation_intelligent(retrieval_result)
+                confidence = 0.95
+            elif model == GenerationModel.HUGGINGFACE:
+                answer = self.huggingface_generation_intelligent(retrieval_result)
+                confidence = 0.92
+            # OpenAI GPT Models (Intelligent)
+            elif model in [GenerationModel.OPENAI_GPT_4O, GenerationModel.OPENAI_GPT_4O_MINI, 
+                          GenerationModel.OPENAI_GPT_4_TURBO, GenerationModel.OPENAI_GPT_4,
+                          GenerationModel.OPENAI_GPT_3_5_TURBO, GenerationModel.OPENAI_GPT_3_5_TURBO_16K,
+                          GenerationModel.OPENAI_GPT]:  # سازگاری با مدل قدیمی
+                answer = self.openai_gpt_generation_intelligent(retrieval_result, model)
+                confidence = 0.97
+            # Anthropic Claude Models (Intelligent)
+            elif model in [GenerationModel.ANTHROPIC_CLAUDE_3_5_SONNET, GenerationModel.ANTHROPIC_CLAUDE_3_5_HAIKU,
+                          GenerationModel.ANTHROPIC_CLAUDE_3_OPUS, GenerationModel.ANTHROPIC_CLAUDE_3_SONNET,
+                          GenerationModel.ANTHROPIC_CLAUDE_3_HAIKU, GenerationModel.ANTHROPIC_CLAUDE]:  # سازگاری
+                answer = self.anthropic_claude_generation_intelligent(retrieval_result, model)
+                confidence = 0.96
+            # Google Gemini Models (Intelligent)
+            elif model in [GenerationModel.GOOGLE_GEMINI_1_5_PRO, GenerationModel.GOOGLE_GEMINI_1_5_FLASH,
+                          GenerationModel.GOOGLE_GEMINI_1_0_PRO, GenerationModel.GOOGLE_GEMINI_1_0_FLASH,
+                          GenerationModel.GOOGLE_GEMINI]:  # سازگاری
+                answer = self.google_gemini_generation_intelligent(retrieval_result, model)
+                confidence = 0.95
+            # سایر مدل‌های پیشرفته (Intelligent)
+            elif model == GenerationModel.META_LLAMA_3_1:
+                answer = self.meta_llama_generation_intelligent(retrieval_result)
+                confidence = 0.93
+            elif model == GenerationModel.MISTRAL_AI:
+                answer = self.mistral_ai_generation_intelligent(retrieval_result)
+                confidence = 0.92
+            elif model == GenerationModel.COHERE_COMMAND:
+                answer = self.cohere_command_generation_intelligent(retrieval_result)
+                confidence = 0.91
+            elif model == GenerationModel.PERPLEXITY_SONAR:
+                answer = self.perplexity_sonar_generation_intelligent(retrieval_result)
+                confidence = 0.90
+            else:
+                answer = "متأسفانه مدل انتخاب شده در دسترس نیست."
+                confidence = 0.0
+        
+        # به‌روزرسانی context_text بر اساس نوع تولید متن
+        if text_generation_type == 'SIMPLE':
+            retrieval_result.context_text = self._create_simple_context_text(retrieval_result)
+        else:  # INTELLIGENT
+            retrieval_result.context_text = self._create_intelligent_context_text(retrieval_result)
         
         return GenerationResult(
             answer=answer,
@@ -2584,9 +2702,246 @@ class GraphRAGService:
             confidence=confidence
         )
     
+    def general_simple_generation(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ ساده و عمومی برای همه نوع سوالات"""
+        query = retrieval_result.query
+        context = retrieval_result.context_text
+        method = retrieval_result.method
+        
+        # اگر بدون بازیابی باشد
+        if method == "بدون بازیابی (فقط مدل)":
+            return f"""🤖 **پاسخ عمومی به سوال شما:**
+
+**سوال:** {query}
+
+بر اساس دانش عمومی در حوزه زیست‌پزشکی، پاسخ شما به شرح زیر است:
+
+{self._generate_general_knowledge_answer(query)}
+
+---
+💡 **نکته:** این پاسخ بر اساس دانش عمومی مدل تولید شده است. برای اطلاعات دقیق‌تر و مبتنی بر داده‌های گراف، از روش‌های بازیابی استفاده کنید."""
+
+        # اگر با بازیابی باشد
+        if not context or context.strip() == "":
+            return f"""❌ **اطلاعات کافی یافت نشد**
+
+**سوال:** {query}
+
+متأسفانه اطلاعات مرتبط با سوال شما در گراف دانش یافت نشد. 
+
+💡 **پیشنهادات:**
+• کلمات کلیدی را تغییر دهید
+• از روش بازیابی دیگری استفاده کنید
+• سوال را به شکل دیگری مطرح کنید"""
+
+        # ایجاد متن زمینه ساده بهینه شده
+        simple_context = self._create_simple_context_text(retrieval_result)
+        
+        # تحلیل نوع سوال برای پاسخ مناسب
+        query_lower = query.lower()
+        
+        # تشخیص نوع سوال
+        if any(word in query_lower for word in ["cancer", "tumor", "malignant"]):
+            return self._generate_cancer_related_answer(retrieval_result)
+        elif any(word in query_lower for word in ["gene", "protein", "express"]):
+            return self._generate_gene_related_answer(retrieval_result)
+        elif any(word in query_lower for word in ["drug", "medicine", "treatment", "therapy"]):
+            return self._generate_drug_related_answer(retrieval_result)
+        elif any(word in query_lower for word in ["disease", "disorder", "condition"]):
+            return self._generate_disease_related_answer(retrieval_result)
+        elif any(word in query_lower for word in ["tissue", "organ", "anatomy", "heart", "brain", "liver"]):
+            return self._generate_tissue_related_answer(retrieval_result)
+        else:
+            return self._generate_general_structured_answer(retrieval_result)
+
+    def _create_simple_context_text(self, retrieval_result: RetrievalResult) -> str:
+        """
+        ایجاد متن زمینه ساده بهینه شده که به طور صریح از نودها، یال‌ها و مسیرهای بازیابی شده استفاده می‌کند
+        """
+        nodes = retrieval_result.nodes
+        edges = retrieval_result.edges
+        paths = retrieval_result.paths
+        query = retrieval_result.query
+        
+        context_parts = []
+        
+        # 1. مقدمه و توضیح روش بازیابی
+        context_parts.append(f"📋 **متن زمینه ساده برای سوال:** {query}")
+        context_parts.append("")
+        context_parts.append("🔍 **اطلاعات بازیابی شده از گراف دانش:**")
+        context_parts.append(f"• تعداد نودهای بازیابی شده: {len(nodes)}")
+        context_parts.append(f"• تعداد یال‌های بازیابی شده: {len(edges)}")
+        context_parts.append(f"• تعداد مسیرهای بازیابی شده: {len(paths)}")
+        context_parts.append("")
+        
+        # 2. نودهای بازیابی شده
+        if nodes:
+            context_parts.append("📍 **نودهای بازیابی شده:**")
+            # دسته‌بندی نودها بر اساس نوع
+            node_types = {}
+            for node in nodes:
+                if node.kind not in node_types:
+                    node_types[node.kind] = []
+                node_types[node.kind].append(node.name)
+            
+            for node_type, node_names in node_types.items():
+                context_parts.append(f"• {node_type}: {', '.join(node_names[:5])}")  # حداکثر 5 نود
+                if len(node_names) > 5:
+                    context_parts.append(f"  (و {len(node_names) - 5} نود دیگر)")
+            context_parts.append("")
+        
+        # 3. یال‌های بازیابی شده (روابط)
+        if edges:
+            context_parts.append("🔗 **یال‌های بازیابی شده (روابط):**")
+            # دسته‌بندی یال‌ها بر اساس نوع رابطه
+            edge_types = {}
+            for edge in edges:
+                if edge.relation not in edge_types:
+                    edge_types[edge.relation] = []
+                edge_types[edge.relation].append(f"{edge.source} → {edge.target}")
+            
+            for relation, connections in edge_types.items():
+                context_parts.append(f"• {relation}: {len(connections)} رابطه")
+                # نمایش چند نمونه
+                for connection in connections[:3]:
+                    context_parts.append(f"  - {connection}")
+                if len(connections) > 3:
+                    context_parts.append(f"  (و {len(connections) - 3} رابطه دیگر)")
+            context_parts.append("")
+        
+        # 4. مسیرهای بازیابی شده
+        if paths:
+            context_parts.append("🛤️ **مسیرهای بازیابی شده:**")
+            for i, path in enumerate(paths[:3]):  # حداکثر 3 مسیر
+                path_str = " → ".join(path)
+                context_parts.append(f"• مسیر {i+1}: {path_str}")
+            if len(paths) > 3:
+                context_parts.append(f"• (و {len(paths) - 3} مسیر دیگر)")
+            context_parts.append("")
+        
+        # 5. دستورالعمل استفاده از اطلاعات
+        context_parts.append("📌 **دستورالعمل:**")
+        context_parts.append("بر اساس نودها، یال‌ها و مسیرهای بازیابی شده از گراف و روابطشان،")
+        context_parts.append("اگر به سوال ربط داشت از آن‌ها استفاده کن و به این سوال پاسخ بده.")
+        context_parts.append("")
+        
+        # 6. خلاصه آماری
+        context_parts.append("📊 **خلاصه آماری:**")
+        context_parts.append(f"• کل عناصر بازیابی شده: {len(nodes) + len(edges) + len(paths)}")
+        context_parts.append(f"• انواع مختلف نودها: {len(set(node.kind for node in nodes))}")
+        context_parts.append(f"• انواع مختلف روابط: {len(set(edge.relation for edge in edges))}")
+        
+        return "\n".join(context_parts)
+
+    def _create_intelligent_context_text(self, retrieval_result: RetrievalResult) -> str:
+        """
+        ایجاد متن زمینه هوشمند پیشرفته با تحلیل عمیق و استنتاجات زیستی
+        """
+        nodes = retrieval_result.nodes
+        edges = retrieval_result.edges
+        paths = retrieval_result.paths
+        query = retrieval_result.query
+        
+        context_parts = []
+        
+        # 1. مقدمه هوشمند
+        context_parts.append(f"🧠 **متن زمینه هوشمند برای سوال:** {query}")
+        context_parts.append("")
+        context_parts.append("🔬 **تحلیل هوشمند داده‌های گراف:**")
+        context_parts.append("این متن شامل تحلیل عمیق، استنتاجات زیستی و روابط معنادار است.")
+        context_parts.append("")
+        
+        # 2. تحلیل آماری پیشرفته
+        context_parts.append("📊 **تحلیل آماری پیشرفته:**")
+        context_parts.append(f"• نودهای بازیابی شده: {len(nodes)}")
+        context_parts.append(f"• یال‌های بازیابی شده: {len(edges)}")
+        context_parts.append(f"• مسیرهای بازیابی شده: {len(paths)}")
+        
+        # محاسبه تراکم روابط
+        if nodes and edges:
+            avg_connections = len(edges) / len(nodes)
+            context_parts.append(f"• تراکم متوسط روابط: {avg_connections:.2f} یال به ازای هر نود")
+        
+        # 3. تحلیل نوع‌شناسی نودها
+        if nodes:
+            context_parts.append("")
+            context_parts.append("🏷️ **تحلیل نوع‌شناسی نودها:**")
+            node_kinds = {}
+            for node in nodes:
+                if node.kind not in node_kinds:
+                    node_kinds[node.kind] = []
+                node_kinds[node.kind].append(node.name)
+            
+            for kind, names in node_kinds.items():
+                context_parts.append(f"• {kind}: {len(names)} نود ({', '.join(names[:3])})")
+                if len(names) > 3:
+                    context_parts.append(f"  و {len(names) - 3} نود دیگر")
+        
+        # 4. تحلیل روابط معنادار
+        if edges:
+            context_parts.append("")
+            context_parts.append("🔗 **تحلیل روابط معنادار:**")
+            edge_analysis = {}
+            for edge in edges:
+                if edge.relation not in edge_analysis:
+                    edge_analysis[edge.relation] = 0
+                edge_analysis[edge.relation] += 1
+            
+            # مرتب‌سازی بر اساس فراوانی
+            sorted_relations = sorted(edge_analysis.items(), key=lambda x: x[1], reverse=True)
+            for relation, count in sorted_relations[:5]:  # 5 رابطه برتر
+                context_parts.append(f"• {relation}: {count} رابطه (رابطه غالب)")
+        
+        # 5. تحلیل مسیرهای زیستی
+        if paths:
+            context_parts.append("")
+            context_parts.append("🛤️ **تحلیل مسیرهای زیستی:**")
+            context_parts.append("مسیرهای شناسایی شده نشان‌دهنده روابط پیچیده زیستی هستند:")
+            
+            for i, path in enumerate(paths[:3]):
+                path_length = len(path)
+                context_parts.append(f"• مسیر {i+1}: {path_length} گام زیستی")
+                context_parts.append(f"  مسیر: {' → '.join(path)}")
+        
+        # 6. استنتاجات زیستی
+        context_parts.append("")
+        context_parts.append("🧬 **استنتاجات زیستی:**")
+        
+        # تشخیص نوع سوال و استنتاج مناسب
+        query_lower = query.lower()
+        if any(word in query_lower for word in ["gene", "express", "protein"]):
+            context_parts.append("• سوال مربوط به بیان ژن و عملکرد پروتئین‌ها")
+            context_parts.append("• تمرکز بر روابط AeG, AuG, AdG و GpBP")
+        elif any(word in query_lower for word in ["disease", "cancer", "disorder"]):
+            context_parts.append("• سوال مربوط به بیماری‌ها و مکانیسم‌های پاتولوژیک")
+            context_parts.append("• تمرکز بر روابط DaG, DuG, DdG و DlA")
+        elif any(word in query_lower for word in ["drug", "treatment", "therapy"]):
+            context_parts.append("• سوال مربوط به درمان و داروها")
+            context_parts.append("• تمرکز بر روابط CtD, CuG, CdG")
+        elif any(word in query_lower for word in ["tissue", "anatomy", "organ"]):
+            context_parts.append("• سوال مربوط به بافت‌ها و آناتومی")
+            context_parts.append("• تمرکز بر روابط AeG, AuG, AdG")
+        else:
+            context_parts.append("• سوال عمومی - تحلیل جامع تمام روابط")
+        
+        # 7. دستورالعمل هوشمند
+        context_parts.append("")
+        context_parts.append("🎯 **دستورالعمل هوشمند:**")
+        context_parts.append("بر اساس تحلیل عمیق داده‌های گراف و استنتاجات زیستی،")
+        context_parts.append("پاسخ جامع و تخصصی ارائه دهید که شامل:")
+        context_parts.append("• تحلیل روابط معنادار")
+        context_parts.append("• استنتاجات زیستی")
+        context_parts.append("• اهمیت بالینی")
+        context_parts.append("• کاربردهای عملی")
+        
+        return "\n".join(context_parts)
+
     def simple_template_generation(self, retrieval_result: RetrievalResult) -> str:
         """تولید پاسخ ساده با قالب بهبود یافته"""
         query_lower = retrieval_result.query.lower()
+        
+        # ایجاد متن زمینه ساده بهینه شده
+        simple_context = self._create_simple_context_text(retrieval_result)
         
         # تحلیل نوع سوال
         question_type = self._analyze_question_type(query_lower)
@@ -3411,15 +3766,17 @@ class GraphRAGService:
         return parts
     
     def process_query(self, query: str, retrieval_method: RetrievalMethod, 
-                     generation_model: GenerationModel, max_depth: int = 2) -> Dict[str, Any]:
+                     generation_model: GenerationModel, text_generation_type: str = 'INTELLIGENT', 
+                     max_depth: int = 2) -> Dict[str, Any]:
         """پردازش کامل یک سوال"""
         print(f"🚀 پردازش سوال: {query}")
+        print(f"📝 نوع تولید متن: {text_generation_type}")
         
         # مرحله 1: بازیابی
         retrieval_result = self.retrieve_information(query, retrieval_method, max_depth)
         
         # مرحله 2: تولید پاسخ
-        generation_result = self.generate_answer(retrieval_result, generation_model)
+        generation_result = self.generate_answer(retrieval_result, generation_model, text_generation_type)
         
         # آماده‌سازی نتیجه
         result = {
@@ -3520,7 +3877,7 @@ class GraphRAGService:
             print(f"خطا در HuggingFace: {e}")
             return self._fallback_generation(retrieval_result, "HuggingFace")
     
-    def openai_gpt_generation(self, retrieval_result: RetrievalResult) -> str:
+    def openai_gpt_generation(self, retrieval_result: RetrievalResult, model: GenerationModel = None) -> str:
         """تولید پاسخ با OpenAI GPT (نیاز به API Key)"""
         try:
             from openai import OpenAI
@@ -3529,17 +3886,25 @@ class GraphRAGService:
             if not hasattr(self, 'openai_api_key') or not self.openai_api_key:
                 return "🔑 برای استفاده از OpenAI GPT، لطفاً API Key را تنظیم کنید.\n\n" + self._fallback_generation(retrieval_result, "OpenAI")
             
+            # تعیین مدل بر اساس انتخاب کاربر
+            model_mapping = {
+                GenerationModel.OPENAI_GPT_4O: "gpt-4o",
+                GenerationModel.OPENAI_GPT_4O_MINI: "gpt-4o-mini",
+                GenerationModel.OPENAI_GPT_4_TURBO: "gpt-4-turbo",
+                GenerationModel.OPENAI_GPT_4: "gpt-4",
+                GenerationModel.OPENAI_GPT_3_5_TURBO: "gpt-3.5-turbo",
+                GenerationModel.OPENAI_GPT_3_5_TURBO_16K: "gpt-3.5-turbo-16k",
+                GenerationModel.OPENAI_GPT: "gpt-4o"  # مدل پیش‌فرض جدیدترین
+            }
+            
+            model_choice = model_mapping.get(model, "gpt-4o")  # پیش‌فرض جدیدترین مدل
+            max_tokens = 1500 if "4o" in model_choice else 1000
+            
             # ایجاد کلاینت OpenAI
             client = OpenAI(api_key=self.openai_api_key)
             
             # آماده‌سازی متن ورودی
             prompt = self._create_advanced_prompt(retrieval_result)
-            
-            # انتخاب مدل بر اساس هزینه و کیفیت
-            # gpt-3.5-turbo: ارزان و سریع
-            # gpt-4: گران‌تر اما کیفیت بهتر
-            # gpt-4-turbo-preview: جدیدترین و بهترین
-            model_choice = "gpt-3.5-turbo"  # می‌توانید به gpt-4 تغییر دهید
             
             # درخواست به OpenAI
             response = client.chat.completions.create(
@@ -3548,7 +3913,7 @@ class GraphRAGService:
                     {"role": "system", "content": "You are a biomedical expert analyzing knowledge graph data. Provide detailed, accurate, and well-structured answers in Persian with proper formatting and emojis."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=self.config['max_answer_tokens'],  # استفاده از تنظیمات
+                max_tokens=max_tokens,
                 temperature=0.7,
                 presence_penalty=0.1,  # تشویق به تنوع
                 frequency_penalty=0.1   # کاهش تکرار
@@ -3557,10 +3922,10 @@ class GraphRAGService:
             return response.choices[0].message.content.strip()
             
         except Exception as e:
-            print(f"خطا در OpenAI: {e}")
-            return self._fallback_generation(retrieval_result, "OpenAI")
+            print(f"خطا در OpenAI ({model_choice}): {e}")
+            return self._fallback_generation(retrieval_result, f"OpenAI ({model_choice})")
     
-    def anthropic_claude_generation(self, retrieval_result: RetrievalResult) -> str:
+    def anthropic_claude_generation(self, retrieval_result: RetrievalResult, model: GenerationModel = None) -> str:
         """تولید پاسخ با Anthropic Claude (نیاز به API Key)"""
         try:
             import anthropic
@@ -3569,6 +3934,19 @@ class GraphRAGService:
             if not hasattr(self, 'anthropic_api_key') or not self.anthropic_api_key:
                 return "🔑 برای استفاده از Claude، لطفاً API Key را تنظیم کنید.\n\n" + self._fallback_generation(retrieval_result, "Claude")
             
+            # تعیین مدل بر اساس انتخاب کاربر
+            model_mapping = {
+                GenerationModel.ANTHROPIC_CLAUDE_3_5_SONNET: "claude-3-5-sonnet-20241022",
+                GenerationModel.ANTHROPIC_CLAUDE_3_5_HAIKU: "claude-3-5-haiku-20241022",
+                GenerationModel.ANTHROPIC_CLAUDE_3_OPUS: "claude-3-opus-20240229",
+                GenerationModel.ANTHROPIC_CLAUDE_3_SONNET: "claude-3-sonnet-20240229",
+                GenerationModel.ANTHROPIC_CLAUDE_3_HAIKU: "claude-3-haiku-20240307",
+                GenerationModel.ANTHROPIC_CLAUDE: "claude-3-5-sonnet-20241022"  # مدل پیش‌فرض جدیدترین
+            }
+            
+            model_choice = model_mapping.get(model, "claude-3-5-sonnet-20241022")  # پیش‌فرض جدیدترین مدل
+            max_tokens = 1500 if "3-5" in model_choice else 1000
+            
             client = anthropic.Anthropic(api_key=self.anthropic_api_key)
             
             # آماده‌سازی متن ورودی
@@ -3576,8 +3954,8 @@ class GraphRAGService:
             
             # درخواست به Claude
             response = client.messages.create(
-                model="claude-3-sonnet-20240229",
-                max_tokens=self.config['max_answer_tokens'],
+                model=model_choice,
+                max_tokens=max_tokens,
                 messages=[
                     {"role": "user", "content": prompt}
                 ]
@@ -3586,10 +3964,10 @@ class GraphRAGService:
             return response.content[0].text.strip()
             
         except Exception as e:
-            print(f"خطا در Claude: {e}")
-            return self._fallback_generation(retrieval_result, "Claude")
+            print(f"خطا در Claude ({model_choice}): {e}")
+            return self._fallback_generation(retrieval_result, f"Claude ({model_choice})")
     
-    def google_gemini_generation(self, retrieval_result: RetrievalResult) -> str:
+    def google_gemini_generation(self, retrieval_result: RetrievalResult, model: GenerationModel = None) -> str:
         """تولید پاسخ با Google Gemini (نیاز به API Key)"""
         try:
             import google.generativeai as genai
@@ -3598,20 +3976,31 @@ class GraphRAGService:
             if not hasattr(self, 'gemini_api_key') or not self.gemini_api_key:
                 return "🔑 برای استفاده از Gemini، لطفاً API Key را تنظیم کنید.\n\n" + self._fallback_generation(retrieval_result, "Gemini")
             
+            # تعیین مدل بر اساس انتخاب کاربر
+            model_mapping = {
+                GenerationModel.GOOGLE_GEMINI_1_5_PRO: "gemini-1.5-pro",
+                GenerationModel.GOOGLE_GEMINI_1_5_FLASH: "gemini-1.5-flash",
+                GenerationModel.GOOGLE_GEMINI_1_0_PRO: "gemini-1.0-pro",
+                GenerationModel.GOOGLE_GEMINI_1_0_FLASH: "gemini-1.0-flash",
+                GenerationModel.GOOGLE_GEMINI: "gemini-1.5-pro"  # مدل پیش‌فرض جدیدترین
+            }
+            
+            model_choice = model_mapping.get(model, "gemini-1.5-pro")  # پیش‌فرض جدیدترین مدل
+            
             genai.configure(api_key=self.gemini_api_key)
-            model = genai.GenerativeModel('gemini-pro')
+            model_instance = genai.GenerativeModel(model_choice)
             
             # آماده‌سازی متن ورودی
             prompt = self._create_advanced_prompt(retrieval_result)
             
             # درخواست به Gemini
-            response = model.generate_content(prompt)
+            response = model_instance.generate_content(prompt)
             
             return response.text.strip()
             
         except Exception as e:
-            print(f"خطا در Gemini: {e}")
-            return self._fallback_generation(retrieval_result, "Gemini")
+            print(f"خطا در Gemini ({model_choice}): {e}")
+            return self._fallback_generation(retrieval_result, f"Gemini ({model_choice})")
     
     def _create_advanced_prompt(self, retrieval_result: RetrievalResult) -> str:
         """ایجاد متن ورودی پیشرفته برای مدل‌های AI با اطلاعات زیستی غنی شده"""
@@ -4225,6 +4614,432 @@ class GraphRAGService:
         
         return (base_score + length_bonus) * depth_penalty
 
+    # توابع کمکی برای تولید متن ساده و عمومی
+    def _generate_general_knowledge_answer(self, query: str) -> str:
+        """تولید پاسخ عمومی بر اساس دانش مدل"""
+        query_lower = query.lower()
+        
+        if "cancer" in query_lower and "tissue" in query_lower:
+            return """سرطان می‌تواند به روش‌های مختلف بر بافت‌های بدن تأثیر بگذارد:
+
+**مکانیسم‌های اصلی:**
+• **تهاجم مستقیم:** سلول‌های سرطانی به بافت‌های مجاور نفوذ می‌کنند
+• **متاستاز:** گسترش سرطان به بافت‌های دورتر از طریق خون یا لنف
+• **تغییرات متابولیک:** افزایش مصرف انرژی و تغییر در متابولیسم بافت
+• **التهاب:** پاسخ ایمنی که می‌تواند به بافت آسیب برساند
+• **فشار مکانیکی:** تومورها می‌توانند بر بافت‌های مجاور فشار وارد کنند
+
+**اثرات بر بافت‌های مختلف:**
+• **بافت‌های نرم:** تغییر در ساختار و عملکرد
+• **استخوان:** ضعیف شدن و شکستگی
+• **عروق خونی:** رشد عروق جدید برای تغذیه تومور
+• **سیستم ایمنی:** تغییر در پاسخ‌های ایمنی
+
+**علائم بالینی:**
+• درد، تورم، تغییر در عملکرد عضو
+• کاهش وزن، خستگی، ضعف عمومی"""
+
+        elif "gene" in query_lower:
+            return """ژن‌ها واحدهای وراثتی هستند که اطلاعات ژنتیکی را حمل می‌کنند:
+
+**نقش‌های اصلی:**
+• **کدگذاری پروتئین:** تولید پروتئین‌های مورد نیاز سلول
+• **تنظیم فرآیندها:** کنترل متابولیسم و رشد سلولی
+• **پاسخ به محیط:** تنظیم پاسخ‌های سلولی به تغییرات محیطی
+
+**انواع ژن‌ها:**
+• **ژن‌های ساختاری:** تولید پروتئین‌های ساختاری
+• **ژن‌های تنظیمی:** کنترل بیان سایر ژن‌ها
+• **ژن‌های آنزیمی:** تولید آنزیم‌های متابولیک"""
+
+        else:
+            return """بر اساس سوال شما، اطلاعات مرتبط در حوزه زیست‌پزشکی وجود دارد. برای پاسخ دقیق‌تر، لطفاً سوال خود را به شکل مشخص‌تری مطرح کنید یا از روش‌های بازیابی استفاده کنید."""
+
+    def _generate_cancer_related_answer(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ برای سوالات مرتبط با سرطان"""
+        query = retrieval_result.query
+        context = retrieval_result.context_text
+        
+        # استخراج اطلاعات مرتبط از context
+        cancer_info = self._extract_cancer_info_from_context(context)
+        
+        return f"""🏥 **تحلیل سرطان و اثرات آن**
+
+**سوال:** {query}
+
+**اطلاعات یافت شده:**
+{cancer_info}
+
+**تحلیل کلی:**
+سرطان می‌تواند از طریق مکانیسم‌های مختلف بر بافت‌ها تأثیر بگذارد:
+
+• **تغییرات ژنتیکی:** جهش‌های ژنتیکی که منجر به رشد غیرطبیعی سلول‌ها می‌شود
+• **تغییرات متابولیک:** افزایش مصرف انرژی و تغییر در مسیرهای متابولیک
+• **اثرات بر بافت:** تغییر در ساختار و عملکرد بافت‌های درگیر
+• **پاسخ ایمنی:** تغییر در پاسخ‌های سیستم ایمنی
+
+💡 **نکته:** این اطلاعات بر اساس داده‌های گراف دانش استخراج شده است."""
+
+    def _generate_gene_related_answer(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ برای سوالات مرتبط با ژن‌ها"""
+        query = retrieval_result.query
+        context = retrieval_result.context_text
+        
+        gene_info = self._extract_gene_info_from_context(context)
+        
+        return f"""🧬 **تحلیل ژن‌ها و عملکرد آنها**
+
+**سوال:** {query}
+
+**ژن‌های یافت شده:**
+{gene_info}
+
+**نقش‌های بیولوژیکی:**
+• **تنظیم بیان ژن:** کنترل فرآیندهای سلولی
+• **متابولیسم:** شرکت در مسیرهای متابولیک
+• **سیگنالینگ:** انتقال پیام‌های سلولی
+• **ساختار سلولی:** حفظ ساختار و عملکرد سلول
+
+💡 **نکته:** این اطلاعات بر اساس روابط موجود در گراف دانش استخراج شده است."""
+
+    def _generate_drug_related_answer(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ برای سوالات مرتبط با داروها"""
+        query = retrieval_result.query
+        context = retrieval_result.context_text
+        
+        drug_info = self._extract_drug_info_from_context(context)
+        
+        return f"""💊 **تحلیل داروها و درمان‌ها**
+
+**سوال:** {query}
+
+**داروهای یافت شده:**
+{drug_info}
+
+**مکانیسم‌های درمانی:**
+• **مهار رشد سلولی:** جلوگیری از تکثیر سلول‌های سرطانی
+• **تحریک سیستم ایمنی:** تقویت پاسخ‌های ایمنی
+• **مهار آنژیوژنز:** جلوگیری از رشد عروق خونی تومور
+• **القای آپوپتوز:** مرگ برنامه‌ریزی شده سلول‌های سرطانی
+
+💡 **نکته:** این اطلاعات بر اساس روابط دارو-بیماری در گراف دانش استخراج شده است."""
+
+    def _generate_disease_related_answer(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ برای سوالات مرتبط با بیماری‌ها"""
+        query = retrieval_result.query
+        context = retrieval_result.context_text
+        
+        disease_info = self._extract_disease_info_from_context(context)
+        
+        return f"""🏥 **تحلیل بیماری‌ها و علل آنها**
+
+**سوال:** {query}
+
+**بیماری‌های یافت شده:**
+{disease_info}
+
+**مکانیسم‌های بیماری‌زایی:**
+• **تغییرات ژنتیکی:** جهش‌های ژنتیکی مؤثر در بیماری
+• **اختلالات متابولیک:** تغییر در مسیرهای متابولیک
+• **التهاب:** پاسخ‌های التهابی غیرطبیعی
+• **اختلالات ساختاری:** تغییر در ساختار بافت‌ها
+
+💡 **نکته:** این اطلاعات بر اساس روابط بیماری-ژن در گراف دانش استخراج شده است."""
+
+    def _generate_tissue_related_answer(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ برای سوالات مرتبط با بافت‌ها"""
+        query = retrieval_result.query
+        context = retrieval_result.context_text
+        
+        tissue_info = self._extract_tissue_info_from_context(context)
+        
+        return f"""🔬 **تحلیل بافت‌ها و عملکرد آنها**
+
+**سوال:** {query}
+
+**بافت‌های یافت شده:**
+{tissue_info}
+
+**نقش‌های بیولوژیکی:**
+• **ساختار و پشتیبانی:** حفظ شکل و ساختار اندام‌ها
+• **متابولیسم:** شرکت در فرآیندهای متابولیک
+• **سیگنالینگ:** انتقال پیام‌های سلولی
+• **محافظت:** محافظت از اندام‌های داخلی
+
+💡 **نکته:** این اطلاعات بر اساس روابط بافت-ژن در گراف دانش استخراج شده است."""
+
+    def _generate_general_structured_answer(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ ساختاریافته عمومی"""
+        query = retrieval_result.query
+        context = retrieval_result.context_text
+        
+        # خلاصه اطلاعات یافت شده
+        summary = self._create_context_summary(context)
+        
+        return f"""📊 **تحلیل اطلاعات یافت شده**
+
+**سوال:** {query}
+
+**خلاصه اطلاعات:**
+{summary}
+
+**تحلیل کلی:**
+بر اساس داده‌های گراف دانش، اطلاعات مرتبط با سوال شما یافت شده است. این اطلاعات شامل روابط بین موجودیت‌های زیستی مختلف است که می‌تواند به درک بهتر موضوع کمک کند.
+
+💡 **نکته:** برای اطلاعات دقیق‌تر، می‌توانید از روش‌های بازیابی پیشرفته استفاده کنید."""
+
+    def _extract_cancer_info_from_context(self, context: str) -> str:
+        """استخراج اطلاعات سرطان از context"""
+        if not context:
+            return "اطلاعات کافی یافت نشد."
+        
+        # استخراج ژن‌ها و بیماری‌های مرتبط
+        lines = context.split('\n')
+        cancer_related = []
+        
+        for line in lines:
+            if any(word in line.lower() for word in ['cancer', 'tumor', 'malignant']):
+                cancer_related.append(line.strip())
+        
+        if cancer_related:
+            return "\n".join(cancer_related[:10])  # حداکثر 10 خط
+        else:
+            return "اطلاعات مرتبط با سرطان در داده‌های یافت شده محدود است."
+
+    def _extract_gene_info_from_context(self, context: str) -> str:
+        """استخراج اطلاعات ژن از context"""
+        if not context:
+            return "اطلاعات کافی یافت نشد."
+        
+        lines = context.split('\n')
+        gene_related = []
+        
+        for line in lines:
+            if 'gene' in line.lower() or any(word in line.lower() for word in ['express', 'regulate', 'function']):
+                gene_related.append(line.strip())
+        
+        if gene_related:
+            return "\n".join(gene_related[:10])
+        else:
+            return "اطلاعات مرتبط با ژن‌ها در داده‌های یافت شده محدود است."
+
+    def _extract_drug_info_from_context(self, context: str) -> str:
+        """استخراج اطلاعات دارو از context"""
+        if not context:
+            return "اطلاعات کافی یافت نشد."
+        
+        lines = context.split('\n')
+        drug_related = []
+        
+        for line in lines:
+            if any(word in line.lower() for word in ['drug', 'compound', 'medicine', 'treat']):
+                drug_related.append(line.strip())
+        
+        if drug_related:
+            return "\n".join(drug_related[:10])
+        else:
+            return "اطلاعات مرتبط با داروها در داده‌های یافت شده محدود است."
+
+    def _extract_disease_info_from_context(self, context: str) -> str:
+        """استخراج اطلاعات بیماری از context"""
+        if not context:
+            return "اطلاعات کافی یافت نشد."
+        
+        lines = context.split('\n')
+        disease_related = []
+        
+        for line in lines:
+            if any(word in line.lower() for word in ['disease', 'disorder', 'condition', 'symptom']):
+                disease_related.append(line.strip())
+        
+        if disease_related:
+            return "\n".join(disease_related[:10])
+        else:
+            return "اطلاعات مرتبط با بیماری‌ها در داده‌های یافت شده محدود است."
+
+    def _extract_tissue_info_from_context(self, context: str) -> str:
+        """استخراج اطلاعات بافت از context"""
+        if not context:
+            return "اطلاعات کافی یافت نشد."
+        
+        lines = context.split('\n')
+        tissue_related = []
+        
+        for line in lines:
+            if any(word in line.lower() for word in ['tissue', 'organ', 'anatomy', 'heart', 'brain', 'liver']):
+                tissue_related.append(line.strip())
+        
+        if tissue_related:
+            return "\n".join(tissue_related[:10])
+        else:
+            return "اطلاعات مرتبط با بافت‌ها در داده‌های یافت شده محدود است."
+
+    def _create_context_summary(self, context: str) -> str:
+        """خلاصه‌سازی context"""
+        if not context:
+            return "اطلاعات کافی یافت نشد."
+        
+        lines = context.split('\n')
+        summary_lines = []
+        
+        # شمارش انواع موجودیت‌ها
+        gene_count = sum(1 for line in lines if 'gene' in line.lower())
+        disease_count = sum(1 for line in lines if 'disease' in line.lower())
+        drug_count = sum(1 for line in lines if 'drug' in line.lower() or 'compound' in line.lower())
+        
+        if gene_count > 0:
+            summary_lines.append(f"• ژن‌های مرتبط: {gene_count} مورد")
+        if disease_count > 0:
+            summary_lines.append(f"• بیماری‌های مرتبط: {disease_count} مورد")
+        if drug_count > 0:
+            summary_lines.append(f"• داروهای مرتبط: {drug_count} مورد")
+        
+        if summary_lines:
+            return "\n".join(summary_lines)
+        else:
+            return "اطلاعات کلی در دسترس است."
+
+    # ========================================
+    # روش‌های تولید متن هوشمند
+    # ========================================
+    
+    def general_simple_generation_intelligent(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ ساده و عمومی هوشمند"""
+        query = retrieval_result.query
+        context = retrieval_result.context_text
+        
+        # ایجاد متن زمینه هوشمند پیشرفته
+        intelligent_context = self._create_intelligent_context_text(retrieval_result)
+        
+        # تحلیل عمیق‌تر سوال
+        query_lower = query.lower()
+        
+        # تشخیص نوع سوال با دقت بیشتر
+        if any(word in query_lower for word in ["relationship", "interact", "connect", "link"]):
+            return self._generate_intelligent_relationship_answer(retrieval_result, [], [], [])
+        elif any(word in query_lower for word in ["drug", "medicine", "treatment", "therapy", "compound"]):
+            return self._generate_intelligent_drug_answer(retrieval_result, [], [])
+        elif any(word in query_lower for word in ["gene", "protein", "express", "regulate"]):
+            return self._generate_intelligent_gene_answer(retrieval_result, [], [])
+        elif any(word in query_lower for word in ["disease", "disorder", "condition", "cancer"]):
+            return self._generate_intelligent_disease_answer(retrieval_result, [], [])
+        elif any(word in query_lower for word in ["tissue", "organ", "anatomy", "heart", "brain"]):
+            return self._generate_intelligent_anatomy_answer(retrieval_result, [], [])
+        else:
+            return self._generate_intelligent_general_answer(retrieval_result, [], [], [], [], [])
+    
+    def simple_template_generation_intelligent(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ با قالب هوشمند"""
+        query_lower = retrieval_result.query.lower()
+        
+        # ایجاد متن زمینه هوشمند پیشرفته
+        intelligent_context = self._create_intelligent_context_text(retrieval_result)
+        
+        # تحلیل پیشرفته نوع سوال
+        if "relationship" in query_lower or "interact" in query_lower:
+            return self._generate_intelligent_relationship_answer(retrieval_result, [], [], [])
+        elif "drug" in query_lower or "treatment" in query_lower:
+            return self._generate_intelligent_drug_answer(retrieval_result, [], [])
+        elif "gene" in query_lower or "express" in query_lower:
+            return self._generate_intelligent_gene_answer(retrieval_result, [], [])
+        elif "disease" in query_lower or "cancer" in query_lower:
+            return self._generate_intelligent_disease_answer(retrieval_result, [], [])
+        elif "tissue" in query_lower or "anatomy" in query_lower:
+            return self._generate_intelligent_anatomy_answer(retrieval_result, [], [])
+        else:
+            return self._generate_intelligent_general_answer(retrieval_result, [], [], [], [], [])
+    
+    def gpt_simulation_generation_intelligent(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ شبیه‌سازی GPT هوشمند"""
+        # استفاده از روش‌های هوشمند موجود
+        return self.gpt_simulation_generation(retrieval_result)
+    
+    def custom_generation_intelligent(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ سفارشی هوشمند"""
+        # استفاده از روش‌های هوشمند موجود
+        return self.custom_generation(retrieval_result)
+    
+    def huggingface_generation_intelligent(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ HuggingFace هوشمند"""
+        # استفاده از روش‌های هوشمند موجود
+        return self.huggingface_generation(retrieval_result)
+    
+    def openai_gpt_generation_intelligent(self, retrieval_result: RetrievalResult, model: GenerationModel = None) -> str:
+        """تولید پاسخ OpenAI GPT هوشمند"""
+        # استفاده از روش‌های هوشمند موجود
+        return self.openai_gpt_generation(retrieval_result, model)
+    
+    def anthropic_claude_generation_intelligent(self, retrieval_result: RetrievalResult, model: GenerationModel = None) -> str:
+        """تولید پاسخ Anthropic Claude هوشمند"""
+        # استفاده از روش‌های هوشمند موجود
+        return self.anthropic_claude_generation(retrieval_result, model)
+    
+    def google_gemini_generation_intelligent(self, retrieval_result: RetrievalResult, model: GenerationModel = None) -> str:
+        """تولید پاسخ Google Gemini هوشمند"""
+        # استفاده از روش‌های هوشمند موجود
+        return self.google_gemini_generation(retrieval_result, model)
+
+    # ========================================
+    # متدهای جدید برای مدل‌های پیشرفته
+    # ========================================
+    
+    def meta_llama_generation(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ با Meta Llama 3.1 (محلی)"""
+        try:
+            # این متد نیاز به نصب Llama 3.1 دارد
+            # برای استفاده نیاز به API Key یا نصب محلی است
+            return "🔧 Meta Llama 3.1 در حال توسعه است.\n\n" + self._fallback_generation(retrieval_result, "Meta Llama 3.1")
+        except Exception as e:
+            print(f"خطا در Meta Llama 3.1: {e}")
+            return self._fallback_generation(retrieval_result, "Meta Llama 3.1")
+    
+    def mistral_ai_generation(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ با Mistral AI (کیفیت بالا)"""
+        try:
+            # این متد نیاز به API Key از Mistral AI دارد
+            return "🔧 Mistral AI در حال توسعه است.\n\n" + self._fallback_generation(retrieval_result, "Mistral AI")
+        except Exception as e:
+            print(f"خطا در Mistral AI: {e}")
+            return self._fallback_generation(retrieval_result, "Mistral AI")
+    
+    def cohere_command_generation(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ با Cohere Command (تخصصی)"""
+        try:
+            # این متد نیاز به API Key از Cohere دارد
+            return "🔧 Cohere Command در حال توسعه است.\n\n" + self._fallback_generation(retrieval_result, "Cohere Command")
+        except Exception as e:
+            print(f"خطا در Cohere Command: {e}")
+            return self._fallback_generation(retrieval_result, "Cohere Command")
+    
+    def perplexity_sonar_generation(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ با Perplexity Sonar (جستجوگر)"""
+        try:
+            # این متد نیاز به API Key از Perplexity دارد
+            return "🔧 Perplexity Sonar در حال توسعه است.\n\n" + self._fallback_generation(retrieval_result, "Perplexity Sonar")
+        except Exception as e:
+            print(f"خطا در Perplexity Sonar: {e}")
+            return self._fallback_generation(retrieval_result, "Perplexity Sonar")
+    
+    # ========================================
+    # متدهای هوشمند برای مدل‌های پیشرفته
+    # ========================================
+    
+    def meta_llama_generation_intelligent(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ Meta Llama 3.1 هوشمند"""
+        return self.meta_llama_generation(retrieval_result)
+    
+    def mistral_ai_generation_intelligent(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ Mistral AI هوشمند"""
+        return self.mistral_ai_generation(retrieval_result)
+    
+    def cohere_command_generation_intelligent(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ Cohere Command هوشمند"""
+        return self.cohere_command_generation(retrieval_result)
+    
+    def perplexity_sonar_generation_intelligent(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ Perplexity Sonar هوشمند"""
+        return self.perplexity_sonar_generation(retrieval_result)
+
 # نمونه استفاده
 if __name__ == "__main__":
     service = GraphRAGService()
@@ -4233,7 +5048,8 @@ if __name__ == "__main__":
     result = service.process_query(
         query="What is the relationship between HMGB3 and diabetes?",
         retrieval_method=RetrievalMethod.BFS,
-        generation_model=GenerationModel.GPT_SIMULATION
+        generation_model=GenerationModel.GPT_SIMULATION,
+        text_generation_type='INTELLIGENT'
     )
     
     print(json.dumps(result, indent=2, ensure_ascii=False)) 

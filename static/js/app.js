@@ -165,6 +165,7 @@ class GraphRAGApp {
 
         const retrievalMethod = document.getElementById('retrieval-method').value;
         const generationModel = document.getElementById('generation-model').value;
+        const textGenerationType = document.getElementById('text-generation-type').value;
         const maxDepth = parseInt(document.getElementById('max-depth').value);
 
         this.showLoading(true);
@@ -179,6 +180,7 @@ class GraphRAGApp {
                     query: query,
                     retrieval_method: retrievalMethod,
                     generation_model: generationModel,
+                    text_generation_type: textGenerationType,
                     max_depth: maxDepth
                 })
             });

@@ -64,13 +64,52 @@
                         <div class="form-group">
                             <label for="generation-model">مدل تولید متن:</label>
                             <select id="generation-model">
-                                <option value="HUGGINGFACE">HuggingFace Models (رایگان)</option>
-                                <option value="GPT_SIMULATION">GPT Simulation</option>
-                                <option value="CUSTOM">Custom Model</option>
-                                <option value="OPENAI_GPT">OpenAI GPT (فعال ✅)</option>
-                                <option value="ANTHROPIC_CLAUDE">Anthropic Claude (نیاز به API Key)</option>
-                                <option value="GOOGLE_GEMINI">Google Gemini (نیاز به API Key)</option>
-                                <option value="SIMPLE">Simple Template</option>
+                                <optgroup label="🤖 مدل‌های محلی و رایگان">
+                                    <option value="GENERAL_SIMPLE">General Simple (پاسخ ساده و عمومی) ⭐</option>
+                                    <option value="SIMPLE">Simple Template</option>
+                                    <option value="GPT_SIMULATION">GPT Simulation</option>
+                                    <option value="CUSTOM">Custom Model</option>
+                                    <option value="HUGGINGFACE">HuggingFace Models (رایگان)</option>
+                                </optgroup>
+                                
+                                <optgroup label="🚀 OpenAI GPT Models">
+                                    <option value="OPENAI_GPT_4O">GPT-4o (جدیدترین و قوی‌ترین) 🆕</option>
+                                    <option value="OPENAI_GPT_4O_MINI">GPT-4o Mini (سریع و اقتصادی)</option>
+                                    <option value="OPENAI_GPT_4_TURBO">GPT-4 Turbo (تعادل سرعت و کیفیت)</option>
+                                    <option value="OPENAI_GPT_4">GPT-4 (کیفیت بالا)</option>
+                                    <option value="OPENAI_GPT_3_5_TURBO">GPT-3.5 Turbo (سریع و اقتصادی)</option>
+                                    <option value="OPENAI_GPT_3_5_TURBO_16K">GPT-3.5 Turbo 16K (متن طولانی)</option>
+                                </optgroup>
+                                
+                                <optgroup label="🧠 Anthropic Claude Models">
+                                    <option value="ANTHROPIC_CLAUDE_3_5_SONNET">Claude 3.5 Sonnet (جدیدترین)</option>
+                                    <option value="ANTHROPIC_CLAUDE_3_5_HAIKU">Claude 3.5 Haiku (سریع)</option>
+                                    <option value="ANTHROPIC_CLAUDE_3_OPUS">Claude 3 Opus (قوی‌ترین)</option>
+                                    <option value="ANTHROPIC_CLAUDE_3_SONNET">Claude 3 Sonnet (تعادل)</option>
+                                    <option value="ANTHROPIC_CLAUDE_3_HAIKU">Claude 3 Haiku (سریع)</option>
+                                </optgroup>
+                                
+                                <optgroup label="🔍 Google Gemini Models">
+                                    <option value="GOOGLE_GEMINI_1_5_PRO">Gemini 1.5 Pro (جدیدترین)</option>
+                                    <option value="GOOGLE_GEMINI_1_5_FLASH">Gemini 1.5 Flash (سریع)</option>
+                                    <option value="GOOGLE_GEMINI_1_0_PRO">Gemini 1.0 Pro (پایدار)</option>
+                                    <option value="GOOGLE_GEMINI_1_0_FLASH">Gemini 1.0 Flash (سریع)</option>
+                                </optgroup>
+                                
+                                <optgroup label="🌟 سایر مدل‌های پیشرفته">
+                                    <option value="META_LLAMA_3_1">Meta Llama 3.1 (محلی)</option>
+                                    <option value="MISTRAL_AI">Mistral AI (کیفیت بالا)</option>
+                                    <option value="COHERE_COMMAND">Cohere Command (تخصصی)</option>
+                                    <option value="PERPLEXITY_SONAR">Perplexity Sonar (جستجوگر)</option>
+                                </optgroup>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="text-generation-type">نوع تولید متن:</label>
+                            <select id="text-generation-type">
+                                <option value="SIMPLE">متن ساده عمومی</option>
+                                <option value="INTELLIGENT" selected>متن تخصصی هوشمند</option>
                             </select>
                         </div>
 
