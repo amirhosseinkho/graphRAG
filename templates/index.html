@@ -44,20 +44,68 @@
                         <textarea id="query" placeholder="مثال: What is the relationship between HMGB3 and diabetes?" rows="3"></textarea>
                     </div>
 
+                    <!-- Enhanced Service Toggle -->
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="use-enhanced-service">
+                            <span class="checkmark"></span>
+                            استفاده از سرویس پیشرفته GraphRAG
+                        </label>
+                        <span class="setting-description">فعال‌سازی قابلیت‌های جدید شامل استخراج توکن پیشرفته و الگوریتم‌های جدید</span>
+                    </div>
+
                     <div class="form-row">
+                        <div class="form-group">
+                            <label for="token-extraction-method">روش استخراج توکن:</label>
+                            <select id="token-extraction-method">
+                                <option value="CLASSIC">کلاسیک (روش قبلی)</option>
+                                <option value="LLM_BASED" selected>LLM-Based (هوشمند)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="token-extraction-model">مدل استخراج توکن:</label>
+                            <select id="token-extraction-model">
+                                <optgroup label="OpenAI Models">
+                                    <option value="OPENAI_GPT_4O">GPT-4o (بهترین کیفیت)</option>
+                                    <option value="OPENAI_GPT_4O_MINI" selected>GPT-4o Mini (سریع و اقتصادی)</option>
+                                    <option value="OPENAI_GPT_3_5_TURBO">GPT-3.5 Turbo (سریع)</option>
+                                </optgroup>
+                                <optgroup label="Anthropic Models">
+                                    <option value="ANTHROPIC_CLAUDE_3_5_SONNET">Claude 3.5 Sonnet</option>
+                                    <option value="ANTHROPIC_CLAUDE_3_5_HAIKU">Claude 3.5 Haiku</option>
+                                </optgroup>
+                                <optgroup label="Google Models">
+                                    <option value="GOOGLE_GEMINI_1_5_PRO">Gemini 1.5 Pro</option>
+                                    <option value="GOOGLE_GEMINI_1_5_FLASH">Gemini 1.5 Flash</option>
+                                </optgroup>
+                            </select>
+                        </div>
+
                         <div class="form-group">
                             <label for="retrieval-method">روش بازیابی:</label>
                             <select id="retrieval-method">
-                                <option value="NO_RETRIEVAL">بدون بازیابی (فقط مدل)</option>
-                                <option value="BFS">BFS (جستجوی سطح اول)</option>
-                                <option value="DFS">DFS (جستجوی عمیق اول)</option>
-                                <option value="SHORTEST_PATH">کوتاه‌ترین مسیر</option>
-                                <option value="NEIGHBORS">همسایه‌ها</option>
-                                <option value="HYBRID">ترکیبی</option>
-                                <option value="MULTI_METHOD">چند روشی (Multi-Method)</option>
-                                <option value="ENSEMBLE">گروهی (Ensemble)</option>
-                                <option value="ADAPTIVE">تطبیقی (Adaptive)</option>
-                                <option value="INTELLIGENT">جستجوی معنایی هوشمند</option>
+                                <optgroup label="الگوریتم‌های کلاسیک">
+                                    <option value="NO_RETRIEVAL">بدون بازیابی (فقط مدل)</option>
+                                    <option value="BFS">BFS (جستجوی سطح اول)</option>
+                                    <option value="DFS">DFS (جستجوی عمیق اول)</option>
+                                    <option value="SHORTEST_PATH">کوتاه‌ترین مسیر</option>
+                                    <option value="NEIGHBORS">همسایه‌ها</option>
+                                    <option value="HYBRID">ترکیبی</option>
+                                    <option value="MULTI_METHOD">چند روشی (Multi-Method)</option>
+                                    <option value="ENSEMBLE">گروهی (Ensemble)</option>
+                                    <option value="ADAPTIVE">تطبیقی (Adaptive)</option>
+                                    <option value="INTELLIGENT">جستجوی معنایی هوشمند</option>
+                                </optgroup>
+                                <optgroup label="الگوریتم‌های جدید GraphRAG">
+                                    <option value="KG_SEARCH">KGSearch (الگوریتم اصلی جدید)</option>
+                                    <option value="N_HOP_RETRIEVAL">N-Hop Retrieval (بازیابی چندمرحله‌ای)</option>
+                                    <option value="PAGERANK_BASED">PageRank-Based (بر اساس اهمیت)</option>
+                                    <option value="SEMANTIC_SIMILARITY">Semantic Similarity (شباهت معنایی)</option>
+                                    <option value="COMMUNITY_DETECTION">Community Detection (تشخیص جامعه‌ها)</option>
+                                    <option value="ENTITY_RESOLUTION">Entity Resolution (حل موجودیت‌ها)</option>
+                                    <option value="HYBRID_NEW">Hybrid New (ترکیب روش‌های جدید)</option>
+                                </optgroup>
                             </select>
                         </div>
 
@@ -121,6 +169,66 @@
                         <div class="form-group">
                             <label for="max-depth">حداکثر عمق:</label>
                             <input type="number" id="max-depth" min="1" max="5" value="2">
+                        </div>
+                    </div>
+
+                    <!-- Enhanced Service Settings (Hidden by default) -->
+                    <div id="enhanced-settings" class="enhanced-settings" style="display: none;">
+                        <h4><i class="fas fa-rocket"></i> تنظیمات سرویس پیشرفته</h4>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="enhanced-token-extraction-method">روش استخراج توکن:</label>
+                                <select id="enhanced-token-extraction-method">
+                                    <option value="llm_based">بر اساس LLM</option>
+                                    <option value="rule_based">بر اساس قوانین</option>
+                                    <option value="hybrid">ترکیبی</option>
+                                    <option value="semantic">معنایی</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="enhanced-retrieval-algorithm">الگوریتم بازیابی:</label>
+                                <select id="enhanced-retrieval-algorithm">
+                                    <option value="bfs">BFS (جستجوی سطح اول)</option>
+                                    <option value="dfs">DFS (جستجوی عمیق اول)</option>
+                                    <option value="pagerank">PageRank</option>
+                                    <option value="community_detection">تشخیص جامعه</option>
+                                    <option value="semantic_similarity">شباهت معنایی</option>
+                                    <option value="n_hop">N-Hop</option>
+                                    <option value="hybrid" selected>ترکیبی</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="enhanced-community-detection-method">روش تشخیص جامعه:</label>
+                                <select id="enhanced-community-detection-method">
+                                    <option value="louvain" selected>Louvain</option>
+                                    <option value="label_propagation">Label Propagation</option>
+                                    <option value="girvan_newman">Girvan-Newman</option>
+                                    <option value="spectral">Spectral</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="enhanced-max-depth">حداکثر عمق:</label>
+                                <input type="number" id="enhanced-max-depth" min="1" max="10" value="3">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="enhanced-max-nodes">حداکثر نودها:</label>
+                                <input type="number" id="enhanced-max-nodes" min="1" max="100" value="20">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="enhanced-max-edges">حداکثر یال‌ها:</label>
+                                <input type="number" id="enhanced-max-edges" min="1" max="200" value="40">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="enhanced-similarity-threshold">آستانه شباهت:</label>
+                                <input type="number" id="enhanced-similarity-threshold" min="0" max="1" step="0.1" value="0.3">
+                            </div>
                         </div>
                     </div>
 
@@ -211,6 +319,36 @@
                                     <input type="number" id="max-prompt-tokens" min="1000" max="10000" value="4000">
                                     <span class="setting-description">طول متن ورودی به مدل</span>
                                 </div>
+
+                                <div class="setting-group">
+                                    <label for="similarity-threshold">آستانه شباهت:</label>
+                                    <input type="number" id="similarity-threshold" min="0" max="1" step="0.1" value="0.3">
+                                    <span class="setting-description">آستانه شباهت برای فیلتر کردن نتایج</span>
+                                </div>
+
+                                <div class="setting-group">
+                                    <label for="n-hop-depth">عمق N-Hop:</label>
+                                    <input type="number" id="n-hop-depth" min="1" max="5" value="2">
+                                    <span class="setting-description">عمق جستجوی چندمرحله‌ای</span>
+                                </div>
+
+                                <div class="setting-group">
+                                    <label for="pagerank-damping">ضریب PageRank:</label>
+                                    <input type="number" id="pagerank-damping" min="0.1" max="0.9" step="0.1" value="0.85">
+                                    <span class="setting-description">ضریب damping برای PageRank</span>
+                                </div>
+
+                                <div class="setting-group">
+                                    <label for="entity-resolution-threshold">آستانه حل موجودیت:</label>
+                                    <input type="number" id="entity-resolution-threshold" min="0.1" max="1.0" step="0.1" value="0.8">
+                                    <span class="setting-description">آستانه شباهت برای ادغام موجودیت‌ها</span>
+                                </div>
+
+                                <div class="setting-group">
+                                    <label for="community-detection-resolution">دقت تشخیص جامعه:</label>
+                                    <input type="number" id="community-detection-resolution" min="0.1" max="2.0" step="0.1" value="1.0">
+                                    <span class="setting-description">پارامتر resolution برای تشخیص جامعه‌ها</span>
+                                </div>
                             </div>
 
                             <div class="boolean-settings">
@@ -239,6 +377,51 @@
                                         فیلتر هوشمند
                                     </label>
                                     <span class="setting-description">فیلتر کردن نتایج غیرمرتبط</span>
+                                </div>
+
+                                <div class="setting-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="enable-llm-caching" checked>
+                                        <span class="checkmark"></span>
+                                        کش کردن LLM
+                                    </label>
+                                    <span class="setting-description">ذخیره نتایج LLM در کش برای سرعت بیشتر</span>
+                                </div>
+
+                                <div class="setting-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="enable-entity-resolution" checked>
+                                        <span class="checkmark"></span>
+                                        حل موجودیت‌های مشابه
+                                    </label>
+                                    <span class="setting-description">ادغام موجودیت‌های مشابه در گراف</span>
+                                </div>
+
+                                <div class="setting-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="enable-community-detection" checked>
+                                        <span class="checkmark"></span>
+                                        تشخیص جامعه‌ها
+                                    </label>
+                                    <span class="setting-description">تشخیص گروه‌های مرتبط در گراف</span>
+                                </div>
+
+                                <div class="setting-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="enable-semantic-search" checked>
+                                        <span class="checkmark"></span>
+                                        جستجوی معنایی
+                                    </label>
+                                    <span class="setting-description">استفاده از شباهت معنایی برای بازیابی</span>
+                                </div>
+
+                                <div class="setting-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="enable-pagerank-scoring" checked>
+                                        <span class="checkmark"></span>
+                                        امتیازدهی PageRank
+                                    </label>
+                                    <span class="setting-description">استفاده از PageRank برای رتبه‌بندی نودها</span>
                                 </div>
                             </div>
                         </div>
@@ -308,6 +491,45 @@
                             </div>
                             <div id="tab-context" class="tab-pane">
                                 <pre id="context-text" class="context-text"></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Enhanced Results (Hidden by default) -->
+                    <div id="enhanced-results" class="enhanced-results" style="display: none;">
+                        <!-- Query Analysis -->
+                        <div class="query-analysis-section">
+                            <h3><i class="fas fa-search"></i> تحلیل سوال</h3>
+                            <div id="query-analysis" class="analysis-container"></div>
+                        </div>
+
+                        <!-- Enhanced Retrieved Information -->
+                        <div class="enhanced-retrieved-info">
+                            <h3><i class="fas fa-database"></i> اطلاعات بازیابی شده (پیشرفته)</h3>
+                            <div class="enhanced-info-tabs">
+                                <button class="enhanced-tab-btn active" data-enhanced-tab="enhanced-nodes">نودها</button>
+                                <button class="enhanced-tab-btn" data-enhanced-tab="enhanced-edges">یال‌ها</button>
+                                <button class="enhanced-tab-btn" data-enhanced-tab="enhanced-communities">جامعه‌ها</button>
+                                <button class="enhanced-tab-btn" data-enhanced-tab="enhanced-similarities">شباهت‌ها</button>
+                                <button class="enhanced-tab-btn" data-enhanced-tab="enhanced-paths">مسیرها</button>
+                            </div>
+                            
+                            <div class="enhanced-tab-content">
+                                <div id="tab-enhanced-nodes" class="enhanced-tab-pane active">
+                                    <div id="enhanced-nodes" class="enhanced-nodes-grid"></div>
+                                </div>
+                                <div id="tab-enhanced-edges" class="enhanced-tab-pane">
+                                    <div id="enhanced-edges" class="enhanced-edges-list"></div>
+                                </div>
+                                <div id="tab-enhanced-communities" class="enhanced-tab-pane">
+                                    <div id="enhanced-communities" class="communities-list"></div>
+                                </div>
+                                <div id="tab-enhanced-similarities" class="enhanced-tab-pane">
+                                    <div id="enhanced-similarities" class="similarities-list"></div>
+                                </div>
+                                <div id="tab-enhanced-paths" class="enhanced-tab-pane">
+                                    <div id="enhanced-paths" class="enhanced-paths-list"></div>
+                                </div>
                             </div>
                         </div>
                     </div>

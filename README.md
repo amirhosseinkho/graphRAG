@@ -4,6 +4,33 @@
 
 GraphRAG یک سیستم پیشرفته برای پاسخ‌دهی به سوالات تخصصی در حوزه پزشکی و زیست‌شناسی است که از ترکیب گراف دانش زیستی و مدل‌های تولید متن استفاده می‌کند. این سیستم قابلیت بازیابی هوشمند اطلاعات از گراف دانش Hetionet و تولید پاسخ‌های دقیق و جامع را فراهم می‌آورد.
 
+## 🚀 قابلیت‌های جدید
+
+### سرویس پیشرفته GraphRAG
+
+این پروژه شامل قابلیت‌های پیشرفته جدید است:
+
+#### روش‌های استخراج توکن
+- **LLM-based**: استفاده از مدل‌های زبانی برای استخراج هوشمند
+- **Rule-based**: استفاده از قوانین از پیش تعریف شده
+- **Hybrid**: ترکیب روش‌های LLM و قوانین
+- **Semantic**: استخراج بر اساس شباهت معنایی
+
+#### الگوریتم‌های بازیابی جدید
+- **BFS**: جستجوی سطح اول
+- **DFS**: جستجوی عمیق اول
+- **PageRank**: رتبه‌بندی بر اساس اهمیت
+- **Community Detection**: تشخیص جامعه‌ها
+- **Semantic Similarity**: شباهت معنایی
+- **N-Hop**: مسیرهای چندمرحله‌ای
+- **Hybrid**: ترکیب چندین الگوریتم
+
+#### روش‌های تشخیص جامعه
+- **Louvain**: الگوریتم سریع و کارآمد
+- **Label Propagation**: انتشار برچسب
+- **Girvan-Newman**: تشخیص جامعه بر اساس مرکزیت
+- **Spectral**: روش طیفی
+
 ## ویژگی‌های اصلی
 
 ### تست مدل بدون گراف
@@ -79,6 +106,16 @@ python test_model_only.py
 ### تست OpenAI GPT
 ```bash
 python test_openai.py
+```
+
+### تست سرویس پیشرفته
+```bash
+python test_enhanced_service.py
+```
+
+### تست عملکرد
+```bash
+python test_performance.py
 ```
 
 ### تست در رابط وب
@@ -270,6 +307,30 @@ tir/
 
 ## مثال استفاده
 
+### استفاده از سرویس پیشرفته
+```python
+from enhanced_graphrag_service import EnhancedGraphRAGService, TokenExtractionMethod, RetrievalAlgorithm
+
+# راه‌اندازی سرویس پیشرفته
+service = EnhancedGraphRAGService(graph_data_path='hetionet_graph.pkl')
+
+# تنظیم پارامترها
+service.set_config(
+    token_extraction_method='hybrid',
+    retrieval_algorithm='pagerank',
+    max_depth=3,
+    max_nodes=20,
+    similarity_threshold=0.3
+)
+
+# پردازش سوال
+result = service.process_query("What genes are associated with diabetes?")
+
+print("تحلیل سوال:", result['query_analysis'])
+print("نودهای یافت شده:", len(result['nodes']))
+print("یال‌های یافت شده:", len(result['edges']))
+```
+
 ### تست مدل بدون گراف
 ```python
 from graphrag_service import GraphRAGService, RetrievalMethod, GenerationModel
@@ -304,7 +365,7 @@ service.set_openai_api_key("your-api-key-here")
 
 ## API RESTful
 
-### پردازش سوال
+### پردازش سوال (سرویس معمولی)
 ```
 POST /api/process_query
 Content-Type: application/json
@@ -317,9 +378,40 @@ Content-Type: application/json
 }
 ```
 
+### پردازش سوال (سرویس پیشرفته)
+```
+POST /api/enhanced_process_query
+Content-Type: application/json
+
+{
+    "query": "سوال شما",
+    "token_extraction_method": "hybrid",
+    "retrieval_algorithm": "pagerank",
+    "community_detection_method": "louvain",
+    "max_depth": 3,
+    "max_nodes": 20,
+    "max_edges": 40,
+    "similarity_threshold": 0.3
+}
+```
+
+### تنظیمات پیشرفته
+```
+GET /api/enhanced_config
+POST /api/enhanced_config
+```
+
 ### اطلاعات گراف
 ```
 GET /api/graph_info
+GET /api/enhanced_graph_info
+```
+
+### روش‌های مختلف
+```
+GET /api/token_extraction_methods
+GET /api/retrieval_algorithms
+GET /api/community_detection_methods
 ```
 
 ### سوالات نمونه

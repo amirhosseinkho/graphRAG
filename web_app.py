@@ -5,6 +5,7 @@ GraphRAG Web Application - رابط وب تعاملی
 
 from flask import Flask, render_template, request, jsonify, send_from_directory, redirect, url_for
 from graphrag_service import GraphRAGService, RetrievalMethod, GenerationModel
+from enhanced_graphrag_service import EnhancedGraphRAGService, TokenExtractionMethod, RetrievalAlgorithm, CommunityDetectionMethod
 import json
 import os
 import shutil
@@ -63,9 +64,11 @@ if graph_files:
     latest_graph_file = max(graph_files)
     print(f"🔧 استفاده از گراف Hetionet: {latest_graph_file}")
     graphrag_service = GraphRAGService(graph_data_path=latest_graph_file)
+    enhanced_graphrag_service = EnhancedGraphRAGService(graph_data_path=latest_graph_file)
 else:
     print("⚠️ فایل گراف Hetionet یافت نشد، استفاده از گراف نمونه")
     graphrag_service = GraphRAGService()
+    enhanced_graphrag_service = EnhancedGraphRAGService()
 
 # تنظیم API Key های OpenAI
 OPENAI_API_KEY = "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"
@@ -288,6 +291,49 @@ def process_query():
             'error': str(e)
         }), 500
 
+@app.route('/api/enhanced_process_query', methods=['POST'])
+def enhanced_process_query():
+    """پردازش سوال با سرویس پیشرفته GraphRAG"""
+    try:
+        data = request.get_json()
+        query = data.get('query', '')
+        token_extraction_method = data.get('token_extraction_method', 'llm_based')
+        retrieval_algorithm = data.get('retrieval_algorithm', 'hybrid')
+        community_detection_method = data.get('community_detection_method', 'louvain')
+        max_depth = data.get('max_depth', 3)
+        max_nodes = data.get('max_nodes', 20)
+        max_edges = data.get('max_edges', 40)
+        similarity_threshold = data.get('similarity_threshold', 0.3)
+        
+        # تنظیم پیکربندی سرویس پیشرفته
+        enhanced_graphrag_service.set_config(
+            token_extraction_method=token_extraction_method,
+            retrieval_algorithm=retrieval_algorithm,
+            community_detection_method=community_detection_method,
+            max_depth=max_depth,
+            max_nodes=max_nodes,
+            max_edges=max_edges,
+            similarity_threshold=similarity_threshold
+        )
+        
+        # پردازش سوال
+        result = enhanced_graphrag_service.process_query(query)
+        
+        # اضافه کردن timestamp
+        result['timestamp'] = datetime.now().isoformat()
+        result['config'] = enhanced_graphrag_service.get_config()
+        
+        return jsonify({
+            'success': True,
+            'result': result
+        })
+    
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @app.route('/api/graph_info')
 def graph_info():
     """اطلاعات گراف"""
@@ -315,6 +361,123 @@ def graph_info():
             'success': False,
             'error': str(e)
         })
+
+@app.route('/api/enhanced_graph_info')
+def enhanced_graph_info():
+    """اطلاعات گراف پیشرفته"""
+    try:
+        stats = enhanced_graphrag_service.get_graph_statistics()
+        if stats:
+            return jsonify({
+                'success': True,
+                'statistics': stats
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Enhanced graph not loaded'
+            })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@app.route('/api/token_extraction_methods')
+def token_extraction_methods():
+    """دریافت روش‌های استخراج توکن"""
+    methods = [
+        {
+            'value': 'llm_based',
+            'label': 'بر اساس LLM',
+            'description': 'استخراج توکن با استفاده از مدل‌های زبانی'
+        },
+        {
+            'value': 'rule_based',
+            'label': 'بر اساس قوانین',
+            'description': 'استخراج توکن با استفاده از قوانین از پیش تعریف شده'
+        },
+        {
+            'value': 'hybrid',
+            'label': 'ترکیبی',
+            'description': 'ترکیب روش‌های LLM و قوانین'
+        },
+        {
+            'value': 'semantic',
+            'label': 'معنایی',
+            'description': 'استخراج توکن بر اساس شباهت معنایی'
+        }
+    ]
+    return jsonify({'methods': methods})
+
+@app.route('/api/retrieval_algorithms')
+def retrieval_algorithms():
+    """دریافت الگوریتم‌های بازیابی"""
+    algorithms = [
+        {
+            'value': 'bfs',
+            'label': 'BFS (جستجوی سطح اول)',
+            'description': 'جستجوی سطح اول در گراف'
+        },
+        {
+            'value': 'dfs',
+            'label': 'DFS (جستجوی عمیق اول)',
+            'description': 'جستجوی عمیق اول در گراف'
+        },
+        {
+            'value': 'pagerank',
+            'label': 'PageRank',
+            'description': 'رتبه‌بندی بر اساس الگوریتم PageRank'
+        },
+        {
+            'value': 'community_detection',
+            'label': 'تشخیص جامعه',
+            'description': 'بازیابی بر اساس تشخیص جامعه‌ها'
+        },
+        {
+            'value': 'semantic_similarity',
+            'label': 'شباهت معنایی',
+            'description': 'بازیابی بر اساس شباهت معنایی'
+        },
+        {
+            'value': 'n_hop',
+            'label': 'N-Hop',
+            'description': 'بازیابی مسیرهای N-Hop'
+        },
+        {
+            'value': 'hybrid',
+            'label': 'ترکیبی',
+            'description': 'ترکیب چندین الگوریتم'
+        }
+    ]
+    return jsonify({'algorithms': algorithms})
+
+@app.route('/api/community_detection_methods')
+def community_detection_methods():
+    """دریافت روش‌های تشخیص جامعه"""
+    methods = [
+        {
+            'value': 'louvain',
+            'label': 'Louvain',
+            'description': 'الگوریتم Louvain برای تشخیص جامعه'
+        },
+        {
+            'value': 'label_propagation',
+            'label': 'Label Propagation',
+            'description': 'انتشار برچسب برای تشخیص جامعه'
+        },
+        {
+            'value': 'girvan_newman',
+            'label': 'Girvan-Newman',
+            'description': 'الگوریتم Girvan-Newman'
+        },
+        {
+            'value': 'spectral',
+            'label': 'Spectral',
+            'description': 'روش طیفی برای تشخیص جامعه'
+        }
+    ]
+    return jsonify({'methods': methods})
 
 @app.route('/api/sample_queries')
 def sample_queries():
@@ -422,6 +585,46 @@ def config_endpoint():
             return jsonify({
                 'success': True,
                 'message': 'تنظیمات با موفقیت به‌روز شد',
+                'config': updated_config
+            })
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
+@app.route('/api/enhanced_config', methods=['GET', 'POST'])
+def enhanced_config_endpoint():
+    """مدیریت تنظیمات سرویس پیشرفته"""
+    if request.method == 'GET':
+        # دریافت تنظیمات فعلی
+        try:
+            config = enhanced_graphrag_service.get_config()
+            return jsonify({
+                'success': True,
+                'config': config
+            })
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+    
+    elif request.method == 'POST':
+        # تغییر تنظیمات
+        try:
+            data = request.get_json()
+            new_config = data.get('config', {})
+            
+            # اعمال تنظیمات جدید
+            enhanced_graphrag_service.set_config(**new_config)
+            
+            # دریافت تنظیمات به‌روز شده
+            updated_config = enhanced_graphrag_service.get_config()
+            
+            return jsonify({
+                'success': True,
+                'message': 'تنظیمات پیشرفته با موفقیت به‌روز شد',
                 'config': updated_config
             })
         except Exception as e:
@@ -564,11 +767,12 @@ def compare_with_gpt():
         label1 = data.get('label1', 'روش اول')
         label2 = data.get('label2', 'روش دوم')
         comparison_type = data.get('comparison_type', 'comprehensive')
+        gpt_model = data.get('gpt_model', 'gpt-4o')
         
         if not text1 or not text2:
             return jsonify({'error': 'هر دو متن باید وارد شوند'}), 400
         
-        # Create a comprehensive prompt for GPT-4o
+        # Create a comprehensive prompt for GPT
         prompt = create_gpt_comparison_prompt(text1, text2, label1, label2, comparison_type)
         
         # Check if OpenAI is available
@@ -581,7 +785,7 @@ def compare_with_gpt():
             openai.api_key = OPENAI_API_KEY
             
             response = openai.chat.completions.create(
-                model="gpt-4o",
+                model=gpt_model,
                 messages=[
                     {"role": "system", "content": "شما یک متخصص ارزیابی کیفیت متن هستید. وظیفه شما مقایسه دو متن و ارائه تحلیل دقیق و منصفانه است."},
                     {"role": "user", "content": prompt}
@@ -594,11 +798,12 @@ def compare_with_gpt():
             
             # Parse the GPT response
             parsed_result = parse_gpt_comparison_response(gpt_response, label1, label2, comparison_type)
+            parsed_result['gpt_model'] = gpt_model
             
             return jsonify(parsed_result)
             
         except Exception as e:
-            return jsonify({'error': f'خطا در ارتباط با GPT-4o: {str(e)}'}), 500
+            return jsonify({'error': f'خطا در ارتباط با {gpt_model}: {str(e)}'}), 500
         
     except Exception as e:
         return jsonify({'error': f'خطا در مقایسه: {str(e)}'}), 500

@@ -30,6 +30,18 @@ class GraphRAGApp {
             });
         });
 
+        // Enhanced tab switching
+        document.querySelectorAll('.enhanced-tab-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                this.switchEnhancedTab(e.target.dataset.enhancedTab);
+            });
+        });
+
+        // Enhanced service toggle
+        document.getElementById('use-enhanced-service').addEventListener('change', (e) => {
+            this.toggleEnhancedService(e.target.checked);
+        });
+
         // Enter key in query textarea
         document.getElementById('query').addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && e.ctrlKey) {
@@ -163,10 +175,35 @@ class GraphRAGApp {
             return;
         }
 
+        // بررسی نوع سرویس (معمولی یا پیشرفته)
+        const useEnhancedService = document.getElementById('use-enhanced-service')?.checked || false;
+
+        if (useEnhancedService) {
+            await this.processEnhancedQuery(query);
+        } else {
+            await this.processStandardQuery(query);
+        }
+    }
+
+    async processStandardQuery(query) {
+        const tokenExtractionMethod = document.getElementById('token-extraction-method').value;
+        const tokenExtractionModel = document.getElementById('token-extraction-model').value;
         const retrievalMethod = document.getElementById('retrieval-method').value;
         const generationModel = document.getElementById('generation-model').value;
         const textGenerationType = document.getElementById('text-generation-type').value;
         const maxDepth = parseInt(document.getElementById('max-depth').value);
+
+        // تنظیمات جدید
+        const similarityThreshold = parseFloat(document.getElementById('similarity-threshold')?.value || 0.3);
+        const nHopDepth = parseInt(document.getElementById('n-hop-depth')?.value || 2);
+        const pagerankDamping = parseFloat(document.getElementById('pagerank-damping')?.value || 0.85);
+        const entityResolutionThreshold = parseFloat(document.getElementById('entity-resolution-threshold')?.value || 0.8);
+        const communityDetectionResolution = parseFloat(document.getElementById('community-detection-resolution')?.value || 1.0);
+        const enableLLMCaching = document.getElementById('enable-llm-caching')?.checked || true;
+        const enableEntityResolution = document.getElementById('enable-entity-resolution')?.checked || true;
+        const enableCommunityDetection = document.getElementById('enable-community-detection')?.checked || true;
+        const enableSemanticSearch = document.getElementById('enable-semantic-search')?.checked || true;
+        const enablePagerankScoring = document.getElementById('enable-pagerank-scoring')?.checked || true;
 
         this.showLoading(true);
 
@@ -178,10 +215,23 @@ class GraphRAGApp {
                 },
                 body: JSON.stringify({
                     query: query,
+                    token_extraction_method: tokenExtractionMethod,
+                    token_extraction_model: tokenExtractionModel,
                     retrieval_method: retrievalMethod,
                     generation_model: generationModel,
                     text_generation_type: textGenerationType,
-                    max_depth: maxDepth
+                    max_depth: maxDepth,
+                    // تنظیمات جدید
+                    similarity_threshold: similarityThreshold,
+                    n_hop_depth: nHopDepth,
+                    pagerank_damping: pagerankDamping,
+                    entity_resolution_threshold: entityResolutionThreshold,
+                    community_detection_resolution: communityDetectionResolution,
+                    enable_llm_caching: enableLLMCaching,
+                    enable_entity_resolution: enableEntityResolution,
+                    enable_community_detection: enableCommunityDetection,
+                    enable_semantic_search: enableSemanticSearch,
+                    enable_pagerank_scoring: enablePagerankScoring
                 })
             });
 
@@ -189,6 +239,49 @@ class GraphRAGApp {
 
             if (data.success) {
                 this.displayResults(data.result);
+            } else {
+                this.showError(data.error);
+            }
+        } catch (error) {
+            this.showError('خطا در ارتباط با سرور: ' + error.message);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    async processEnhancedQuery(query) {
+        const tokenExtractionMethod = document.getElementById('enhanced-token-extraction-method')?.value || 'llm_based';
+        const retrievalAlgorithm = document.getElementById('enhanced-retrieval-algorithm')?.value || 'hybrid';
+        const communityDetectionMethod = document.getElementById('enhanced-community-detection-method')?.value || 'louvain';
+        const maxDepth = parseInt(document.getElementById('enhanced-max-depth')?.value || 3);
+        const maxNodes = parseInt(document.getElementById('enhanced-max-nodes')?.value || 20);
+        const maxEdges = parseInt(document.getElementById('enhanced-max-edges')?.value || 40);
+        const similarityThreshold = parseFloat(document.getElementById('enhanced-similarity-threshold')?.value || 0.3);
+
+        this.showLoading(true);
+
+        try {
+            const response = await fetch('/api/enhanced_process_query', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    query: query,
+                    token_extraction_method: tokenExtractionMethod,
+                    retrieval_algorithm: retrievalAlgorithm,
+                    community_detection_method: communityDetectionMethod,
+                    max_depth: maxDepth,
+                    max_nodes: maxNodes,
+                    max_edges: maxEdges,
+                    similarity_threshold: similarityThreshold
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.displayEnhancedResults(data.result);
             } else {
                 this.showError(data.error);
             }
@@ -323,6 +416,174 @@ class GraphRAGApp {
         document.getElementById('model-name').textContent = model;
     }
 
+    displayEnhancedResults(result) {
+        // Show results section
+        document.getElementById('results-section').style.display = 'block';
+
+        // Display query analysis
+        this.displayQueryAnalysis(result.query_analysis);
+
+        // Display nodes
+        this.displayEnhancedNodes(result.nodes);
+
+        // Display edges
+        this.displayEnhancedEdges(result.edges);
+
+        // Display communities if available
+        if (result.communities && result.communities.length > 0) {
+            this.displayCommunities(result.communities);
+        }
+
+        // Display similarities if available
+        if (result.similarities && result.similarities.length > 0) {
+            this.displaySimilarities(result.similarities);
+        }
+
+        // Display paths if available
+        if (result.paths && result.paths.length > 0) {
+            this.displayEnhancedPaths(result.paths);
+        }
+
+        // Scroll to results
+        document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    displayQueryAnalysis(analysis) {
+        const container = document.getElementById('query-analysis');
+        if (!container) return;
+
+        container.innerHTML = `
+            <div class="analysis-section">
+                <h4>تحلیل سوال</h4>
+                <div class="analysis-item">
+                    <strong>سوال:</strong> ${analysis.query}
+                </div>
+                <div class="analysis-item">
+                    <strong>نوع پاسخ:</strong> ${analysis.answer_types.join(', ')}
+                </div>
+                <div class="analysis-item">
+                    <strong>موجودیت‌ها:</strong> ${analysis.entities.join(', ')}
+                </div>
+                <div class="analysis-item">
+                    <strong>نودهای شروع:</strong> ${analysis.start_nodes.join(', ')}
+                </div>
+                <div class="analysis-item">
+                    <strong>الگوریتم:</strong> ${analysis.algorithm}
+                </div>
+                <div class="analysis-item">
+                    <strong>روش استخراج توکن:</strong> ${analysis.token_extraction_method}
+                </div>
+            </div>
+        `;
+    }
+
+    displayEnhancedNodes(nodes) {
+        const container = document.getElementById('enhanced-nodes');
+        if (!container) return;
+
+        if (!nodes || nodes.length === 0) {
+            container.innerHTML = '<div class="no-results">هیچ نودی یافت نشد</div>';
+            return;
+        }
+
+        container.innerHTML = nodes.map(node => {
+            const nodeData = typeof node === 'object' ? node : { id: node };
+            return `
+                <div class="node-card enhanced">
+                    <div class="node-header">
+                        <span class="node-name">${nodeData.id}</span>
+                        ${nodeData.source ? `<span class="node-source">${nodeData.source}</span>` : ''}
+                    </div>
+                    <div class="node-details">
+                        ${nodeData.pagerank ? `<div class="node-detail"><span>PageRank:</span><span>${nodeData.pagerank.toFixed(4)}</span></div>` : ''}
+                        ${nodeData.similarity ? `<div class="node-detail"><span>شباهت:</span><span>${nodeData.similarity.toFixed(4)}</span></div>` : ''}
+                        ${nodeData.community !== undefined ? `<div class="node-detail"><span>جامعه:</span><span>${nodeData.community}</span></div>` : ''}
+                        ${nodeData.attributes ? `<div class="node-detail"><span>نوع:</span><span>${nodeData.attributes.kind || 'نامشخص'}</span></div>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    displayEnhancedEdges(edges) {
+        const container = document.getElementById('enhanced-edges');
+        if (!container) return;
+
+        if (!edges || edges.length === 0) {
+            container.innerHTML = '<div class="no-results">هیچ یالی یافت نشد</div>';
+            return;
+        }
+
+        container.innerHTML = edges.map(edge => `
+            <div class="edge-item enhanced">
+                <div class="edge-header">
+                    <span class="edge-source">${edge.source}</span>
+                    <span class="edge-arrow">→</span>
+                    <span class="edge-target">${edge.target}</span>
+                </div>
+                <div class="edge-details">
+                    <div class="edge-detail">
+                        <span>رابطه:</span>
+                        <span>${edge.relation || 'نامشخص'}</span>
+                    </div>
+                    <div class="edge-detail">
+                        <span>وزن:</span>
+                        <span>${edge.weight || 1.0}</span>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    displayCommunities(communities) {
+        const container = document.getElementById('enhanced-communities');
+        if (!container) return;
+
+        container.innerHTML = communities.map(community => `
+            <div class="community-card">
+                <div class="community-header">
+                    <span class="community-id">جامعه ${community.id}</span>
+                    <span class="community-size">${community.size} نود</span>
+                </div>
+                <div class="community-nodes">
+                    ${community.nodes.slice(0, 10).map(node => `<span class="community-node">${node}</span>`).join('')}
+                    ${community.nodes.length > 10 ? `<span class="more-nodes">+${community.nodes.length - 10} بیشتر</span>` : ''}
+                </div>
+            </div>
+        `).join('');
+    }
+
+    displaySimilarities(similarities) {
+        const container = document.getElementById('enhanced-similarities');
+        if (!container) return;
+
+        container.innerHTML = similarities.map(sim => `
+            <div class="similarity-item">
+                <span class="similarity-node">${sim.node}</span>
+                <span class="similarity-score">${sim.score.toFixed(4)}</span>
+            </div>
+        `).join('');
+    }
+
+    displayEnhancedPaths(paths) {
+        const container = document.getElementById('enhanced-paths');
+        if (!container) return;
+
+        container.innerHTML = paths.map((path, index) => `
+            <div class="path-item enhanced">
+                <div class="path-header">
+                    <span class="path-number">مسیر ${index + 1}</span>
+                    <span class="path-length">${path.length} نود</span>
+                </div>
+                <div class="path-nodes">
+                    ${path.map((node, i) => 
+                        `${i > 0 ? '<span class="path-arrow">→</span>' : ''}<span class="path-node">${node}</span>`
+                    ).join('')}
+                </div>
+            </div>
+        `).join('');
+    }
+
     getNodeNameById(nodeId) {
         // This would need to be implemented with actual node data
         // For now, we'll extract the name from the ID
@@ -338,6 +599,32 @@ class GraphRAGApp {
         // Add active class to selected tab and pane
         document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
         document.getElementById(`tab-${tabName}`).classList.add('active');
+    }
+
+    switchEnhancedTab(tabName) {
+        // Remove active class from all enhanced tabs and panes
+        document.querySelectorAll('.enhanced-tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.enhanced-tab-pane').forEach(pane => pane.classList.remove('active'));
+
+        // Add active class to selected enhanced tab and pane
+        document.querySelector(`[data-enhanced-tab="${tabName}"]`).classList.add('active');
+        document.getElementById(`tab-${tabName}`).classList.add('active');
+    }
+
+    toggleEnhancedService(enabled) {
+        const enhancedSettings = document.getElementById('enhanced-settings');
+        const enhancedResults = document.getElementById('enhanced-results');
+        const standardResults = document.getElementById('results-section');
+
+        if (enabled) {
+            enhancedSettings.style.display = 'block';
+            enhancedResults.style.display = 'block';
+            standardResults.style.display = 'none';
+        } else {
+            enhancedSettings.style.display = 'none';
+            enhancedResults.style.display = 'none';
+            standardResults.style.display = 'block';
+        }
     }
 
     showLoading(show) {

@@ -16,6 +16,19 @@ from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
 
+# Import new modules
+try:
+    from graphrag_new.search import KGSearch
+    from graphrag_new.utils import get_entity_type2sampels, get_llm_cache, set_llm_cache, get_relation
+    from graphrag_new.query_analyze_prompt import PROMPTS
+    from graphrag_new.entity_resolution import EntityResolution
+    from rag_new.llm.chat_model import GptTurbo, MoonshotChat, AzureChat, QWenChat, ZhipuChat, OllamaChat, GeminiChat, AnthropicChat
+    from rag_new.utils import REDIS_CONN
+    NEW_MODULES_AVAILABLE = True
+except ImportError:
+    NEW_MODULES_AVAILABLE = False
+    print("Warning: New GraphRAG modules not available. Using classic methods only.")
+
 # دیکشنری کامل توضیحات metaedge برای استفاده در متن زمینه‌ای
 METAEDGE_DESCRIPTIONS = {
     # Anatomy relationships
@@ -127,6 +140,7 @@ DISEASE_SIGNIFICANCE = {
 
 class RetrievalMethod(Enum):
     """روش‌های بازیابی"""
+    # الگوریتم‌های کلاسیک
     BFS = "BFS"
     DFS = "DFS"
     SHORTEST_PATH = "Shortest Path"
@@ -137,6 +151,35 @@ class RetrievalMethod(Enum):
     ADAPTIVE = "Adaptive"
     INTELLIGENT = "Intelligent Semantic Search"
     NO_RETRIEVAL = "بدون بازیابی (فقط مدل)"
+    
+    # الگوریتم‌های جدید GraphRAG
+    KG_SEARCH = "KGSearch (الگوریتم اصلی جدید)"
+    N_HOP_RETRIEVAL = "N-Hop Retrieval (بازیابی چندمرحله‌ای)"
+    PAGERANK_BASED = "PageRank-Based (بر اساس اهمیت)"
+    SEMANTIC_SIMILARITY = "Semantic Similarity (شباهت معنایی)"
+    COMMUNITY_DETECTION = "Community Detection (تشخیص جامعه‌ها)"
+    ENTITY_RESOLUTION = "Entity Resolution (حل موجودیت‌ها)"
+    HYBRID_NEW = "Hybrid New (ترکیب روش‌های جدید)"
+
+class TokenExtractionMethod(Enum):
+    """روش‌های استخراج توکن"""
+    CLASSIC = "کلاسیک (روش قبلی)"
+    LLM_BASED = "LLM-Based (هوشمند)"
+
+class TokenExtractionModel(Enum):
+    """مدل‌های استخراج توکن"""
+    # OpenAI Models
+    OPENAI_GPT_4O = "GPT-4o (بهترین کیفیت)"
+    OPENAI_GPT_4O_MINI = "GPT-4o Mini (سریع و اقتصادی)"
+    OPENAI_GPT_3_5_TURBO = "GPT-3.5 Turbo (سریع)"
+    
+    # Anthropic Models
+    ANTHROPIC_CLAUDE_3_5_SONNET = "Claude 3.5 Sonnet"
+    ANTHROPIC_CLAUDE_3_5_HAIKU = "Claude 3.5 Haiku"
+    
+    # Google Models
+    GOOGLE_GEMINI_1_5_PRO = "Gemini 1.5 Pro"
+    GOOGLE_GEMINI_1_5_FLASH = "Gemini 1.5 Flash"
 
 class ContextTextType(Enum):
     """انواع متن زمینه"""
@@ -606,6 +649,84 @@ class GraphRAGService:
         doc = self.nlp(text)
         keywords = set()
         
+        # نگاشت فارسی به انگلیسی برای کلمات کلیدی مهم
+        persian_to_english = {
+            # ژن‌ها
+            'ژن': 'gene', 'ژن‌ها': 'genes', 'پروتئین': 'protein', 'پروتئین‌ها': 'proteins',
+            'دی‌ان‌ای': 'dna', 'آر‌ان‌ای': 'rna', 'ام‌آر‌ان‌ای': 'mrna',
+            
+            # بافت‌ها و اندام‌ها
+            'کبد': 'liver', 'مغز': 'brain', 'قلب': 'heart', 'ریه': 'lung', 'کلیه': 'kidney',
+            'معده': 'stomach', 'ماهیچه': 'muscle', 'استخوان': 'bone', 'خون': 'blood',
+            'بافت': 'tissue', 'بافت‌ها': 'tissues', 'اندام': 'organ', 'اندام‌ها': 'organs',
+            'بدن': 'body', 'بخش بدن': 'body part',
+            
+            # بیماری‌ها
+            'سرطان': 'cancer', 'سرطان‌ها': 'cancers', 'تومور': 'tumor', 'تومورها': 'tumors',
+            'بیماری': 'disease', 'بیماری‌ها': 'diseases', 'اختلال': 'disorder', 'اختلالات': 'disorders',
+            'سندرم': 'syndrome', 'سندرم‌ها': 'syndromes', 'بدخیمی': 'malignancy', 'بدخیمی‌ها': 'malignancies',
+            'سرطان سینه': 'breast cancer', 'سرطان ریه': 'lung cancer', 'سرطان کبد': 'liver cancer',
+            'سرطان مغز': 'brain cancer', 'سرطان خون': 'blood cancer', 'سرطان معده': 'stomach cancer',
+            'دیابت': 'diabetes', 'آلزایمر': 'alzheimer', 'فیبروز': 'fibrosis',
+            
+            # داروها
+            'دارو': 'drug', 'داروها': 'drugs', 'داروی': 'drug', 'دارویی': 'drug',
+            'داروهای': 'drugs', 'دارویی': 'drug', 'داروها': 'drugs',
+            'آسپرین': 'aspirin', 'ایبوپروفن': 'ibuprofen', 'کافئین': 'caffeine',
+            'ویتامین': 'vitamin', 'ویتامین‌ها': 'vitamins', 'شیمیایی': 'chemical',
+            'شیمیایی‌ها': 'chemicals', 'مولکول': 'molecule', 'مولکول‌ها': 'molecules',
+            'ترکیب': 'compound', 'ترکیبات': 'compounds', 'دارو': 'medication',
+            'داروها': 'medications', 'دارو': 'medicine', 'داروها': 'medicines',
+            
+            # فرآیندهای زیستی
+            'فرآیند': 'process', 'فرآیندها': 'processes', 'زیستی': 'biological',
+            'مسیر': 'pathway', 'مسیرها': 'pathways', 'مکانیسم': 'mechanism',
+            'عملکرد': 'function', 'عملکردها': 'functions', 'فعالیت': 'activity',
+            'فعالیت‌ها': 'activities', 'آپوپتوز': 'apoptosis', 'چرخه سلولی': 'cell cycle',
+            'ترمیم دی‌ان‌ای': 'dna repair', 'تقسیم سلولی': 'cell division',
+            
+            # علائم
+            'علائم': 'symptom', 'علائم': 'symptoms', 'نشانه': 'sign', 'نشانه‌ها': 'signs',
+            'تجلی': 'manifestation', 'تجلیات': 'manifestations', 'نشانه': 'indication',
+            'درد': 'pain', 'تب': 'fever', 'سرفه': 'cough', 'خستگی': 'fatigue',
+            
+            # عوارض جانبی
+            'عوارض جانبی': 'side effect', 'عوارض جانبی': 'side effects', 'عوارض': 'adverse',
+            'واکنش': 'reaction', 'واکنش‌ها': 'reactions', 'سمیت': 'toxicity',
+            'تهوع': 'nausea', 'سردرد': 'headache', 'سرگیجه': 'dizziness',
+            
+            # عملکرد مولکولی
+            'مولکولی': 'molecular', 'آنزیمی': 'enzymatic', 'آنزیم': 'enzyme',
+            'گیرنده': 'receptor', 'حامل': 'transporter', 'حامل‌ها': 'transporters',
+            
+            # اجزای سلولی
+            'سلولی': 'cellular', 'جزء': 'component', 'اجزا': 'components',
+            'اندامک': 'organelle', 'اندامک‌ها': 'organelles', 'ساختار': 'structure',
+            'هسته': 'nucleus', 'میتوکندری': 'mitochondria', 'غشاء': 'membrane',
+            
+            # طبقه‌بندی دارویی
+            'دارویی': 'pharmacologic', 'داروشناختی': 'pharmacological', 'طبقه': 'class',
+            'طبقات': 'classes', 'دسته': 'category', 'دسته‌ها': 'categories',
+            'نوع': 'type', 'انواع': 'types', 'آنتی‌بیوتیک': 'antibiotic',
+            'ضد فشار خون': 'antihypertensive',
+            
+            # کلمات عمومی
+            'کدام': 'which', 'چه': 'what', 'کجا': 'where', 'چگونه': 'how',
+            'چرا': 'why', 'چه زمانی': 'when', 'چه کسی': 'who',
+            'مرتبط': 'related', 'مرتبط با': 'related to', 'مربوط': 'associated',
+            'مربوط به': 'associated with', 'متصل': 'connected', 'متصل به': 'connected to',
+            'بیان': 'expression', 'بیان می‌شود': 'expressed', 'بیان می‌شوند': 'expressed',
+            'درمان': 'treatment', 'درمان می‌کند': 'treats', 'درمان می‌کنند': 'treat',
+            'استفاده': 'used', 'استفاده می‌شود': 'used', 'استفاده می‌شوند': 'used',
+            'نقش': 'role', 'نقش دارد': 'plays role', 'نقش دارند': 'play role',
+            'شرکت': 'participate', 'شرکت می‌کند': 'participates', 'شرکت می‌کنند': 'participate',
+            'تعامل': 'interaction', 'تعامل دارد': 'interacts', 'تعامل دارند': 'interact',
+            'تنظیم': 'regulation', 'تنظیم می‌کند': 'regulates', 'تنظیم می‌کنند': 'regulate',
+            'افزایش': 'upregulation', 'افزایش می‌دهد': 'upregulates', 'کاهش': 'downregulation',
+            'کاهش می‌دهد': 'downregulates', 'محل': 'location', 'محل است': 'located',
+            'یافت': 'found', 'یافت می‌شود': 'found', 'یافت می‌شوند': 'found'
+        }
+        
         # نگاشت ژن‌های مشهور و نام‌های مختلف آنها
         famous_genes = {
             'tp53': ['TP53', 'P53', 'p53', 'Tumor Protein P53', 'Tumor Suppressor P53'],
@@ -626,6 +747,12 @@ class GraphRAGService:
                 keywords.add(gene_key)
                 # اضافه کردن نام اصلی ژن
                 keywords.add(gene_variants[0])
+        
+        # تبدیل کلمات فارسی به انگلیسی
+        for persian_word, english_word in persian_to_english.items():
+            if persian_word in text:
+                keywords.add(english_word)
+                print(f"🔄 تبدیل فارسی به انگلیسی: '{persian_word}' -> '{english_word}'")
         
         # موجودیت‌های نام‌دار
         for ent in doc.ents:
@@ -1327,12 +1454,15 @@ class GraphRAGService:
             'tissue': 'Anatomy', 'tissues': 'Anatomy', 'body': 'Anatomy', 'body part': 'Anatomy',
             'heart': 'Anatomy', 'brain': 'Anatomy', 'liver': 'Anatomy', 'lung': 'Anatomy',
             'kidney': 'Anatomy', 'stomach': 'Anatomy', 'muscle': 'Anatomy', 'bone': 'Anatomy',
+            'blood': 'Anatomy',
             
             # Disease (137 nodes)
             'disease': 'Disease', 'diseases': 'Disease', 'disorder': 'Disease', 'disorders': 'Disease',
             'syndrome': 'Disease', 'syndromes': 'Disease', 'cancer': 'Disease', 'cancers': 'Disease',
             'tumor': 'Disease', 'tumors': 'Disease', 'malignancy': 'Disease', 'malignancies': 'Disease',
             'diabetes': 'Disease', 'alzheimer': 'Disease', 'fibrosis': 'Disease',
+            'breast cancer': 'Disease', 'lung cancer': 'Disease', 'liver cancer': 'Disease',
+            'brain cancer': 'Disease', 'blood cancer': 'Disease', 'stomach cancer': 'Disease',
             
             # Compound (1552 nodes)
             'compound': 'Compound', 'compounds': 'Compound', 'drug': 'Compound', 'drugs': 'Compound',
@@ -1422,6 +1552,48 @@ class GraphRAGService:
                         print(f"🔍 تطبیق ژن مشهور: '{token}' -> {attrs['name']} ({attrs.get('kind', 'Unknown')})")
                         break
             
+            # روش 3: جستجوی فازی برای کلمات مشابه
+            if not found and len(token) >= 3:
+                best_match = None
+                best_score = 0
+                
+                for node_id, attrs in self.G.nodes(data=True):
+                    name_lower = attrs['name'].lower()
+                    
+                    # محاسبه امتیاز شباهت
+                    if token_lower == name_lower:
+                        score = 1.0
+                    elif token_lower in name_lower:
+                        score = len(token_lower) / len(name_lower)
+                    elif name_lower in token_lower:
+                        score = len(name_lower) / len(token_lower)
+                    elif any(word in name_lower for word in token_lower.split()):
+                        score = 0.7
+                    elif any(word in token_lower for word in name_lower.split()):
+                        score = 0.6
+                    else:
+                        # محاسبه شباهت کاراکتری
+                        common_chars = sum(1 for c in token_lower if c in name_lower)
+                        if common_chars > 0:
+                            score = common_chars / max(len(token_lower), len(name_lower))
+                        else:
+                            score = 0
+                    
+                    # بهبود تطبیق برای کلمات خاص
+                    if token_lower == 'aspirin' and 'aspirin' in name_lower:
+                        score = 1.0  # اولویت برای تطبیق دقیق
+                    elif token_lower == 'aspirin' and 'aspirin' not in name_lower:
+                        score = 0  # رد تطبیق اشتباه
+                    
+                    if score > best_score and score > 0.3:  # حداقل 30% شباهت
+                        best_score = score
+                        best_match = (node_id, attrs)
+                
+                if best_match:
+                    matched[token] = best_match[0]
+                    found = True
+                    print(f"🔍 تطبیق فازی: '{token}' -> {best_match[1]['name']} ({best_match[1].get('kind', 'Unknown')}) [امتیاز: {best_score:.2f}]")
+            
             # روش 3: جستجو بر اساس نوع موجودیت
             if not found and token_lower in fallback_kinds:
                 kind = fallback_kinds[token_lower]
@@ -1462,6 +1634,42 @@ class GraphRAGService:
                         found = True
                         print(f"🔍 تطبیق جزئی: '{token}' -> {attrs['name']} ({attrs.get('kind', 'Unknown')})")
                         break
+            
+            # روش 5: تطبیق کلمات فارسی با نودهای مشابه
+            if not found and any('\u0600' <= c <= '\u06FF' for c in token):  # کاراکترهای فارسی
+                # نگاشت کلمات فارسی به انگلیسی برای تطبیق بهتر
+                persian_mapping = {
+                    'سرطان': 'cancer',
+                    'کبد': 'liver', 
+                    'مغز': 'brain',
+                    'قلب': 'heart',
+                    'ریه': 'lung',
+                    'کلیه': 'kidney',
+                    'معده': 'stomach',
+                    'ماهیچه': 'muscle',
+                    'استخوان': 'bone',
+                    'خون': 'blood',
+                    'بافت': 'tissue',
+                    'اندام': 'organ',
+                    'بدن': 'body',
+                    'بیماری': 'disease',
+                    'دارو': 'drug',
+                    'آسپرین': 'aspirin',
+                    'ژن': 'gene',
+                    'پروتئین': 'protein',
+                    'فرآیند': 'process',
+                    'آپوپتوز': 'apoptosis'
+                }
+                
+                if token in persian_mapping:
+                    english_word = persian_mapping[token]
+                    # جستجوی نود با نام انگلیسی
+                    for node_id, attrs in self.G.nodes(data=True):
+                        if english_word in attrs['name'].lower():
+                            matched[token] = node_id
+                            found = True
+                            print(f"🔍 تطبیق فارسی-انگلیسی: '{token}' -> {attrs['name']} ({attrs.get('kind', 'Unknown')})")
+                            break
             
             # روش 5: جستجوی فازی برای ژن‌ها
             if not found and len(token) >= 3:

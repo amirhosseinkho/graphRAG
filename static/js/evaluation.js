@@ -1,12 +1,20 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Elements
     const queryInput = document.getElementById('queryInput');
+    const textGenerationTypeSelect = document.getElementById('text-generation-type');
+    
+    // Answer 1 elements
+    const tokenExtractionMethod1Select = document.getElementById('token_extraction_method1');
+    const tokenExtractionModel1Select = document.getElementById('token_extraction_model1');
     const retrievalMethod1Select = document.getElementById('retrieval_method1');
     const generationModel1Select = document.getElementById('generation_model1');
     const maxDepth1Input = document.getElementById('max_depth1');
     const inputType1Select = document.getElementById('input_type1');
     const answer1Textarea = document.getElementById('answer1');
     
+    // Answer 2 elements
+    const tokenExtractionMethod2Select = document.getElementById('token_extraction_method2');
+    const tokenExtractionModel2Select = document.getElementById('token_extraction_model2');
     const retrievalMethod2Select = document.getElementById('retrieval_method2');
     const generationModel2Select = document.getElementById('generation_model2');
     const maxDepth2Input = document.getElementById('max_depth2');
@@ -22,9 +30,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // GPT comparison elements
     const gptCompareBtn = document.getElementById('gptCompareBtn');
     const gptStatus = document.getElementById('gptStatus');
+    const gptComparisonModelSelect = document.getElementById('gptComparisonModel');
     const method1Label = document.getElementById('method1Label');
     const method2Label = document.getElementById('method2Label');
     const comparisonType = document.getElementById('comparisonType');
+    const autoLabel1Btn = document.getElementById('autoLabel1Btn');
+    const autoLabel2Btn = document.getElementById('autoLabel2Btn');
 
     let selectedMethod = 'cosine_tfidf';
 
@@ -47,6 +58,10 @@ document.addEventListener('DOMContentLoaded', function() {
         compareBtn.addEventListener('click', compareAnswers);
         gptCompareBtn.addEventListener('click', compareWithGPT);
         
+        // Add auto-label buttons
+        autoLabel1Btn.addEventListener('click', () => generateAutoLabel(1));
+        autoLabel2Btn.addEventListener('click', () => generateAutoLabel(2));
+        
         // Add method change listeners for both answer boxes
         inputType1Select.addEventListener('change', () => handleInputTypeChange(1));
         inputType2Select.addEventListener('change', () => handleInputTypeChange(2));
@@ -59,6 +74,17 @@ document.addEventListener('DOMContentLoaded', function() {
         retrievalMethod2Select.addEventListener('change', () => handleAutoGeneration(2));
         generationModel2Select.addEventListener('change', () => handleAutoGeneration(2));
         maxDepth2Input.addEventListener('change', () => handleAutoGeneration(2));
+        
+        // Add background text change listener
+        textGenerationTypeSelect.addEventListener('change', () => {
+            // Update auto labels when background text changes
+            generateAutoLabel(1);
+            generateAutoLabel(2);
+        });
+        
+        // Generate initial auto labels
+        generateAutoLabel(1);
+        generateAutoLabel(2);
     }
 
     function selectMethod(method) {
@@ -74,6 +100,66 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         selectedMethod = method;
+    }
+
+    function generateAutoLabel(answerBoxNumber) {
+        const retrievalMethod = answerBoxNumber === 1 ? retrievalMethod1Select.value : retrievalMethod2Select.value;
+        const generationModel = answerBoxNumber === 1 ? generationModel1Select.value : generationModel2Select.value;
+        const textGenerationType = textGenerationTypeSelect.value;
+        
+        let label = '';
+        
+        // Generate label based on retrieval method
+        const retrievalLabels = {
+            'NO_RETRIEVAL': 'بدون بازیابی',
+            'BFS': 'BFS (جستجوی سطح اول)',
+            'DFS': 'DFS (جستجوی عمیق اول)',
+            'SHORTEST_PATH': 'کوتاه‌ترین مسیر',
+            'NEIGHBORS': 'همسایه‌ها',
+            'HYBRID': 'ترکیبی',
+            'MULTI_METHOD': 'چند روشی',
+            'ENSEMBLE': 'گروهی',
+            'ADAPTIVE': 'تطبیقی',
+            'INTELLIGENT': 'جستجوی هوشمند'
+        };
+        
+        // Generate label based on generation model
+        const modelLabels = {
+            'OPENAI_GPT_4O': 'GPT-4o',
+            'OPENAI_GPT_4O_MINI': 'GPT-4o Mini',
+            'OPENAI_GPT_4_TURBO': 'GPT-4 Turbo',
+            'OPENAI_GPT_4': 'GPT-4',
+            'OPENAI_GPT_3_5_TURBO': 'GPT-3.5 Turbo',
+            'OPENAI_GPT_3_5_TURBO_16K': 'GPT-3.5 Turbo 16K',
+            'HUGGINGFACE': 'HuggingFace',
+            'GPT_SIMULATION': 'GPT Simulation',
+            'CUSTOM': 'Custom Model',
+            'SIMPLE': 'Simple Template'
+        };
+        
+        // Generate label based on text generation type
+        const textTypeLabels = {
+            'SIMPLE': 'متن ساده',
+            'INTELLIGENT': 'متن هوشمند',
+            'SCIENTIFIC_ANALYTICAL': 'سبک علمی',
+            'NARRATIVE_DESCRIPTIVE': 'سبک روایی',
+            'DATA_DRIVEN': 'سبک داده‌محور',
+            'STEP_BY_STEP': 'سبک گام به گام',
+            'CONCISE_DIRECT': 'سبک فشرده'
+        };
+        
+        const retrievalLabel = retrievalLabels[retrievalMethod] || 'روش نامشخص';
+        const modelLabel = modelLabels[generationModel] || 'مدل نامشخص';
+        const textTypeLabel = textTypeLabels[textGenerationType] || 'متن نامشخص';
+        
+        label = `${retrievalLabel} + ${modelLabel} + ${textTypeLabel}`;
+        
+        // Update the appropriate label input
+        if (answerBoxNumber === 1) {
+            method1Label.value = label;
+        } else {
+            method2Label.value = label;
+        }
     }
 
     function handleInputTypeChange(answerBoxNumber) {
@@ -98,6 +184,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (inputTypeSelect.value === 'auto') {
             generateAnswer(answerBoxNumber);
         }
+        
+        // Update auto label when method changes
+        generateAutoLabel(answerBoxNumber);
     }
 
     function generateAnswer(answerBoxNumber) {
@@ -108,9 +197,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const textarea = answerBoxNumber === 1 ? answer1Textarea : answer2Textarea;
+        const tokenExtractionMethod = answerBoxNumber === 1 ? tokenExtractionMethod1Select.value : tokenExtractionMethod2Select.value;
+        const tokenExtractionModel = answerBoxNumber === 1 ? tokenExtractionModel1Select.value : tokenExtractionModel2Select.value;
         const retrievalMethod = answerBoxNumber === 1 ? retrievalMethod1Select.value : retrievalMethod2Select.value;
         const generationModel = answerBoxNumber === 1 ? generationModel1Select.value : generationModel2Select.value;
         const maxDepth = answerBoxNumber === 1 ? maxDepth1Input.value : maxDepth2Input.value;
+        const textGenerationType = textGenerationTypeSelect.value;
 
         // Show loading state
         textarea.value = 'در حال تولید پاسخ...';
@@ -124,9 +216,12 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             body: JSON.stringify({
                 query: query,
+                token_extraction_method: tokenExtractionMethod,
+                token_extraction_model: tokenExtractionModel,
                 retrieval_method: retrievalMethod,
                 generation_model: generationModel,
-                max_depth: parseInt(maxDepth)
+                max_depth: parseInt(maxDepth),
+                text_generation_type: textGenerationType
             })
         })
         .then(response => response.json())
@@ -143,8 +238,6 @@ document.addEventListener('DOMContentLoaded', function() {
             textarea.style.color = '#e74c3c';
         });
     }
-
-
 
     function generateBothAnswers() {
         const query = queryInput.value;
@@ -294,6 +387,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const label1 = method1Label.value.trim() || 'روش اول';
         const label2 = method2Label.value.trim() || 'روش دوم';
         const comparisonTypeValue = comparisonType.value;
+        const gptModel = gptComparisonModelSelect.value;
         
         if (!text1 || !text2) {
             showError('لطفاً هر دو پاسخ را وارد کنید');
@@ -304,7 +398,7 @@ document.addEventListener('DOMContentLoaded', function() {
         gptCompareBtn.disabled = true;
         gptCompareBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> در حال مقایسه...';
         gptStatus.className = 'gpt-status processing';
-        gptStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i> در حال ارسال به GPT-4o...';
+        gptStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i> در حال ارسال به GPT...';
         resultsSection.style.display = 'none';
 
         // Call API to compare with GPT
@@ -318,7 +412,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 text2: text2,
                 label1: label1,
                 label2: label2,
-                comparison_type: comparisonTypeValue
+                comparison_type: comparisonTypeValue,
+                gpt_model: gptModel
             })
         })
         .then(response => response.json())
@@ -340,16 +435,17 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .finally(() => {
             gptCompareBtn.disabled = false;
-            gptCompareBtn.innerHTML = '<i class="fas fa-robot"></i> مقایسه با GPT-4o';
+            gptCompareBtn.innerHTML = '<i class="fas fa-robot"></i> مقایسه با GPT';
         });
     }
 
     function displayGPTResults(data) {
         const comparisonTypeText = getComparisonTypeText(data.comparison_type);
+        const modelName = data.gpt_model || 'GPT';
         
         resultsContent.innerHTML = `
             <div class="gpt-result">
-                <h4><i class="fas fa-robot"></i> تحلیل GPT-4o - ${comparisonTypeText}</h4>
+                <h4><i class="fas fa-robot"></i> تحلیل ${modelName} - ${comparisonTypeText}</h4>
                 
                 <div class="gpt-analysis">
                     <h5><i class="fas fa-chart-bar"></i> خلاصه مقایسه</h5>
@@ -383,7 +479,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 
                 <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; font-size: 0.9rem; color: #6c757d;">
-                    <strong>نکته:</strong> این تحلیل توسط GPT-4o انجام شده و صرفاً جنبه راهنمایی دارد. برای تصمیم‌گیری نهایی، عوامل دیگری مانند سرعت، هزینه، و نیازهای خاص پروژه نیز باید در نظر گرفته شوند.
+                    <strong>نکته:</strong> این تحلیل توسط ${modelName} انجام شده و صرفاً جنبه راهنمایی دارد. برای تصمیم‌گیری نهایی، عوامل دیگری مانند سرعت، هزینه، و نیازهای خاص پروژه نیز باید در نظر گرفته شوند.
                 </div>
             </div>
         `;
