@@ -837,9 +837,9 @@ def create_gpt_comparison_prompt(text1, text2, label1, label2, comparison_type):
 **خلاصه مقایسه:**
 [یک خلاصه کوتاه از تفاوت‌های اصلی]
 
-**امتیازدهی (از 1 تا 10):**
-{label1}: [امتیاز]/10
-{label2}: [امتیاز]/10
+**امتیازدهی (از 0 تا 100):**
+{label1}: [امتیاز]/100
+{label2}: [امتیاز]/100
 
 **توضیح امتیازدهی:**
 [توضیح دلیل امتیازدهی]
@@ -870,12 +870,20 @@ def parse_gpt_comparison_response(response, label1, label2, comparison_type):
     # Extract scores using regex
     import re
     
-    # Find scores
-    score1_match = re.search(rf'{label1}:\s*(\d+)/10', response)
-    score2_match = re.search(rf'{label2}:\s*(\d+)/10', response)
+    # Find scores - use more flexible regex patterns
+    score1_match = re.search(rf'{re.escape(label1)}:\s*(\d+)/100', response, re.IGNORECASE)
+    score2_match = re.search(rf'{re.escape(label2)}:\s*(\d+)/100', response, re.IGNORECASE)
     
-    score1 = int(score1_match.group(1)) if score1_match else 5
-    score2 = int(score2_match.group(1)) if score2_match else 5
+    # If not found, try alternative patterns
+    if not score1_match:
+        score1_match = re.search(rf'{re.escape(label1)}.*?(\d+)/100', response, re.IGNORECASE)
+    if not score2_match:
+        score2_match = re.search(rf'{re.escape(label2)}.*?(\d+)/100', response, re.IGNORECASE)
+    
+    score1 = int(score1_match.group(1)) if score1_match else 50
+    score2 = int(score2_match.group(1)) if score2_match else 50
+    
+
     
     # Split response into sections
     sections = response.split('\n\n')
