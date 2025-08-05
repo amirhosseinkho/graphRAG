@@ -18,6 +18,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const resultsSection = document.getElementById('resultsSection');
     const resultsContent = document.getElementById('resultsContent');
     const methodOptions = document.querySelectorAll('.method-option');
+    
+    // GPT comparison elements
+    const gptCompareBtn = document.getElementById('gptCompareBtn');
+    const gptStatus = document.getElementById('gptStatus');
+    const method1Label = document.getElementById('method1Label');
+    const method2Label = document.getElementById('method2Label');
+    const comparisonType = document.getElementById('comparisonType');
 
     let selectedMethod = 'cosine_tfidf';
 
@@ -38,6 +45,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         generateBtn.addEventListener('click', generateBothAnswers);
         compareBtn.addEventListener('click', compareAnswers);
+        gptCompareBtn.addEventListener('click', compareWithGPT);
         
         // Add method change listeners for both answer boxes
         inputType1Select.addEventListener('change', () => handleInputTypeChange(1));
@@ -278,5 +286,120 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
         resultsSection.style.display = 'block';
         resultsSection.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function compareWithGPT() {
+        const text1 = answer1Textarea.value.trim();
+        const text2 = answer2Textarea.value.trim();
+        const label1 = method1Label.value.trim() || 'روش اول';
+        const label2 = method2Label.value.trim() || 'روش دوم';
+        const comparisonTypeValue = comparisonType.value;
+        
+        if (!text1 || !text2) {
+            showError('لطفاً هر دو پاسخ را وارد کنید');
+            return;
+        }
+
+        // Show loading state
+        gptCompareBtn.disabled = true;
+        gptCompareBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> در حال مقایسه...';
+        gptStatus.className = 'gpt-status processing';
+        gptStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i> در حال ارسال به GPT-4o...';
+        resultsSection.style.display = 'none';
+
+        // Call API to compare with GPT
+        fetch('/api/compare_with_gpt', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                text1: text1,
+                text2: text2,
+                label1: label1,
+                label2: label2,
+                comparison_type: comparisonTypeValue
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showError(data.error);
+                gptStatus.className = 'gpt-status error';
+                gptStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> خطا در مقایسه';
+            } else {
+                displayGPTResults(data);
+                gptStatus.className = 'gpt-status success';
+                gptStatus.innerHTML = '<i class="fas fa-check-circle"></i> مقایسه تکمیل شد';
+            }
+        })
+        .catch(error => {
+            showError('خطا در ارتباط با سرور: ' + error.message);
+            gptStatus.className = 'gpt-status error';
+            gptStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> خطا در ارتباط';
+        })
+        .finally(() => {
+            gptCompareBtn.disabled = false;
+            gptCompareBtn.innerHTML = '<i class="fas fa-robot"></i> مقایسه با GPT-4o';
+        });
+    }
+
+    function displayGPTResults(data) {
+        const comparisonTypeText = getComparisonTypeText(data.comparison_type);
+        
+        resultsContent.innerHTML = `
+            <div class="gpt-result">
+                <h4><i class="fas fa-robot"></i> تحلیل GPT-4o - ${comparisonTypeText}</h4>
+                
+                <div class="gpt-analysis">
+                    <h5><i class="fas fa-chart-bar"></i> خلاصه مقایسه</h5>
+                    <p>${data.summary}</p>
+                </div>
+                
+                <div class="gpt-analysis">
+                    <h5><i class="fas fa-star"></i> امتیازدهی</h5>
+                    <div style="margin: 10px 0;">
+                        <span class="gpt-score">${data.label1}: ${data.score1}/10</span>
+                        <span class="gpt-score">${data.label2}: ${data.score2}/10</span>
+                    </div>
+                    <p>${data.scoring_explanation}</p>
+                </div>
+                
+                <div class="gpt-analysis">
+                    <h5><i class="fas fa-search"></i> تحلیل جزئیات</h5>
+                    <p><strong>نقاط قوت ${data.label1}:</strong></p>
+                    <p>${data.strengths1}</p>
+                    <p><strong>نقاط قوت ${data.label2}:</strong></p>
+                    <p>${data.strengths2}</p>
+                    <p><strong>نقاط ضعف ${data.label1}:</strong></p>
+                    <p>${data.weaknesses1}</p>
+                    <p><strong>نقاط ضعف ${data.label2}:</strong></p>
+                    <p>${data.weaknesses2}</p>
+                </div>
+                
+                <div class="gpt-recommendation">
+                    <h5><i class="fas fa-lightbulb"></i> توصیه نهایی</h5>
+                    <p>${data.recommendation}</p>
+                </div>
+                
+                <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; font-size: 0.9rem; color: #6c757d;">
+                    <strong>نکته:</strong> این تحلیل توسط GPT-4o انجام شده و صرفاً جنبه راهنمایی دارد. برای تصمیم‌گیری نهایی، عوامل دیگری مانند سرعت، هزینه، و نیازهای خاص پروژه نیز باید در نظر گرفته شوند.
+                </div>
+            </div>
+        `;
+        
+        resultsSection.style.display = 'block';
+        resultsSection.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function getComparisonTypeText(type) {
+        const types = {
+            'comprehensive': 'مقایسه جامع',
+            'accuracy': 'تمرکز بر دقت',
+            'completeness': 'تمرکز بر جامعیت',
+            'clarity': 'تمرکز بر وضوح',
+            'relevance': 'تمرکز بر مرتبط بودن'
+        };
+        return types[type] || 'مقایسه';
     }
 }); 

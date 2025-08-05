@@ -174,7 +174,7 @@ def update_service_graph():
     # کپی به نام استاندارد
     import shutil
     shutil.copy(latest_graph_file, 'hetionet_graph.pkl')
-    print("✅ فایل گراف به‌روزرسانی شد")
+    print(" فایل گراف به‌روزرسانی شد")
     
     return True
 

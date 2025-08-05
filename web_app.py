@@ -16,6 +16,12 @@ import numpy as np
 import re
 from difflib import SequenceMatcher
 
+# OpenAI import for GPT-4o comparison
+try:
+    import openai
+except ImportError:
+    openai = None
+
 # Simple text processing functions without external dependencies
 def simple_tokenize(text):
     """Tokenize text without external dependencies"""
@@ -548,6 +554,169 @@ def compare_texts():
         
     except Exception as e:
         return jsonify({'error': f'خطا در مقایسه: {str(e)}'}), 500
+
+@app.route('/api/compare_with_gpt', methods=['POST'])
+def compare_with_gpt():
+    try:
+        data = request.get_json()
+        text1 = data.get('text1', '')
+        text2 = data.get('text2', '')
+        label1 = data.get('label1', 'روش اول')
+        label2 = data.get('label2', 'روش دوم')
+        comparison_type = data.get('comparison_type', 'comprehensive')
+        
+        if not text1 or not text2:
+            return jsonify({'error': 'هر دو متن باید وارد شوند'}), 400
+        
+        # Create a comprehensive prompt for GPT-4o
+        prompt = create_gpt_comparison_prompt(text1, text2, label1, label2, comparison_type)
+        
+        # Check if OpenAI is available
+        if openai is None:
+            return jsonify({'error': 'OpenAI کتابخانه نصب نشده است. لطفاً با دستور pip install openai آن را نصب کنید.'}), 500
+        
+        # Call OpenAI API
+        try:
+            # Set the API key for this request
+            openai.api_key = OPENAI_API_KEY
+            
+            response = openai.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "شما یک متخصص ارزیابی کیفیت متن هستید. وظیفه شما مقایسه دو متن و ارائه تحلیل دقیق و منصفانه است."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                max_tokens=2000
+            )
+            
+            gpt_response = response.choices[0].message.content
+            
+            # Parse the GPT response
+            parsed_result = parse_gpt_comparison_response(gpt_response, label1, label2, comparison_type)
+            
+            return jsonify(parsed_result)
+            
+        except Exception as e:
+            return jsonify({'error': f'خطا در ارتباط با GPT-4o: {str(e)}'}), 500
+        
+    except Exception as e:
+        return jsonify({'error': f'خطا در مقایسه: {str(e)}'}), 500
+
+def create_gpt_comparison_prompt(text1, text2, label1, label2, comparison_type):
+    """ایجاد پرامپ مناسب برای مقایسه با GPT-4o"""
+    
+    comparison_focus = {
+        'comprehensive': 'کیفیت کلی، دقت، جامعیت، وضوح، و مرتبط بودن',
+        'accuracy': 'دقت و صحت اطلاعات ارائه شده',
+        'completeness': 'جامعیت و کامل بودن پاسخ',
+        'clarity': 'وضوح و قابل فهم بودن متن',
+        'relevance': 'مرتبط بودن با سوال اصلی'
+    }
+    
+    focus = comparison_focus.get(comparison_type, comparison_focus['comprehensive'])
+    
+    prompt = f"""
+لطفاً دو متن زیر را مقایسه کنید و تحلیل دقیقی ارائه دهید:
+
+**متن اول ({label1}):**
+{text1}
+
+**متن دوم ({label2}):**
+{text2}
+
+**نوع مقایسه:** {focus}
+
+لطفاً تحلیل خود را در قالب زیر ارائه دهید:
+
+**خلاصه مقایسه:**
+[یک خلاصه کوتاه از تفاوت‌های اصلی]
+
+**امتیازدهی (از 1 تا 10):**
+{label1}: [امتیاز]/10
+{label2}: [امتیاز]/10
+
+**توضیح امتیازدهی:**
+[توضیح دلیل امتیازدهی]
+
+**نقاط قوت {label1}:**
+[لیست نقاط قوت]
+
+**نقاط قوت {label2}:**
+[لیست نقاط قوت]
+
+**نقاط ضعف {label1}:**
+[لیست نقاط ضعف]
+
+**نقاط ضعف {label2}:**
+[لیست نقاط ضعف]
+
+**توصیه نهایی:**
+[توصیه کدام روش بهتر است و چرا]
+
+لطفاً تحلیل خود را به فارسی ارائه دهید و صادقانه و منصفانه قضاوت کنید.
+"""
+    
+    return prompt
+
+def parse_gpt_comparison_response(response, label1, label2, comparison_type):
+    """تجزیه و تحلیل پاسخ GPT-4o"""
+    
+    # Extract scores using regex
+    import re
+    
+    # Find scores
+    score1_match = re.search(rf'{label1}:\s*(\d+)/10', response)
+    score2_match = re.search(rf'{label2}:\s*(\d+)/10', response)
+    
+    score1 = int(score1_match.group(1)) if score1_match else 5
+    score2 = int(score2_match.group(1)) if score2_match else 5
+    
+    # Split response into sections
+    sections = response.split('\n\n')
+    
+    summary = ""
+    scoring_explanation = ""
+    strengths1 = ""
+    strengths2 = ""
+    weaknesses1 = ""
+    weaknesses2 = ""
+    recommendation = ""
+    
+    for section in sections:
+        if "خلاصه مقایسه" in section:
+            summary = section.replace("**خلاصه مقایسه:**", "").strip()
+        elif "توضیح امتیازدهی" in section:
+            scoring_explanation = section.replace("**توضیح امتیازدهی:**", "").strip()
+        elif f"نقاط قوت {label1}" in section:
+            strengths1 = section.replace(f"**نقاط قوت {label1}:**", "").strip()
+        elif f"نقاط قوت {label2}" in section:
+            strengths2 = section.replace(f"**نقاط قوت {label2}:**", "").strip()
+        elif f"نقاط ضعف {label1}" in section:
+            weaknesses1 = section.replace(f"**نقاط ضعف {label1}:**", "").strip()
+        elif f"نقاط ضعف {label2}" in section:
+            weaknesses2 = section.replace(f"**نقاط ضعف {label2}:**", "").strip()
+        elif "توصیه نهایی" in section:
+            recommendation = section.replace("**توصیه نهایی:**", "").strip()
+    
+    # If sections are empty, use the full response
+    if not summary:
+        summary = response[:200] + "..." if len(response) > 200 else response
+    
+    return {
+        'summary': summary,
+        'score1': score1,
+        'score2': score2,
+        'scoring_explanation': scoring_explanation,
+        'strengths1': strengths1,
+        'strengths2': strengths2,
+        'weaknesses1': weaknesses1,
+        'weaknesses2': weaknesses2,
+        'recommendation': recommendation,
+        'label1': label1,
+        'label2': label2,
+        'comparison_type': comparison_type
+    }
 
 def preprocess_text(text):
     """پیش‌پردازش متن برای مقایسه"""

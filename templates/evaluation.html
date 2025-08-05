@@ -249,6 +249,55 @@
                 </div>
             </section>
 
+            <!-- GPT-4o Comparison Section -->
+            <section class="gpt-comparison-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-robot"></i> مقایسه هوشمند با GPT-4o</h2>
+                    <p>از هوش مصنوعی پیشرفته برای مقایسه کیفیت پاسخ‌ها استفاده کنید</p>
+                </div>
+
+                <div class="gpt-comparison-content">
+                    <div class="comparison-info">
+                        <div class="info-box">
+                            <h4><i class="fas fa-info-circle"></i> نحوه کارکرد</h4>
+                            <p>این بخش دو متن را به GPT-4o ارسال می‌کند و از آن می‌خواهد که کیفیت، دقت، و جامعیت پاسخ‌ها را مقایسه کند. یکی از متن‌ها با روش بازیابی از گراف و دیگری با روش متفاوت تولید شده است.</p>
+                        </div>
+                    </div>
+
+                    <div class="comparison-options">
+                        <div class="option-group">
+                            <label><i class="fas fa-tag"></i> برچسب روش اول:</label>
+                            <input type="text" id="method1Label" placeholder="مثال: بازیابی از گراف" value="بازیابی از گراف">
+                        </div>
+                        
+                        <div class="option-group">
+                            <label><i class="fas fa-tag"></i> برچسب روش دوم:</label>
+                            <input type="text" id="method2Label" placeholder="مثال: تولید مستقیم" value="تولید مستقیم">
+                        </div>
+                        
+                        <div class="option-group">
+                            <label><i class="fas fa-cog"></i> نوع مقایسه:</label>
+                            <select id="comparisonType">
+                                <option value="comprehensive">مقایسه جامع (کیفیت، دقت، جامعیت)</option>
+                                <option value="accuracy">تمرکز بر دقت و صحت اطلاعات</option>
+                                <option value="completeness">تمرکز بر جامعیت و کامل بودن</option>
+                                <option value="clarity">تمرکز بر وضوح و قابل فهم بودن</option>
+                                <option value="relevance">تمرکز بر مرتبط بودن با سوال</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="gpt-action-buttons">
+                        <button id="gptCompareBtn" class="btn btn-warning">
+                            <i class="fas fa-robot"></i> مقایسه با GPT-4o
+                        </button>
+                        <div class="gpt-status" id="gptStatus">
+                            <i class="fas fa-clock"></i> آماده برای مقایسه
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- Results Section -->
             <section id="resultsSection" class="results-section" style="display: none;">
                 <div class="section-header">

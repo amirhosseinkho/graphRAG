@@ -29,6 +29,19 @@ class RetrievalMethod(Enum):
     INTELLIGENT = "Intelligent Semantic Search"
     NO_RETRIEVAL = "بدون بازیابی (فقط مدل)"
 
+class ContextTextType(Enum):
+    """انواع متن زمینه"""
+    SIMPLE = "متن ساده عمومی"
+    INTELLIGENT = "متن تخصصی هوشمند"
+    SCIENTIFIC_ANALYTICAL = "متن علمی-تحلیلی (تحقیقاتی)"
+    NARRATIVE = "متن روایی (ساده و توصیفی)"
+    DATA_DRIVEN = "متن داده‌محور (رابطه‌ها به صورت لیست)"
+    STEP_BY_STEP = "متن توضیح قبل از سؤال (استدلال گام به گام)"
+    COMPACT_DIRECT = "متن فشرده و مستقیم"
+    BIOLOGICAL_PATHWAY = "متن مسیر زیستی (تخصصی)"
+    CLINICAL_RELEVANCE = "متن ارتباط بالینی"
+    MECHANISTIC_DETAILED = "متن مکانیسمی تفصیلی"
+
 class GenerationModel(Enum):
     """مدل‌های تولید متن"""
     # مدل‌های محلی و رایگان
@@ -1979,7 +1992,7 @@ class GraphRAGService:
     
     def _create_enhanced_context_text(self, retrieval_result: RetrievalResult) -> str:
         """
-        ایجاد متن زمینه خلاصه و کاربردی
+        ایجاد متن زمینه خلاصه و کاربردی با بهبودهای جدید
         """
         # استفاده از روش جدید بازیابی هدفمند
         intent = self.analyze_question_intent(retrieval_result.query)
@@ -1992,15 +2005,138 @@ class GraphRAGService:
         context_parts = []
         context_parts.append("📊 **آمار بازیابی:**")
         context_parts.append(f"• نودها: {len(retrieval_result.nodes)}, روابط: {len(retrieval_result.edges)}")
-        context_parts.append(f"• ژن‌های اصلی: {len(retrieval_data['primary_genes'])}")
+        context_parts.append(f"• ژن‌های اصلی: {len(retrieval_data.get('primary_genes', []))}")
+        context_parts.append(f"• بیماری‌های مرتبط: {len(retrieval_data.get('diseases', []))}")
+        context_parts.append(f"• داروهای مرتبط: {len(retrieval_data.get('drugs', []))}")
         context_parts.append("")
         
         # اضافه کردن متن ساختاریافته
         context_parts.append("🧬 **داده‌های کلیدی:**")
         context_parts.append(structured_text)
         
+        # اضافه کردن تحلیل نوع سوال
+        context_parts.append("")
+        context_parts.append("🎯 **تحلیل نوع سوال:**")
+        question_type = intent.get('question_type', 'general')
+        context_parts.append(f"• نوع سوال: {question_type}")
+        context_parts.append(f"• موجودیت‌های کلیدی: {', '.join(intent.get('entities', []))}")
+        context_parts.append(f"• روابط هدف: {', '.join(intent.get('metaedges', []))}")
+        
+        # اضافه کردن دستورالعمل هوشمند
+        context_parts.append("")
+        context_parts.append("💡 **دستورالعمل هوشمند:**")
+        context_parts.append("بر اساس داده‌های ارائه شده و تحلیل نوع سوال،")
+        context_parts.append("پاسخ جامع و تخصصی ارائه دهید که شامل:")
+        context_parts.append("• تحلیل روابط معنادار")
+        context_parts.append("• استنتاجات زیستی")
+        context_parts.append("• اهمیت بالینی")
+        context_parts.append("• کاربردهای عملی")
+        
         return "\n".join(context_parts)
-    
+
+    def _create_advanced_context_text(self, retrieval_result: RetrievalResult) -> str:
+        """
+        ایجاد متن زمینه پیشرفته با تحلیل عمیق و استنتاجات زیستی
+        """
+        nodes = retrieval_result.nodes
+        edges = retrieval_result.edges
+        paths = retrieval_result.paths
+        query = retrieval_result.query
+        
+        context_parts = []
+        
+        # 1. مقدمه پیشرفته
+        context_parts.append(f"🧠 **متن زمینه پیشرفته برای سوال:** {query}")
+        context_parts.append("")
+        context_parts.append("🔬 **تحلیل عمیق داده‌های گراف:**")
+        context_parts.append("این متن شامل تحلیل عمیق، استنتاجات زیستی و روابط معنادار است.")
+        context_parts.append("")
+        
+        # 2. تحلیل آماری پیشرفته
+        context_parts.append("📊 **تحلیل آماری پیشرفته:**")
+        context_parts.append(f"• نودهای بازیابی شده: {len(nodes)}")
+        context_parts.append(f"• یال‌های بازیابی شده: {len(edges)}")
+        context_parts.append(f"• مسیرهای بازیابی شده: {len(paths)}")
+        
+        # محاسبه تراکم روابط
+        if nodes and edges:
+            avg_connections = len(edges) / len(nodes)
+            context_parts.append(f"• تراکم متوسط روابط: {avg_connections:.2f} یال به ازای هر نود")
+        
+        # 3. تحلیل نوع‌شناسی نودها
+        if nodes:
+            context_parts.append("")
+            context_parts.append("🏷️ **تحلیل نوع‌شناسی نودها:**")
+            node_kinds = {}
+            for node in nodes:
+                if node.kind not in node_kinds:
+                    node_kinds[node.kind] = []
+                node_kinds[node.kind].append(node.name)
+            
+            for kind, names in node_kinds.items():
+                context_parts.append(f"• {kind}: {len(names)} نود ({', '.join(names[:3])})")
+                if len(names) > 3:
+                    context_parts.append(f"  و {len(names) - 3} نود دیگر")
+        
+        # 4. تحلیل روابط معنادار
+        if edges:
+            context_parts.append("")
+            context_parts.append("🔗 **تحلیل روابط معنادار:**")
+            edge_analysis = {}
+            for edge in edges:
+                if edge.relation not in edge_analysis:
+                    edge_analysis[edge.relation] = 0
+                edge_analysis[edge.relation] += 1
+            
+            # مرتب‌سازی بر اساس فراوانی
+            sorted_relations = sorted(edge_analysis.items(), key=lambda x: x[1], reverse=True)
+            for relation, count in sorted_relations[:5]:  # 5 رابطه برتر
+                context_parts.append(f"• {relation}: {count} رابطه (رابطه غالب)")
+        
+        # 5. تحلیل مسیرهای زیستی
+        if paths:
+            context_parts.append("")
+            context_parts.append("🛤️ **تحلیل مسیرهای زیستی:**")
+            context_parts.append("مسیرهای شناسایی شده نشان‌دهنده روابط پیچیده زیستی هستند:")
+            
+            for i, path in enumerate(paths[:3]):
+                path_length = len(path)
+                context_parts.append(f"• مسیر {i+1}: {path_length} گام زیستی")
+                context_parts.append(f"  مسیر: {' → '.join(path)}")
+        
+        # 6. استنتاجات زیستی
+        context_parts.append("")
+        context_parts.append("🧬 **استنتاجات زیستی:**")
+        
+        # تشخیص نوع سوال و استنتاج مناسب
+        query_lower = query.lower()
+        if any(word in query_lower for word in ["gene", "express", "protein"]):
+            context_parts.append("• سوال مربوط به بیان ژن و عملکرد پروتئین‌ها")
+            context_parts.append("• تمرکز بر روابط AeG, AuG, AdG و GpBP")
+        elif any(word in query_lower for word in ["disease", "cancer", "disorder"]):
+            context_parts.append("• سوال مربوط به بیماری‌ها و مکانیسم‌های پاتولوژیک")
+            context_parts.append("• تمرکز بر روابط DaG, DuG, DdG و DlA")
+        elif any(word in query_lower for word in ["drug", "treatment", "therapy"]):
+            context_parts.append("• سوال مربوط به درمان و داروها")
+            context_parts.append("• تمرکز بر روابط CtD, CuG, CdG")
+        elif any(word in query_lower for word in ["tissue", "anatomy", "organ"]):
+            context_parts.append("• سوال مربوط به بافت‌ها و آناتومی")
+            context_parts.append("• تمرکز بر روابط AeG, AuG, AdG")
+        else:
+            context_parts.append("• سوال عمومی - تحلیل جامع تمام روابط")
+        
+        # 7. دستورالعمل هوشمند
+        context_parts.append("")
+        context_parts.append("🎯 **دستورالعمل هوشمند:**")
+        context_parts.append("بر اساس تحلیل عمیق داده‌های گراف و استنتاجات زیستی،")
+        context_parts.append("پاسخ جامع و تخصصی ارائه دهید که شامل:")
+        context_parts.append("• تحلیل روابط معنادار")
+        context_parts.append("• استنتاجات زیستی")
+        context_parts.append("• اهمیت بالینی")
+        context_parts.append("• کاربردهای عملی")
+        
+        return "\n".join(context_parts)
+
     def _targeted_retrieval_for_question(self, query: str, intent: Dict) -> Dict[str, Any]:
         """
         بازیابی هدفمند بر اساس نوع سوال و metaedge های مرتبط
@@ -2692,6 +2828,18 @@ class GraphRAGService:
         # به‌روزرسانی context_text بر اساس نوع تولید متن
         if text_generation_type == 'SIMPLE':
             retrieval_result.context_text = self._create_simple_context_text(retrieval_result)
+        elif text_generation_type == 'ADVANCED':
+            retrieval_result.context_text = self._create_advanced_context_text(retrieval_result)
+        elif text_generation_type == 'SCIENTIFIC_ANALYTICAL':
+            retrieval_result.context_text = self._create_scientific_analytical_context(retrieval_result)
+        elif text_generation_type == 'NARRATIVE_DESCRIPTIVE':
+            retrieval_result.context_text = self._create_narrative_context(retrieval_result)
+        elif text_generation_type == 'DATA_DRIVEN':
+            retrieval_result.context_text = self._create_data_driven_context(retrieval_result)
+        elif text_generation_type == 'STEP_BY_STEP':
+            retrieval_result.context_text = self._create_step_by_step_context(retrieval_result)
+        elif text_generation_type == 'CONCISE_DIRECT':
+            retrieval_result.context_text = self._create_compact_direct_context(retrieval_result)
         else:  # INTELLIGENT
             retrieval_result.context_text = self._create_intelligent_context_text(retrieval_result)
         
@@ -2830,6 +2978,399 @@ class GraphRAGService:
         context_parts.append(f"• کل عناصر بازیابی شده: {len(nodes) + len(edges) + len(paths)}")
         context_parts.append(f"• انواع مختلف نودها: {len(set(node.kind for node in nodes))}")
         context_parts.append(f"• انواع مختلف روابط: {len(set(edge.relation for edge in edges))}")
+        
+        return "\n".join(context_parts)
+
+    def _create_scientific_analytical_context(self, retrieval_result: RetrievalResult) -> str:
+        """
+        ایجاد متن زمینه علمی-تحلیلی (تحقیقاتی)
+        مناسب برای مدل‌هایی که پاسخ‌های تحلیلی و دقیق می‌دهند
+        """
+        nodes = retrieval_result.nodes
+        edges = retrieval_result.edges
+        paths = retrieval_result.paths
+        query = retrieval_result.query
+        
+        context_parts = []
+        
+        # 1. مقدمه علمی
+        context_parts.append(f"🔬 **تحلیل علمی-تحقیقاتی برای سوال:** {query}")
+        context_parts.append("")
+        
+        # 2. استخراج مسیر اصلی
+        if paths:
+            main_path = paths[0] if paths else []
+            if len(main_path) >= 2:
+                context_parts.append("📊 **مسیر بازیابی شده از Hetionet:**")
+                context_parts.append("")
+                
+                # ساخت مسیر به شکل علمی
+                path_elements = []
+                for i, node in enumerate(main_path):
+                    if i < len(main_path) - 1:
+                        # پیدا کردن رابطه بین این نود و نود بعدی
+                        relation = "→"
+                        for edge in edges:
+                            if edge.source == node and edge.target == main_path[i + 1]:
+                                relation = edge.relation
+                                break
+                        path_elements.append(f"[{node}]")
+                        path_elements.append(f"    ↓ {relation}")
+                    else:
+                        path_elements.append(f"[{node}]")
+                
+                context_parts.append("\n".join(path_elements))
+                context_parts.append("")
+        
+        # 3. تحلیل علمی
+        context_parts.append("🧬 **تحلیل علمی:**")
+        context_parts.append("بر اساس گراف دانش Hetionet، این مسیر نشان می‌دهد که:")
+        context_parts.append("")
+        
+        if edges:
+            edge_analysis = {}
+            for edge in edges:
+                if edge.relation not in edge_analysis:
+                    edge_analysis[edge.relation] = []
+                edge_analysis[edge.relation].append(f"{edge.source} → {edge.target}")
+            
+            for relation, connections in edge_analysis.items():
+                context_parts.append(f"• {relation}: {len(connections)} رابطه")
+                for connection in connections[:2]:
+                    context_parts.append(f"  - {connection}")
+            context_parts.append("")
+        
+        # 4. استنتاج علمی
+        context_parts.append("💡 **استنتاج علمی:**")
+        context_parts.append("با توجه به این روابط، می‌توان ارتباطات زیستی معناداری را استنتاج کرد.")
+        context_parts.append("")
+        
+        # 5. دستورالعمل علمی
+        context_parts.append("📋 **دستورالعمل:**")
+        context_parts.append("بر اساس داده‌های ارائه شده، تحلیل دقیق و علمی ارائه دهید.")
+        context_parts.append("تمرکز بر مکانیسم‌های زیستی و ارتباطات معنادار باشد.")
+        
+        return "\n".join(context_parts)
+
+    def _create_narrative_context(self, retrieval_result: RetrievalResult) -> str:
+        """
+        ایجاد متن زمینه روایی (ساده و توصیفی)
+        برای مدل‌هایی که با زبان ساده‌تر بهتر نتیجه می‌دهند
+        """
+        nodes = retrieval_result.nodes
+        edges = retrieval_result.edges
+        paths = retrieval_result.paths
+        query = retrieval_result.query
+        
+        context_parts = []
+        
+        # 1. مقدمه روایی
+        context_parts.append(f"📖 **داستان زیستی برای سوال:** {query}")
+        context_parts.append("")
+        
+        # 2. استخراج مسیر اصلی
+        if paths:
+            main_path = paths[0] if paths else []
+            if len(main_path) >= 2:
+                context_parts.append("در Hetionet، این داستان زیستی شناسایی شده است:")
+                context_parts.append("")
+                
+                # ساخت داستان ساده
+                path_elements = []
+                for i, node in enumerate(main_path):
+                    if i < len(main_path) - 1:
+                        # پیدا کردن رابطه بین این نود و نود بعدی
+                        relation = "→"
+                        for edge in edges:
+                            if edge.source == node and edge.target == main_path[i + 1]:
+                                relation = edge.relation
+                                break
+                        path_elements.append(f"{node}")
+                        path_elements.append(f"    ↓ {relation}")
+                    else:
+                        path_elements.append(f"{node}")
+                
+                context_parts.append("\n".join(path_elements))
+                context_parts.append("")
+        
+        # 3. توضیح ساده
+        context_parts.append("💡 **توضیح ساده:**")
+        context_parts.append("این روابط نشان می‌دهد که چگونه عناصر زیستی با هم در ارتباط هستند.")
+        context_parts.append("")
+        
+        # 4. دستورالعمل ساده
+        context_parts.append("📝 **دستورالعمل:**")
+        context_parts.append("داستان زیستی را به زبان ساده و قابل فهم توضیح دهید.")
+        
+        return "\n".join(context_parts)
+
+    def _create_data_driven_context(self, retrieval_result: RetrievalResult) -> str:
+        """
+        ایجاد متن زمینه داده‌محور (رابطه‌ها به صورت لیست)
+        برای مدل‌هایی که با ساختارهای روشن و فکت‌محور بهتر کار می‌کنند
+        """
+        nodes = retrieval_result.nodes
+        edges = retrieval_result.edges
+        paths = retrieval_result.paths
+        query = retrieval_result.query
+        
+        context_parts = []
+        
+        # 1. مقدمه داده‌محور
+        context_parts.append(f"📊 **داده‌های گراف برای سوال:** {query}")
+        context_parts.append("")
+        context_parts.append("**فکت‌های استخراج شده از Hetionet:**")
+        context_parts.append("")
+        
+        # 2. لیست فکت‌ها
+        if edges:
+            context_parts.append("🔗 **روابط شناسایی شده:**")
+            for edge in edges[:10]:
+                context_parts.append(f"• {edge.source} → {edge.relation} → {edge.target}")
+            context_parts.append("")
+        
+        # 3. استنتاج داده‌محور
+        context_parts.append("💡 **استنتاج:**")
+        context_parts.append("این روابط نشان می‌دهد که ارتباطات معناداری بین عناصر زیستی وجود دارد.")
+        context_parts.append("")
+        
+        # 4. دستورالعمل داده‌محور
+        context_parts.append("📋 **دستورالعمل:**")
+        context_parts.append("بر اساس فکت‌های ارائه شده، پاسخ دقیق و مبتنی بر داده ارائه دهید.")
+        
+        return "\n".join(context_parts)
+
+    def _create_step_by_step_context(self, retrieval_result: RetrievalResult) -> str:
+        """
+        ایجاد متن توضیح قبل از سؤال (استدلال گام به گام)
+        مناسب برای مدل‌هایی که به دنبال استدلال خطی هستند
+        """
+        nodes = retrieval_result.nodes
+        edges = retrieval_result.edges
+        paths = retrieval_result.paths
+        query = retrieval_result.query
+        
+        context_parts = []
+        
+        # 1. مقدمه استدلالی
+        context_parts.append(f"🧠 **استدلال گام به گام برای سوال:** {query}")
+        context_parts.append("")
+        context_parts.append("برای پاسخ به این سوال، مراحل زیر را دنبال می‌کنیم:")
+        context_parts.append("")
+        
+        # 2. گام‌های استدلال
+        context_parts.append("📝 **مراحل استدلال:**")
+        
+        if paths:
+            main_path = paths[0] if paths else []
+            if len(main_path) >= 2:
+                context_parts.append("**گام 1: شناسایی مسیر اصلی**")
+                path_elements = []
+                for i, node in enumerate(main_path):
+                    if i < len(main_path) - 1:
+                        # پیدا کردن رابطه بین این نود و نود بعدی
+                        relation = "→"
+                        for edge in edges:
+                            if edge.source == node and edge.target == main_path[i + 1]:
+                                relation = edge.relation
+                                break
+                        path_elements.append(f"{i+1}. {node}")
+                        path_elements.append(f"   ↓ {relation}")
+                    else:
+                        path_elements.append(f"{i+1}. {node}")
+                
+                context_parts.append("\n".join(path_elements))
+                context_parts.append("")
+        
+        # 3. استنتاج منطقی
+        context_parts.append("💡 **استنتاج منطقی:**")
+        context_parts.append("بر اساس این مسیر، می‌توانیم ارتباطات زیستی را درک کنیم.")
+        context_parts.append("")
+        
+        # 4. دستورالعمل استدلالی
+        context_parts.append("🎯 **دستورالعمل:**")
+        context_parts.append("مراحل استدلال را دنبال کرده و پاسخ منطقی ارائه دهید.")
+        
+        return "\n".join(context_parts)
+
+    def _create_compact_direct_context(self, retrieval_result: RetrievalResult) -> str:
+        """
+        ایجاد متن فشرده و مستقیم
+        مفید برای تست مدل‌هایی که پاسخ‌های خلاصه ولی دقیق تولید می‌کنند
+        """
+        nodes = retrieval_result.nodes
+        edges = retrieval_result.edges
+        paths = retrieval_result.paths
+        query = retrieval_result.query
+        
+        context_parts = []
+        
+        # 1. مقدمه فشرده
+        context_parts.append(f"⚡ **اطلاعات فشرده برای:** {query}")
+        context_parts.append("")
+        
+        # 2. مسیر مستقیم
+        if paths:
+            main_path = paths[0] if paths else []
+            if len(main_path) >= 2:
+                context_parts.append("🛤️ **مسیر کلیدی:**")
+                path_str = " → ".join(main_path)
+                context_parts.append(f"• {path_str}")
+                context_parts.append("")
+        
+        # 3. دستورالعمل فشرده
+        context_parts.append("📋 **دستورالعمل:** پاسخ کوتاه و دقیق ارائه دهید.")
+        
+        return "\n".join(context_parts)
+
+    def _create_biological_pathway_context(self, retrieval_result: RetrievalResult) -> str:
+        """
+        ایجاد متن مسیر زیستی (تخصصی)
+        برای تحلیل‌های تخصصی زیستی
+        """
+        nodes = retrieval_result.nodes
+        edges = retrieval_result.edges
+        paths = retrieval_result.paths
+        query = retrieval_result.query
+        
+        context_parts = []
+        
+        # 1. مقدمه تخصصی
+        context_parts.append(f"🧬 **تحلیل مسیر زیستی برای:** {query}")
+        context_parts.append("")
+        context_parts.append("**مسیرهای زیستی شناسایی شده در Hetionet:**")
+        context_parts.append("")
+        
+        # 2. تحلیل مسیرها
+        if paths:
+            context_parts.append("🛤️ **مسیرهای زیستی:**")
+            for i, path in enumerate(paths[:3]):
+                context_parts.append(f"**مسیر {i+1}:**")
+                for j, node in enumerate(path):
+                    if j < len(path) - 1:
+                        context_parts.append(f"  {node} →")
+                    else:
+                        context_parts.append(f"  {node}")
+                context_parts.append("")
+        
+        # 3. مکانیسم‌های زیستی
+        context_parts.append("⚙️ **مکانیسم‌های زیستی:**")
+        if edges:
+            edge_types = {}
+            for edge in edges:
+                if edge.relation not in edge_types:
+                    edge_types[edge.relation] = 0
+                edge_types[edge.relation] += 1
+            
+            for relation, count in sorted(edge_types.items(), key=lambda x: x[1], reverse=True)[:3]:
+                context_parts.append(f"• {relation}: {count} مورد")
+        context_parts.append("")
+        
+        # 4. دستورالعمل تخصصی
+        context_parts.append("🔬 **دستورالعمل تخصصی:**")
+        context_parts.append("تحلیل عمیق مسیرهای زیستی و مکانیسم‌های مولکولی ارائه دهید.")
+        
+        return "\n".join(context_parts)
+
+    def _create_clinical_relevance_context(self, retrieval_result: RetrievalResult) -> str:
+        """
+        ایجاد متن ارتباط بالینی
+        برای تحلیل‌های مرتبط با پزشکی و درمان
+        """
+        nodes = retrieval_result.nodes
+        edges = retrieval_result.edges
+        paths = retrieval_result.paths
+        query = retrieval_result.query
+        
+        context_parts = []
+        
+        # 1. مقدمه بالینی
+        context_parts.append(f"🏥 **تحلیل بالینی برای:** {query}")
+        context_parts.append("")
+        context_parts.append("**اطلاعات بالینی استخراج شده:**")
+        context_parts.append("")
+        
+        # 2. عناصر بالینی
+        clinical_elements = []
+        for node in nodes:
+            if node.kind in ['Disease', 'Compound', 'Gene', 'Anatomy']:
+                clinical_elements.append(f"• {node.kind}: {node.name}")
+        
+        if clinical_elements:
+            context_parts.append("🏥 **عناصر بالینی:**")
+            context_parts.extend(clinical_elements[:5])
+            context_parts.append("")
+        
+        # 3. روابط درمانی
+        therapeutic_relations = []
+        for edge in edges:
+            if edge.relation in ['CtD', 'CuG', 'CdG', 'DaG']:
+                therapeutic_relations.append(f"• {edge.source} → {edge.relation} → {edge.target}")
+        
+        if therapeutic_relations:
+            context_parts.append("💊 **روابط درمانی:**")
+            context_parts.extend(therapeutic_relations[:3])
+            context_parts.append("")
+        
+        # 4. اهمیت بالینی
+        context_parts.append("📋 **اهمیت بالینی:**")
+        context_parts.append("این روابط می‌تواند برای درک مکانیسم‌های درمانی مفید باشد.")
+        context_parts.append("")
+        
+        # 5. دستورالعمل بالینی
+        context_parts.append("🎯 **دستورالعمل بالینی:**")
+        context_parts.append("تحلیل بالینی و کاربردهای درمانی را بررسی کنید.")
+        
+        return "\n".join(context_parts)
+
+    def _create_mechanistic_detailed_context(self, retrieval_result: RetrievalResult) -> str:
+        """
+        ایجاد متن مکانیسمی تفصیلی
+        برای تحلیل‌های عمیق مکانیسم‌های زیستی
+        """
+        nodes = retrieval_result.nodes
+        edges = retrieval_result.edges
+        paths = retrieval_result.paths
+        query = retrieval_result.query
+        
+        context_parts = []
+        
+        # 1. مقدمه مکانیسمی
+        context_parts.append(f"⚙️ **تحلیل مکانیسمی تفصیلی برای:** {query}")
+        context_parts.append("")
+        context_parts.append("**مکانیسم‌های زیستی شناسایی شده:**")
+        context_parts.append("")
+        
+        # 2. تحلیل عمیق روابط
+        if edges:
+            context_parts.append("🔬 **تحلیل مکانیسمی روابط:**")
+            edge_analysis = {}
+            for edge in edges:
+                if edge.relation not in edge_analysis:
+                    edge_analysis[edge.relation] = []
+                edge_analysis[edge.relation].append(f"{edge.source} → {edge.target}")
+            
+            for relation, connections in edge_analysis.items():
+                context_parts.append(f"**مکانیسم {relation}:**")
+                for connection in connections[:2]:
+                    context_parts.append(f"  - {connection}")
+                context_parts.append("")
+        
+        # 3. مسیرهای مکانیسمی
+        if paths:
+            context_parts.append("🛤️ **مسیرهای مکانیسمی:**")
+            for i, path in enumerate(paths[:2]):
+                context_parts.append(f"**مسیر مکانیسمی {i+1}:**")
+                for j, node in enumerate(path):
+                    if j < len(path) - 1:
+                        context_parts.append(f"  {node} →")
+                    else:
+                        context_parts.append(f"  {node}")
+                context_parts.append("")
+        
+        # 4. دستورالعمل مکانیسمی
+        context_parts.append("🔬 **دستورالعمل مکانیسمی:**")
+        context_parts.append("تحلیل عمیق مکانیسم‌های مولکولی و زیستی ارائه دهید.")
         
         return "\n".join(context_parts)
 
