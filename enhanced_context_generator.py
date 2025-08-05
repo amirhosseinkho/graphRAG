@@ -7,6 +7,7 @@
 
 import sys
 import os
+import re
 from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass
 import json
@@ -16,6 +17,64 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from node_lookup_system import NodeLookupSystem
 from graphrag_service import GraphNode, GraphEdge, RetrievalResult
+
+def remove_emojis(text: str) -> str:
+    """حذف ایموجی‌ها از متن"""
+    # الگوی regex برای شناسایی ایموجی‌ها - شامل تمام انواع ایموجی
+    emoji_pattern = re.compile(
+        "["
+        "\U0001F600-\U0001F64F"  # emoticons
+        "\U0001F300-\U0001F5FF"  # symbols & pictographs
+        "\U0001F680-\U0001F6FF"  # transport & map symbols
+        "\U0001F1E0-\U0001F1FF"  # flags (iOS)
+        "\U00002702-\U000027B0"  # dingbats
+        "\U000024C2-\U0001F251"  # enclosed characters
+        "\U0001F900-\U0001F9FF"  # supplemental symbols and pictographs
+        "\U0001FA70-\U0001FAFF"  # symbols and pictographs extended-A
+        "\U00002600-\U000026FF"  # miscellaneous symbols
+        "\U00002B00-\U00002BFF"  # miscellaneous symbols and arrows
+        "\U0001F000-\U0001F02F"  # mahjong tiles
+        "\U0001F0A0-\U0001F0FF"  # playing cards
+        "\U0001F100-\U0001F64F"  # enclosed alphanumeric supplement
+        "\U0001F650-\U0001F67F"  # geometric shapes extended
+        "\U0001F680-\U0001F6FF"  # transport and map symbols
+        "\U0001F700-\U0001F77F"  # alchemical symbols
+        "\U0001F780-\U0001F7FF"  # geometric shapes extended
+        "\U0001F800-\U0001F8FF"  # supplemental arrows-C
+        "\U0001F900-\U0001F9FF"  # supplemental symbols and pictographs
+        "\U0001FA00-\U0001FA6F"  # chess symbols
+        "\U0001FA70-\U0001FAFF"  # symbols and pictographs extended-A
+        "\U00002600-\U000027BF"  # miscellaneous symbols
+        "\U00002B00-\U00002BFF"  # miscellaneous symbols and arrows
+        "\U00002300-\U000023FF"  # technical symbols
+        "\U00002500-\U0000257F"  # box drawing
+        "\U00002580-\U0000259F"  # block elements
+        "\U000025A0-\U000025FF"  # geometric shapes
+        "\U00002600-\U0000267F"  # miscellaneous symbols
+        "\U00002680-\U0000269F"  # dingbats
+        "\U000026A0-\U000026FF"  # miscellaneous symbols
+        "\U00002700-\U000027BF"  # dingbats
+        "\U000027C0-\U000027EF"  # miscellaneous mathematical symbols-A
+        "\U000027F0-\U000027FF"  # supplemental arrows-A
+        "\U00002900-\U0000297F"  # supplemental arrows-B
+        "\U00002980-\U000029FF"  # miscellaneous mathematical symbols-B
+        "\U00002A00-\U00002AFF"  # supplemental mathematical operators
+        "\U00002B00-\U00002BFF"  # miscellaneous symbols and arrows
+        "\U00002C60-\U00002C7F"  # latin extended-C
+        "\U00002E00-\U00002E7F"  # supplemental punctuation
+        "\U00003000-\U0000303F"  # cjk symbols and punctuation
+        "\U0000FF00-\U0000FFEF"  # halfwidth and fullwidth forms
+        "\U0000FE00-\U0000FE0F"  # variation selectors
+        "\U0000FE10-\U0000FE1F"  # vertical forms
+        "\U0000FE20-\U0000FE2F"  # combining half marks
+        "\U0000FE30-\U0000FE4F"  # cjk compatibility forms
+        "\U0000FE50-\U0000FE6F"  # small form variants
+        "\U0000FE70-\U0000FEFF"  # arabic presentation forms-B
+        "\U0000FF00-\U0000FFEF"  # halfwidth and fullwidth forms
+        "\U0000FFF0-\U0000FFFF"  # specials
+        "]+", flags=re.UNICODE
+    )
+    return emoji_pattern.sub('', text).strip()
 
 @dataclass
 class EnhancedNode:
@@ -172,13 +231,13 @@ class EnhancedContextGenerator:
         context_parts = []
         
         # 1. مقدمه
-        context_parts.append(f"🧬 **متن زمینه هوشمند برای سوال:** {query}")
+        context_parts.append(f"**متن زمینه هوشمند برای سوال:** {query}")
         context_parts.append("")
         context_parts.append("این متن شامل اطلاعات معنادار و قابل فهم برای مدل زبان است.")
         context_parts.append("")
         
         # 2. نودهای کلیدی
-        context_parts.append("📋 **نودهای کلیدی (با اطلاعات معنادار):**")
+        context_parts.append("**نودهای کلیدی (با اطلاعات معنادار):**")
         for node in nodes:
             context_parts.append(f"• {node.name} ({node.kind})")
             if node.description:
@@ -190,13 +249,13 @@ class EnhancedContextGenerator:
             context_parts.append("")
         
         # 3. روابط معنادار
-        context_parts.append("🔗 **روابط معنادار:**")
+        context_parts.append("**روابط معنادار:**")
         for edge in edges:
             context_parts.append(f"• {edge.relation_description}")
         context_parts.append("")
         
         # 4. تحلیل زیستی
-        context_parts.append("🔬 **تحلیل زیستی و استنتاجات:**")
+        context_parts.append("**تحلیل زیستی و استنتاجات:**")
         
         # گروه‌بندی نودها
         gene_nodes = [n for n in nodes if n.kind == 'Gene']
@@ -237,7 +296,7 @@ class EnhancedContextGenerator:
         
         # 5. استنتاجات زیستی
         context_parts.append("")
-        context_parts.append("🧠 **استنتاجات زیستی:**")
+        context_parts.append("**استنتاجات زیستی:**")
         
         # یافتن روابط مهم
         treatment_edges = [e for e in edges if e.relation == 'CtD']
@@ -267,7 +326,7 @@ class EnhancedContextGenerator:
         
         # 6. اهمیت بالینی
         context_parts.append("")
-        context_parts.append("🏥 **اهمیت بالینی:**")
+        context_parts.append("**اهمیت بالینی:**")
         context_parts.append("بر اساس داده‌های ارائه شده، این روابط می‌تواند برای:")
         context_parts.append("• درک مکانیسم‌های بیماری")
         context_parts.append("• شناسایی اهداف درمانی")
@@ -276,7 +335,9 @@ class EnhancedContextGenerator:
         context_parts.append("• تشخیص و طبقه‌بندی بیماری‌ها")
         context_parts.append("مفید باشد.")
         
-        return "\n".join(context_parts)
+        # حذف ایموجی‌ها از متن نهایی
+        final_text = "\n".join(context_parts)
+        return remove_emojis(final_text)
     
     def _create_scientific_context(self, nodes: List[EnhancedNode], 
                                  edges: List[EnhancedEdge], query: str) -> str:
@@ -285,13 +346,13 @@ class EnhancedContextGenerator:
         context_parts = []
         
         # 1. مقدمه علمی
-        context_parts.append(f"🔬 **تحلیل علمی برای سوال:** {query}")
+        context_parts.append(f"**تحلیل علمی برای سوال:** {query}")
         context_parts.append("")
         context_parts.append("تحلیل علمی بر اساس داده‌های زیستی و روابط مولکولی:")
         context_parts.append("")
         
         # 2. آمار و ارقام
-        context_parts.append("📊 **آمار بازیابی:**")
+        context_parts.append("**آمار بازیابی:**")
         context_parts.append(f"• تعداد نودها: {len(nodes)}")
         context_parts.append(f"• تعداد روابط: {len(edges)}")
         
@@ -309,7 +370,7 @@ class EnhancedContextGenerator:
         context_parts.append("")
         
         # 3. تحلیل روابط
-        context_parts.append("🔗 **تحلیل روابط مولکولی:**")
+        context_parts.append("**تحلیل روابط مولکولی:**")
         relation_types = {}
         for edge in edges:
             if edge.relation not in relation_types:
@@ -322,7 +383,7 @@ class EnhancedContextGenerator:
         context_parts.append("")
         
         # 4. تحلیل عمیق
-        context_parts.append("🧬 **تحلیل عمیق زیستی:**")
+        context_parts.append("**تحلیل عمیق زیستی:**")
         
         # تحلیل ژن‌ها
         gene_nodes = [n for n in nodes if n.kind == 'Gene']
@@ -346,7 +407,7 @@ class EnhancedContextGenerator:
         
         # 5. استنتاجات علمی
         context_parts.append("")
-        context_parts.append("🔬 **استنتاجات علمی:**")
+        context_parts.append("**استنتاجات علمی:**")
         context_parts.append("بر اساس تحلیل داده‌ها:")
         
         if gene_nodes and disease_nodes:
@@ -358,7 +419,9 @@ class EnhancedContextGenerator:
         if process_nodes := [n for n in nodes if n.kind == 'Biological Process']:
             context_parts.append("• مسیرهای زیستی شناسایی شد")
         
-        return "\n".join(context_parts)
+        # حذف ایموجی‌ها از متن نهایی
+        final_text = "\n".join(context_parts)
+        return remove_emojis(final_text)
     
     def _create_clinical_context(self, nodes: List[EnhancedNode], 
                                edges: List[EnhancedEdge], query: str) -> str:
@@ -367,13 +430,13 @@ class EnhancedContextGenerator:
         context_parts = []
         
         # 1. مقدمه بالینی
-        context_parts.append(f"🏥 **تحلیل بالینی برای سوال:** {query}")
+        context_parts.append(f"**تحلیل بالینی برای سوال:** {query}")
         context_parts.append("")
         context_parts.append("تحلیل بالینی بر اساس روابط درمانی و اهمیت پزشکی:")
         context_parts.append("")
         
         # 2. اطلاعات بالینی
-        context_parts.append("📋 **اطلاعات بالینی:**")
+        context_parts.append("**اطلاعات بالینی:**")
         
         # یافتن داروها
         compound_nodes = [n for n in nodes if n.kind == 'Compound']
@@ -395,7 +458,7 @@ class EnhancedContextGenerator:
         
         # 3. روابط درمانی
         context_parts.append("")
-        context_parts.append("💊 **روابط درمانی:**")
+        context_parts.append("**روابط درمانی:**")
         
         treatment_edges = [e for e in edges if e.relation == 'CtD']
         if treatment_edges:
@@ -404,14 +467,16 @@ class EnhancedContextGenerator:
         
         # 4. اهمیت بالینی
         context_parts.append("")
-        context_parts.append("🎯 **اهمیت بالینی:**")
+        context_parts.append("**اهمیت بالینی:**")
         context_parts.append("این روابط برای موارد زیر اهمیت دارد:")
         context_parts.append("• انتخاب درمان مناسب")
         context_parts.append("• پیش‌بینی پاسخ به درمان")
         context_parts.append("• مدیریت عوارض جانبی")
         context_parts.append("• توسعه پروتکل‌های درمانی")
         
-        return "\n".join(context_parts)
+        # حذف ایموجی‌ها از متن نهایی
+        final_text = "\n".join(context_parts)
+        return remove_emojis(final_text)
     
     def _create_pathway_context(self, nodes: List[EnhancedNode], 
                               edges: List[EnhancedEdge], query: str) -> str:
@@ -420,13 +485,13 @@ class EnhancedContextGenerator:
         context_parts = []
         
         # 1. مقدمه مسیر زیستی
-        context_parts.append(f"🔄 **تحلیل مسیر زیستی برای سوال:** {query}")
+        context_parts.append(f"**تحلیل مسیر زیستی برای سوال:** {query}")
         context_parts.append("")
         context_parts.append("تحلیل مسیرهای زیستی و روابط مولکولی:")
         context_parts.append("")
         
         # 2. مسیرهای زیستی
-        context_parts.append("🛤️ **مسیرهای زیستی شناسایی شده:**")
+        context_parts.append("**مسیرهای زیستی شناسایی شده:**")
         
         # یافتن فرآیندهای زیستی
         process_nodes = [n for n in nodes if n.kind == 'Biological Process']
@@ -438,7 +503,7 @@ class EnhancedContextGenerator:
         
         # 3. روابط مسیر
         context_parts.append("")
-        context_parts.append("🔗 **روابط مسیر زیستی:**")
+        context_parts.append("**روابط مسیر زیستی:**")
         
         gene_process_edges = [e for e in edges if e.relation == 'GpBP']
         if gene_process_edges:
@@ -447,13 +512,15 @@ class EnhancedContextGenerator:
         
         # 4. تحلیل مسیر
         context_parts.append("")
-        context_parts.append("🧬 **تحلیل مسیر زیستی:**")
+        context_parts.append("**تحلیل مسیر زیستی:**")
         context_parts.append("این مسیرها برای موارد زیر اهمیت دارند:")
         context_parts.append("• درک مکانیسم‌های سلولی")
         context_parts.append("• شناسایی نقاط کنترل")
         context_parts.append("• توسعه درمان‌های هدفمند")
         
-        return "\n".join(context_parts)
+        # حذف ایموجی‌ها از متن نهایی
+        final_text = "\n".join(context_parts)
+        return remove_emojis(final_text)
     
     def _create_general_context(self, nodes: List[EnhancedNode], 
                               edges: List[EnhancedEdge], query: str) -> str:
@@ -462,11 +529,11 @@ class EnhancedContextGenerator:
         context_parts = []
         
         # 1. مقدمه عمومی
-        context_parts.append(f"📝 **اطلاعات عمومی برای سوال:** {query}")
+        context_parts.append(f"**اطلاعات عمومی برای سوال:** {query}")
         context_parts.append("")
         
         # 2. نودهای کلیدی
-        context_parts.append("📋 **نودهای کلیدی:**")
+        context_parts.append("**نودهای کلیدی:**")
         for node in nodes:
             context_parts.append(f"• {node.name} ({node.kind})")
             if node.description:
@@ -474,15 +541,17 @@ class EnhancedContextGenerator:
         
         # 3. روابط
         context_parts.append("")
-        context_parts.append("🔗 **روابط:**")
+        context_parts.append("**روابط:**")
         for edge in edges:
             context_parts.append(f"• {edge.relation_description}")
         
-        return "\n".join(context_parts)
+        # حذف ایموجی‌ها از متن نهایی
+        final_text = "\n".join(context_parts)
+        return remove_emojis(final_text)
 
 def test_enhanced_context_generator():
     """تست ماژول تولید متن زمینه بهبود یافته"""
-    print("🧬 تست ماژول تولید متن زمینه بهبود یافته")
+    print("تست ماژول تولید متن زمینه بهبود یافته")
     print("=" * 60)
     
     # راه‌اندازی

@@ -30,4 +30,5 @@ nltk==3.8.1
 sentence-transformers==2.2.2
 textblob==0.17.1
 jieba==0.42.1
-json-repair==0.19.0 
+json-repair==0.19.0
+python-community==0.15 

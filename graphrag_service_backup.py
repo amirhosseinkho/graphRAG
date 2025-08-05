@@ -12,7 +12,6 @@ from collections import deque
 import pickle
 import os
 import json
-import re
 from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
@@ -29,64 +28,6 @@ try:
 except ImportError:
     NEW_MODULES_AVAILABLE = False
     print("Warning: New GraphRAG modules not available. Using classic methods only.")
-
-def remove_emojis(text: str) -> str:
-    """حذف ایموجی‌ها از متن"""
-    # الگوی regex برای شناسایی ایموجی‌ها - شامل تمام انواع ایموجی
-    emoji_pattern = re.compile(
-        "["
-        "\U0001F600-\U0001F64F"  # emoticons
-        "\U0001F300-\U0001F5FF"  # symbols & pictographs
-        "\U0001F680-\U0001F6FF"  # transport & map symbols
-        "\U0001F1E0-\U0001F1FF"  # flags (iOS)
-        "\U00002702-\U000027B0"  # dingbats
-        "\U000024C2-\U0001F251"  # enclosed characters
-        "\U0001F900-\U0001F9FF"  # supplemental symbols and pictographs
-        "\U0001FA70-\U0001FAFF"  # symbols and pictographs extended-A
-        "\U00002600-\U000026FF"  # miscellaneous symbols
-        "\U00002B00-\U00002BFF"  # miscellaneous symbols and arrows
-        "\U0001F000-\U0001F02F"  # mahjong tiles
-        "\U0001F0A0-\U0001F0FF"  # playing cards
-        "\U0001F100-\U0001F64F"  # enclosed alphanumeric supplement
-        "\U0001F650-\U0001F67F"  # geometric shapes extended
-        "\U0001F680-\U0001F6FF"  # transport and map symbols
-        "\U0001F700-\U0001F77F"  # alchemical symbols
-        "\U0001F780-\U0001F7FF"  # geometric shapes extended
-        "\U0001F800-\U0001F8FF"  # supplemental arrows-C
-        "\U0001F900-\U0001F9FF"  # supplemental symbols and pictographs
-        "\U0001FA00-\U0001FA6F"  # chess symbols
-        "\U0001FA70-\U0001FAFF"  # symbols and pictographs extended-A
-        "\U00002600-\U000027BF"  # miscellaneous symbols
-        "\U00002B00-\U00002BFF"  # miscellaneous symbols and arrows
-        "\U00002300-\U000023FF"  # technical symbols
-        "\U00002500-\U0000257F"  # box drawing
-        "\U00002580-\U0000259F"  # block elements
-        "\U000025A0-\U000025FF"  # geometric shapes
-        "\U00002600-\U0000267F"  # miscellaneous symbols
-        "\U00002680-\U0000269F"  # dingbats
-        "\U000026A0-\U000026FF"  # miscellaneous symbols
-        "\U00002700-\U000027BF"  # dingbats
-        "\U000027C0-\U000027EF"  # miscellaneous mathematical symbols-A
-        "\U000027F0-\U000027FF"  # supplemental arrows-A
-        "\U00002900-\U0000297F"  # supplemental arrows-B
-        "\U00002980-\U000029FF"  # miscellaneous mathematical symbols-B
-        "\U00002A00-\U00002AFF"  # supplemental mathematical operators
-        "\U00002B00-\U00002BFF"  # miscellaneous symbols and arrows
-        "\U00002C60-\U00002C7F"  # latin extended-C
-        "\U00002E00-\U00002E7F"  # supplemental punctuation
-        "\U00003000-\U0000303F"  # cjk symbols and punctuation
-        "\U0000FF00-\U0000FFEF"  # halfwidth and fullwidth forms
-        "\U0000FE00-\U0000FE0F"  # variation selectors
-        "\U0000FE10-\U0000FE1F"  # vertical forms
-        "\U0000FE20-\U0000FE2F"  # combining half marks
-        "\U0000FE30-\U0000FE4F"  # cjk compatibility forms
-        "\U0000FE50-\U0000FE6F"  # small form variants
-        "\U0000FE70-\U0000FEFF"  # arabic presentation forms-B
-        "\U0000FF00-\U0000FFEF"  # halfwidth and fullwidth forms
-        "\U0000FFF0-\U0000FFFF"  # specials
-        "]+", flags=re.UNICODE
-    )
-    return emoji_pattern.sub('', text).strip()
 
 # دیکشنری کامل توضیحات metaedge برای استفاده در متن زمینه‌ای
 METAEDGE_DESCRIPTIONS = {
@@ -2186,332 +2127,6 @@ class GraphRAGService:
                                 weight=edge_data.get('weight', 1.0)
                             ))
         
-        elif method == RetrievalMethod.KG_SEARCH:
-            # جستجوی دانش‌گراف (Knowledge Graph Search)
-            print("🔍 استفاده از الگوریتم KG_SEARCH")
-            intelligent_result = self.intelligent_semantic_search(query, max_depth)
-            
-            # تبدیل نتایج به GraphNode
-            for node_id, depth, score, reason in intelligent_result[:max_nodes]:
-                nodes.append(GraphNode(
-                    id=node_id,
-                    name=self.G.nodes[node_id]['name'],
-                    kind=self.G.nodes[node_id]['kind'],
-                    depth=depth,
-                    score=score
-                ))
-            
-            # یافتن مسیرهای ارتباطی بین نودها
-            if len(nodes) >= 2:
-                node_ids = [node.id for node in nodes]
-                for i in range(len(node_ids)):
-                    for j in range(i+1, len(node_ids)):
-                        paths.extend(self.get_shortest_paths(node_ids[i], node_ids[j]))
-            
-            # یافتن یال‌های مرتبط
-            for node in nodes:
-                for neighbor in self.G.neighbors(node.id):
-                    if any(n.id == neighbor for n in nodes):
-                        edge_data = self.G.get_edge_data(node.id, neighbor)
-                        if edge_data:
-                            edges.append(GraphEdge(
-                                source=node.id,
-                                target=neighbor,
-                                relation=edge_data.get('metaedge', 'related'),
-                                weight=edge_data.get('weight', 1.0)
-                            ))
-        
-        elif method == RetrievalMethod.N_HOP_RETRIEVAL:
-            # بازیابی چندمرحله‌ای
-            print("🔍 استفاده از الگوریتم N_HOP_RETRIEVAL")
-            multi_hop_result = self.multi_hop_search(query, max_depth)
-            
-            # تبدیل نتایج به GraphNode
-            for node_id, depth, score, reason, path in multi_hop_result[:max_nodes]:
-                nodes.append(GraphNode(
-                    id=node_id,
-                    name=self.G.nodes[node_id]['name'],
-                    kind=self.G.nodes[node_id]['kind'],
-                    depth=depth,
-                    score=score
-                ))
-                if path:
-                    paths.append(path)
-            
-            # یافتن یال‌های مرتبط
-            for node in nodes:
-                for neighbor in self.G.neighbors(node.id):
-                    if any(n.id == neighbor for n in nodes):
-                        edge_data = self.G.get_edge_data(node.id, neighbor)
-                        if edge_data:
-                            edges.append(GraphEdge(
-                                source=node.id,
-                                target=neighbor,
-                                relation=edge_data.get('metaedge', 'related'),
-                                weight=edge_data.get('weight', 1.0)
-                            ))
-        
-        elif method == RetrievalMethod.PAGERANK_BASED:
-            # جستجو بر اساس PageRank
-            print("🔍 استفاده از الگوریتم PAGERANK_BASED")
-            try:
-                import networkx as nx
-                # محاسبه PageRank
-                pagerank_scores = nx.pagerank(self.G, alpha=0.85, max_iter=100)
-                
-                # مرتب‌سازی نودها بر اساس PageRank
-                sorted_nodes = sorted(pagerank_scores.items(), key=lambda x: x[1], reverse=True)
-                
-                # انتخاب نودهای برتر
-                for node_id, score in sorted_nodes[:max_nodes]:
-                    if node_id in self.G.nodes:
-                        nodes.append(GraphNode(
-                            id=node_id,
-                            name=self.G.nodes[node_id]['name'],
-                            kind=self.G.nodes[node_id]['kind'],
-                            depth=0,
-                            score=score
-                        ))
-                
-                # یافتن یال‌های مرتبط
-                for node in nodes:
-                    for neighbor in self.G.neighbors(node.id):
-                        if any(n.id == neighbor for n in nodes):
-                            edge_data = self.G.get_edge_data(node.id, neighbor)
-                            if edge_data:
-                                edges.append(GraphEdge(
-                                    source=node.id,
-                                    target=neighbor,
-                                    relation=edge_data.get('metaedge', 'related'),
-                                    weight=edge_data.get('weight', 1.0)
-                                ))
-            except Exception as e:
-                print(f"⚠️ خطا در محاسبه PageRank: {e}")
-                # استفاده از روش جایگزین
-                intelligent_result = self.intelligent_semantic_search(query, max_depth)
-                for node_id, depth, score, reason in intelligent_result[:max_nodes]:
-                    nodes.append(GraphNode(
-                        id=node_id,
-                        name=self.G.nodes[node_id]['name'],
-                        kind=self.G.nodes[node_id]['kind'],
-                        depth=depth,
-                        score=score
-                    ))
-        
-        elif method == RetrievalMethod.SEMANTIC_SIMILARITY:
-            # جستجو بر اساس شباهت معنایی
-            print("🔍 استفاده از الگوریتم SEMANTIC_SIMILARITY")
-            intelligent_result = self.intelligent_semantic_search(query, max_depth)
-            
-            # تبدیل نتایج به GraphNode
-            for node_id, depth, score, reason in intelligent_result[:max_nodes]:
-                nodes.append(GraphNode(
-                    id=node_id,
-                    name=self.G.nodes[node_id]['name'],
-                    kind=self.G.nodes[node_id]['kind'],
-                    depth=depth,
-                    score=score
-                ))
-            
-            # یافتن مسیرهای ارتباطی بین نودها
-            if len(nodes) >= 2:
-                node_ids = [node.id for node in nodes]
-                for i in range(len(node_ids)):
-                    for j in range(i+1, len(node_ids)):
-                        paths.extend(self.get_shortest_paths(node_ids[i], node_ids[j]))
-            
-            # یافتن یال‌های مرتبط
-            for node in nodes:
-                for neighbor in self.G.neighbors(node.id):
-                    if any(n.id == neighbor for n in nodes):
-                        edge_data = self.G.get_edge_data(node.id, neighbor)
-                        if edge_data:
-                            edges.append(GraphEdge(
-                                source=node.id,
-                                target=neighbor,
-                                relation=edge_data.get('metaedge', 'related'),
-                                weight=edge_data.get('weight', 1.0)
-                            ))
-        
-        elif method == RetrievalMethod.COMMUNITY_DETECTION:
-            # تشخیص جامعه‌ها
-            print("🔍 استفاده از الگوریتم COMMUNITY_DETECTION")
-            try:
-                import networkx as nx
-                from community import community_louvain
-                
-                # تشخیص جامعه‌ها با الگوریتم Louvain
-                communities = community_louvain.best_partition(self.G)
-                
-                # گروه‌بندی نودها بر اساس جامعه
-                community_nodes = {}
-                for node_id, community_id in communities.items():
-                    if community_id not in community_nodes:
-                        community_nodes[community_id] = []
-                    community_nodes[community_id].append(node_id)
-                
-                # انتخاب نودهای جامعه‌های مختلف
-                selected_nodes = []
-                for community_id, node_list in community_nodes.items():
-                    # انتخاب نودهای برتر از هر جامعه
-                    for node_id in node_list[:max(1, max_nodes // len(community_nodes))]:
-                        if node_id in self.G.nodes:
-                            selected_nodes.append(node_id)
-                
-                # تبدیل به GraphNode
-                for node_id in selected_nodes[:max_nodes]:
-                    nodes.append(GraphNode(
-                        id=node_id,
-                        name=self.G.nodes[node_id]['name'],
-                        kind=self.G.nodes[node_id]['kind'],
-                        depth=0,
-                        score=1.0
-                    ))
-                
-                # یافتن یال‌های مرتبط
-                for node in nodes:
-                    for neighbor in self.G.neighbors(node.id):
-                        if any(n.id == neighbor for n in nodes):
-                            edge_data = self.G.get_edge_data(node.id, neighbor)
-                            if edge_data:
-                                edges.append(GraphEdge(
-                                    source=node.id,
-                                    target=neighbor,
-                                    relation=edge_data.get('metaedge', 'related'),
-                                    weight=edge_data.get('weight', 1.0)
-                                ))
-            except ImportError:
-                print("⚠️ کتابخانه community در دسترس نیست، استفاده از روش جایگزین")
-                intelligent_result = self.intelligent_semantic_search(query, max_depth)
-                for node_id, depth, score, reason in intelligent_result[:max_nodes]:
-                    nodes.append(GraphNode(
-                        id=node_id,
-                        name=self.G.nodes[node_id]['name'],
-                        kind=self.G.nodes[node_id]['kind'],
-                        depth=depth,
-                        score=score
-                    ))
-            except Exception as e:
-                print(f"⚠️ خطا در تشخیص جامعه‌ها: {e}")
-                intelligent_result = self.intelligent_semantic_search(query, max_depth)
-                for node_id, depth, score, reason in intelligent_result[:max_nodes]:
-                    nodes.append(GraphNode(
-                        id=node_id,
-                        name=self.G.nodes[node_id]['name'],
-                        kind=self.G.nodes[node_id]['kind'],
-                        depth=depth,
-                        score=score
-                    ))
-        
-        elif method == RetrievalMethod.ENTITY_RESOLUTION:
-            # حل موجودیت‌ها
-            print("🔍 استفاده از الگوریتم ENTITY_RESOLUTION")
-            try:
-                if NEW_MODULES_AVAILABLE:
-                    # استفاده از ماژول جدید EntityResolution
-                    entity_resolver = EntityResolution()
-                    resolved_entities = entity_resolver.resolve_entities(query)
-                    
-                    # تطبیق موجودیت‌های حل شده با نودهای گراف
-                    for entity in resolved_entities:
-                        for node_id, node_attrs in self.G.nodes(data=True):
-                            if entity.lower() in node_attrs['name'].lower():
-                                nodes.append(GraphNode(
-                                    id=node_id,
-                                    name=node_attrs['name'],
-                                    kind=node_attrs['kind'],
-                                    depth=0,
-                                    score=1.0
-                                ))
-                                break
-                else:
-                    # استفاده از روش جایگزین
-                    intelligent_result = self.intelligent_semantic_search(query, max_depth)
-                    for node_id, depth, score, reason in intelligent_result[:max_nodes]:
-                        nodes.append(GraphNode(
-                            id=node_id,
-                            name=self.G.nodes[node_id]['name'],
-                            kind=self.G.nodes[node_id]['kind'],
-                            depth=depth,
-                            score=score
-                        ))
-            except Exception as e:
-                print(f"⚠️ خطا در حل موجودیت‌ها: {e}")
-                intelligent_result = self.intelligent_semantic_search(query, max_depth)
-                for node_id, depth, score, reason in intelligent_result[:max_nodes]:
-                    nodes.append(GraphNode(
-                        id=node_id,
-                        name=self.G.nodes[node_id]['name'],
-                        kind=self.G.nodes[node_id]['kind'],
-                        depth=depth,
-                        score=score
-                    ))
-        
-        elif method == RetrievalMethod.HYBRID_NEW:
-            # ترکیب روش‌های جدید
-            print("🔍 استفاده از الگوریتم HYBRID_NEW")
-            
-            # ترکیب چندین روش
-            methods_results = []
-            
-            # 1. جستجوی معنایی هوشمند
-            intelligent_result = self.intelligent_semantic_search(query, max_depth)
-            methods_results.extend(intelligent_result)
-            
-            # 2. جستجوی چندمرحله‌ای
-            multi_hop_result = self.multi_hop_search(query, max_depth)
-            for node_id, depth, score, reason, path in multi_hop_result:
-                methods_results.append((node_id, depth, score, reason))
-            
-            # 3. PageRank (اگر در دسترس باشد)
-            try:
-                import networkx as nx
-                pagerank_scores = nx.pagerank(self.G, alpha=0.85, max_iter=100)
-                sorted_nodes = sorted(pagerank_scores.items(), key=lambda x: x[1], reverse=True)
-                for node_id, score in sorted_nodes[:max_nodes//3]:
-                    if node_id in self.G.nodes:
-                        methods_results.append((node_id, 0, score, "PageRank"))
-            except:
-                pass
-            
-            # ترکیب و مرتب‌سازی نتایج
-            unique_results = {}
-            for node_id, depth, score, reason in methods_results:
-                if node_id not in unique_results or score > unique_results[node_id][2]:
-                    unique_results[node_id] = (node_id, depth, score, reason)
-            
-            final_results = sorted(unique_results.values(), key=lambda x: x[2], reverse=True)
-            
-            # تبدیل نتایج به GraphNode
-            for node_id, depth, score, reason in final_results[:max_nodes]:
-                nodes.append(GraphNode(
-                    id=node_id,
-                    name=self.G.nodes[node_id]['name'],
-                    kind=self.G.nodes[node_id]['kind'],
-                    depth=depth,
-                    score=score
-                ))
-            
-            # یافتن مسیرهای ارتباطی بین نودها
-            if len(nodes) >= 2:
-                node_ids = [node.id for node in nodes]
-                for i in range(len(node_ids)):
-                    for j in range(i+1, len(node_ids)):
-                        paths.extend(self.get_shortest_paths(node_ids[i], node_ids[j]))
-            
-            # یافتن یال‌های مرتبط
-            for node in nodes:
-                for neighbor in self.G.neighbors(node.id):
-                    if any(n.id == neighbor for n in nodes):
-                        edge_data = self.G.get_edge_data(node.id, neighbor)
-                        if edge_data:
-                            edges.append(GraphEdge(
-                                source=node.id,
-                                target=neighbor,
-                                relation=edge_data.get('metaedge', 'related'),
-                                weight=edge_data.get('weight', 1.0)
-                            ))
-        
         elif method == RetrievalMethod.NO_RETRIEVAL:
             # بدون بازیابی - فقط مدل
             print("🔍 بدون بازیابی از گراف - فقط استفاده از مدل")
@@ -2564,42 +2179,280 @@ class GraphRAGService:
     
     def create_context_text(self, nodes: List[GraphNode], edges: List[GraphEdge], 
                            paths: List[List[str]]) -> str:
-        """
-        تابع قدیمی تولید متن زمینه - استفاده نمی‌شود
-        برای تولید متن زمینه بهبود یافته از EnhancedContextGenerator استفاده کنید
-        """
-        return "برای استفاده از سیستم بهبود یافته، از IntegratedGraphRAGService استفاده کنید"
+        """ایجاد متن زمینه بهبود یافته با اطلاعات زیستی غنی شده"""
+        # استفاده از تابع جدید برای غنی‌سازی
+        retrieval_result = RetrievalResult(
+            nodes=nodes,
+            edges=edges,
+            paths=paths,
+            context_text="",
+            method="Enhanced",
+            query=""
+        )
+        return self._create_enhanced_context_text(retrieval_result)
     
     def _enrich_retrieved_data(self, nodes: List[GraphNode], edges: List[GraphEdge], query: str) -> Dict[str, Any]:
         """
-        تابع قدیمی غنی‌سازی داده‌ها - استفاده نمی‌شود
+        غنی‌سازی داده‌های بازیابی شده با اطلاعات زیستی و روابط معنادار
         """
-        return {}
+        enriched_data = {
+            'biological_context': {},
+            'relationship_details': [],
+            'tissue_specific_info': {},
+            'gene_functions': {},
+            'disease_associations': {},
+            'pathway_information': {}
+        }
+        
+        # 1. استخراج اطلاعات بافت‌محور
+        anatomy_nodes = [n for n in nodes if n.kind == 'Anatomy']
+        gene_nodes = [n for n in nodes if n.kind == 'Gene']
+        
+        for anatomy in anatomy_nodes:
+            enriched_data['tissue_specific_info'][anatomy.name] = {
+                'genes_expressed': [],
+                'genes_upregulated': [],
+                'genes_downregulated': [],
+                'biological_significance': self._get_anatomy_significance(anatomy.name)
+            }
+            
+            # یافتن ژن‌های مرتبط با این بافت
+            for edge in edges:
+                if edge.source == anatomy.id and edge.target in [g.id for g in gene_nodes]:
+                    gene_name = next((g.name for g in gene_nodes if g.id == edge.target), edge.target)
+                    if edge.relation == 'AeG':
+                        enriched_data['tissue_specific_info'][anatomy.name]['genes_expressed'].append(gene_name)
+                    elif edge.relation == 'AuG':
+                        enriched_data['tissue_specific_info'][anatomy.name]['genes_upregulated'].append(gene_name)
+                    elif edge.relation == 'AdG':
+                        enriched_data['tissue_specific_info'][anatomy.name]['genes_downregulated'].append(gene_name)
+        
+        # 2. استخراج اطلاعات عملکرد ژن‌ها
+        for gene in gene_nodes:
+            enriched_data['gene_functions'][gene.name] = {
+                'biological_processes': [],
+                'molecular_functions': [],
+                'cellular_components': [],
+                'pathways': [],
+                'disease_associations': []
+            }
+            
+            # یافتن فرآیندهای زیستی مرتبط
+            for edge in edges:
+                if edge.source == gene.id:
+                    target_node = next((n for n in nodes if n.id == edge.target), None)
+                    if target_node:
+                        if edge.relation == 'GpBP':
+                            enriched_data['gene_functions'][gene.name]['biological_processes'].append(target_node.name)
+                        elif edge.relation == 'GpMF':
+                            enriched_data['gene_functions'][gene.name]['molecular_functions'].append(target_node.name)
+                        elif edge.relation == 'GpCC':
+                            enriched_data['gene_functions'][gene.name]['cellular_components'].append(target_node.name)
+                        elif edge.relation == 'GpPW':
+                            enriched_data['gene_functions'][gene.name]['pathways'].append(target_node.name)
+                        elif edge.relation == 'DaG':
+                            enriched_data['gene_functions'][gene.name]['disease_associations'].append(target_node.name)
+        
+        # 3. ایجاد متن توصیفی زیستی
+        enriched_data['biological_context'] = self._create_biological_context(enriched_data, query)
+        
+        return enriched_data
     
     def _get_anatomy_significance(self, anatomy_name: str) -> str:
         """
-        تابع قدیمی - استفاده نمی‌شود
+        دریافت اهمیت زیستی بافت‌ها
         """
-        return ""
+        significance_map = {
+            'heart': 'عضله قلب، مسئول پمپاژ خون و عملکرد سیستم قلبی-عروقی',
+            'brain': 'مرکز کنترل سیستم عصبی، مسئول تفکر، حافظه و عملکردهای شناختی',
+            'liver': 'مرکز متابولیسم بدن، مسئول سم‌زدایی و تولید پروتئین‌های ضروری',
+            'kidney': 'تصفیه خون و تنظیم تعادل الکترولیت‌ها',
+            'lung': 'تبادل گازهای تنفسی و اکسیژن‌رسانی به بدن',
+            'muscle': 'حرکت و انقباض، تولید انرژی و حفظ وضعیت بدن',
+            'blood': 'انتقال مواد مغذی، اکسیژن و سلول‌های ایمنی',
+            'skin': 'محافظت از بدن، تنظیم دما و حس لمس'
+        }
+        return significance_map.get(anatomy_name.lower(), f'بافت {anatomy_name} با عملکردهای زیستی متعدد')
     
     def _create_biological_context(self, enriched_data: Dict, query: str) -> str:
         """
-        تابع قدیمی - استفاده نمی‌شود
+        ایجاد متن توصیفی زیستی بر اساس داده‌های غنی شده
         """
-        return ""
+        context_parts = []
+        
+        # تحلیل بافت‌های موجود
+        for tissue, info in enriched_data['tissue_specific_info'].items():
+            if info['genes_expressed'] or info['genes_upregulated'] or info['genes_downregulated']:
+                context_parts.append(f"**{tissue}:** {info['biological_significance']}")
+                
+                if info['genes_expressed']:
+                    context_parts.append(f"ژن‌های بیان شده: {', '.join(info['genes_expressed'][:5])}")
+                if info['genes_upregulated']:
+                    context_parts.append(f"ژن‌های تنظیم مثبت: {', '.join(info['genes_upregulated'][:3])}")
+                if info['genes_downregulated']:
+                    context_parts.append(f"ژن‌های تنظیم منفی: {', '.join(info['genes_downregulated'][:3])}")
+                context_parts.append("")
+        
+        # تحلیل عملکرد ژن‌ها
+        for gene, functions in enriched_data['gene_functions'].items():
+            if any(functions.values()):
+                context_parts.append(f"**{gene}:**")
+                if functions['biological_processes']:
+                    context_parts.append(f"فرآیندهای زیستی: {', '.join(functions['biological_processes'][:3])}")
+                if functions['pathways']:
+                    context_parts.append(f"مسیرهای زیستی: {', '.join(functions['pathways'][:3])}")
+                if functions['disease_associations']:
+                    context_parts.append(f"ارتباط با بیماری‌ها: {', '.join(functions['disease_associations'][:3])}")
+                context_parts.append("")
+        
+        return "\n".join(context_parts) if context_parts else "اطلاعات زیستی محدودی در دسترس است."
     
     def _create_enhanced_context_text(self, retrieval_result: RetrievalResult) -> str:
         """
-        تابع قدیمی تولید متن زمینه بهبود یافته - استفاده نمی‌شود
-        برای استفاده از سیستم جدید، از EnhancedContextGenerator استفاده کنید
+        ایجاد متن زمینه خلاصه و کاربردی با بهبودهای جدید
         """
-        return "برای استفاده از سیستم بهبود یافته، از IntegratedGraphRAGService استفاده کنید"
+        # استفاده از روش جدید بازیابی هدفمند
+        intent = self.analyze_question_intent(retrieval_result.query)
+        retrieval_data = self._targeted_retrieval_for_question(retrieval_result.query, intent)
+        
+        # ایجاد متن ساختاریافته خلاصه
+        structured_text = self._create_structured_text_for_model(retrieval_data, retrieval_result.query)
+        
+        # اضافه کردن اطلاعات آماری کوتاه
+        context_parts = []
+        context_parts.append("📊 **آمار بازیابی:**")
+        context_parts.append(f"• نودها: {len(retrieval_result.nodes)}, روابط: {len(retrieval_result.edges)}")
+        context_parts.append(f"• ژن‌های اصلی: {len(retrieval_data.get('primary_genes', []))}")
+        context_parts.append(f"• بیماری‌های مرتبط: {len(retrieval_data.get('diseases', []))}")
+        context_parts.append(f"• داروهای مرتبط: {len(retrieval_data.get('drugs', []))}")
+        context_parts.append("")
+        
+        # اضافه کردن متن ساختاریافته
+        context_parts.append("🧬 **داده‌های کلیدی:**")
+        context_parts.append(structured_text)
+        
+        # اضافه کردن تحلیل نوع سوال
+        context_parts.append("")
+        context_parts.append("🎯 **تحلیل نوع سوال:**")
+        question_type = intent.get('question_type', 'general')
+        context_parts.append(f"• نوع سوال: {question_type}")
+        context_parts.append(f"• موجودیت‌های کلیدی: {', '.join(intent.get('entities', []))}")
+        context_parts.append(f"• روابط هدف: {', '.join(intent.get('metaedges', []))}")
+        
+        # اضافه کردن دستورالعمل هوشمند
+        context_parts.append("")
+        context_parts.append("💡 **دستورالعمل هوشمند:**")
+        context_parts.append("بر اساس داده‌های ارائه شده و تحلیل نوع سوال،")
+        context_parts.append("پاسخ جامع و تخصصی ارائه دهید که شامل:")
+        context_parts.append("• تحلیل روابط معنادار")
+        context_parts.append("• استنتاجات زیستی")
+        context_parts.append("• اهمیت بالینی")
+        context_parts.append("• کاربردهای عملی")
+        
+        return "\n".join(context_parts)
 
     def _create_advanced_context_text(self, retrieval_result: RetrievalResult) -> str:
         """
-        تابع قدیمی تولید متن زمینه پیشرفته - استفاده نمی‌شود
+        ایجاد متن زمینه پیشرفته با تحلیل عمیق و استنتاجات زیستی
         """
-        return "برای استفاده از سیستم بهبود یافته، از IntegratedGraphRAGService استفاده کنید"
+        nodes = retrieval_result.nodes
+        edges = retrieval_result.edges
+        paths = retrieval_result.paths
+        query = retrieval_result.query
+        
+        context_parts = []
+        
+        # 1. مقدمه پیشرفته
+        context_parts.append(f"🧠 **متن زمینه پیشرفته برای سوال:** {query}")
+        context_parts.append("")
+        context_parts.append("🔬 **تحلیل عمیق داده‌های گراف:**")
+        context_parts.append("این متن شامل تحلیل عمیق، استنتاجات زیستی و روابط معنادار است.")
+        context_parts.append("")
+        
+        # 2. تحلیل آماری پیشرفته
+        context_parts.append("📊 **تحلیل آماری پیشرفته:**")
+        context_parts.append(f"• نودهای بازیابی شده: {len(nodes)}")
+        context_parts.append(f"• یال‌های بازیابی شده: {len(edges)}")
+        context_parts.append(f"• مسیرهای بازیابی شده: {len(paths)}")
+        
+        # محاسبه تراکم روابط
+        if nodes and edges:
+            avg_connections = len(edges) / len(nodes)
+            context_parts.append(f"• تراکم متوسط روابط: {avg_connections:.2f} یال به ازای هر نود")
+        
+        # 3. تحلیل نوع‌شناسی نودها
+        if nodes:
+            context_parts.append("")
+            context_parts.append("🏷️ **تحلیل نوع‌شناسی نودها:**")
+            node_kinds = {}
+            for node in nodes:
+                if node.kind not in node_kinds:
+                    node_kinds[node.kind] = []
+                node_kinds[node.kind].append(node.name)
+            
+            for kind, names in node_kinds.items():
+                context_parts.append(f"• {kind}: {len(names)} نود ({', '.join(names[:3])})")
+                if len(names) > 3:
+                    context_parts.append(f"  و {len(names) - 3} نود دیگر")
+        
+        # 4. تحلیل روابط معنادار
+        if edges:
+            context_parts.append("")
+            context_parts.append("🔗 **تحلیل روابط معنادار:**")
+            edge_analysis = {}
+            for edge in edges:
+                if edge.relation not in edge_analysis:
+                    edge_analysis[edge.relation] = 0
+                edge_analysis[edge.relation] += 1
+            
+            # مرتب‌سازی بر اساس فراوانی
+            sorted_relations = sorted(edge_analysis.items(), key=lambda x: x[1], reverse=True)
+            for relation, count in sorted_relations[:5]:  # 5 رابطه برتر
+                context_parts.append(f"• {relation}: {count} رابطه (رابطه غالب)")
+        
+        # 5. تحلیل مسیرهای زیستی
+        if paths:
+            context_parts.append("")
+            context_parts.append("🛤️ **تحلیل مسیرهای زیستی:**")
+            context_parts.append("مسیرهای شناسایی شده نشان‌دهنده روابط پیچیده زیستی هستند:")
+            
+            for i, path in enumerate(paths[:3]):
+                path_length = len(path)
+                context_parts.append(f"• مسیر {i+1}: {path_length} گام زیستی")
+                context_parts.append(f"  مسیر: {' → '.join(path)}")
+        
+        # 6. استنتاجات زیستی
+        context_parts.append("")
+        context_parts.append("🧬 **استنتاجات زیستی:**")
+        
+        # تشخیص نوع سوال و استنتاج مناسب
+        query_lower = query.lower()
+        if any(word in query_lower for word in ["gene", "express", "protein"]):
+            context_parts.append("• سوال مربوط به بیان ژن و عملکرد پروتئین‌ها")
+            context_parts.append("• تمرکز بر روابط AeG, AuG, AdG و GpBP")
+        elif any(word in query_lower for word in ["disease", "cancer", "disorder"]):
+            context_parts.append("• سوال مربوط به بیماری‌ها و مکانیسم‌های پاتولوژیک")
+            context_parts.append("• تمرکز بر روابط DaG, DuG, DdG و DlA")
+        elif any(word in query_lower for word in ["drug", "treatment", "therapy"]):
+            context_parts.append("• سوال مربوط به درمان و داروها")
+            context_parts.append("• تمرکز بر روابط CtD, CuG, CdG")
+        elif any(word in query_lower for word in ["tissue", "anatomy", "organ"]):
+            context_parts.append("• سوال مربوط به بافت‌ها و آناتومی")
+            context_parts.append("• تمرکز بر روابط AeG, AuG, AdG")
+        else:
+            context_parts.append("• سوال عمومی - تحلیل جامع تمام روابط")
+        
+        # 7. دستورالعمل هوشمند
+        context_parts.append("")
+        context_parts.append("🎯 **دستورالعمل هوشمند:**")
+        context_parts.append("بر اساس تحلیل عمیق داده‌های گراف و استنتاجات زیستی،")
+        context_parts.append("پاسخ جامع و تخصصی ارائه دهید که شامل:")
+        context_parts.append("• تحلیل روابط معنادار")
+        context_parts.append("• استنتاجات زیستی")
+        context_parts.append("• اهمیت بالینی")
+        context_parts.append("• کاربردهای عملی")
+        
+        return "\n".join(context_parts)
 
     def _targeted_retrieval_for_question(self, query: str, intent: Dict) -> Dict[str, Any]:
         """
@@ -2921,7 +2774,7 @@ class GraphRAGService:
         context_parts = []
         
         # 1. سوال اصلی
-        context_parts.append(f"**Query:** {query}")
+        context_parts.append(f"🧬 **Query:** {query}")
         context_parts.append("")
         
         # 2. خلاصه آماری دقیق
@@ -2930,7 +2783,7 @@ class GraphRAGService:
         secondary_genes = len(retrieval_data['secondary_genes'])
         total_found = primary_genes + secondary_genes
         
-        context_parts.append("**Graph Summary:**")
+        context_parts.append("📊 **Graph Summary:**")
         context_parts.append(f"• Total genes in Hetionet: {total_genes_in_graph:,}")
         context_parts.append(f"• Genes found for this query: {total_found}")
         context_parts.append(f"• Primary genes (direct relationships): {primary_genes}")
@@ -2972,7 +2825,7 @@ class GraphRAGService:
         
         # 3. ژن‌های کلیدی با اطلاعات غنی (حداکثر 3 ژن)
         if retrieval_data['primary_genes']:
-            context_parts.append("**Key Results:**")
+            context_parts.append("🔍 **Key Results:**")
             context_parts.append("The following genes were identified:")
             context_parts.append("")
             
@@ -3002,35 +2855,35 @@ class GraphRAGService:
         
         # 4. فرآیندهای زیستی مرتبط
         if retrieval_data['biological_processes']:
-            context_parts.append("**Related Biological Processes:**")
+            context_parts.append("⚙️ **Related Biological Processes:**")
             for process in retrieval_data['biological_processes'][:3]:
                 context_parts.append(f"• {process['name']}")
             context_parts.append("")
         
         # 5. مسیرهای زیستی مرتبط
         if retrieval_data['pathways']:
-            context_parts.append("**Related Pathways:**")
+            context_parts.append("🛤️ **Related Pathways:**")
             for pathway in retrieval_data['pathways'][:3]:
                 context_parts.append(f"• {pathway['name']}")
             context_parts.append("")
         
         # 6. بیماری‌های مرتبط
         if retrieval_data['diseases']:
-            context_parts.append("**Related Diseases:**")
+            context_parts.append("🏥 **Related Diseases:**")
             for disease in retrieval_data['diseases'][:3]:
                 context_parts.append(f"• {disease['name']}")
             context_parts.append("")
         
         # 7. داروهای مرتبط
         if retrieval_data['drugs']:
-            context_parts.append("**Related Drugs/Compounds:**")
+            context_parts.append("💊 **Related Drugs/Compounds:**")
             for drug in retrieval_data['drugs'][:3]:
                 context_parts.append(f"• {drug['name']}")
             context_parts.append("")
         
         # 8. مسیرهای ترکیبی بیماری→بافت→ژن (برای سوالات مربوط به اثر بیماری بر بافت‌ها)
         if retrieval_data.get('tissue_disease_paths'):
-            context_parts.append("**Disease-Tissue-Gene Pathways:**")
+            context_parts.append("🔄 **Disease-Tissue-Gene Pathways:**")
             context_parts.append("The following pathways show how diseases affect specific tissues and their genes:")
             context_parts.append("")
             
@@ -3045,7 +2898,7 @@ class GraphRAGService:
         
         # 9. مسیرهای درمانی دارو→بیماری→ژن (برای سوالات مربوط به درمان)
         if retrieval_data.get('treatment_paths'):
-            context_parts.append("**Treatment-Disease-Gene Pathways:**")
+            context_parts.append("💊 **Treatment-Disease-Gene Pathways:**")
             context_parts.append("The following pathways show how drugs treat diseases by regulating genes:")
             context_parts.append("")
             
@@ -3060,28 +2913,26 @@ class GraphRAGService:
                 context_parts.append("")
         
         # 10. دستورالعمل کوتاه و کاربردی
-        context_parts.append("**Instructions:** Analyze biological relevance and clinical importance of these genes.")
+        context_parts.append("📌 **Instructions:** Analyze biological relevance and clinical importance of these genes.")
         
-        # حذف ایموجی‌ها از متن نهایی
-        final_text = "\n".join(context_parts)
-        return remove_emojis(final_text)
+        return "\n".join(context_parts)
     
     def test_targeted_retrieval(self, query: str) -> Dict[str, Any]:
         """
         تست بازیابی هدفمند و نمایش نتایج
         """
-        print(f"تست بازیابی هدفمند برای سوال: {query}")
+        print(f"🧪 تست بازیابی هدفمند برای سوال: {query}")
         print("=" * 60)
         
         # تحلیل سوال
         intent = self.analyze_question_intent(query)
-        print(f"نوع سوال تشخیص داده شده: {intent.get('question_type', 'unknown')}")
+        print(f"📋 نوع سوال تشخیص داده شده: {intent.get('question_type', 'unknown')}")
         
         # بازیابی هدفمند
         retrieval_data = self._targeted_retrieval_for_question(query, intent)
         
         # نمایش نتایج
-        print(f"\nنتایج بازیابی:")
+        print(f"\n📊 نتایج بازیابی:")
         print(f"• ژن‌های اصلی: {len(retrieval_data['primary_genes'])}")
         print(f"• ژن‌های ثانویه: {len(retrieval_data['secondary_genes'])}")
         print(f"• فرآیندهای زیستی: {len(retrieval_data['biological_processes'])}")
@@ -3092,7 +2943,7 @@ class GraphRAGService:
         
         # نمایش ژن‌های اصلی با جزئیات
         if retrieval_data['primary_genes']:
-            print(f"\nژن‌های اصلی یافت شده:")
+            print(f"\n🧬 ژن‌های اصلی یافت شده:")
             for i, gene in enumerate(retrieval_data['primary_genes'][:5], 1):
                 print(f"{i}. {gene['name']} ({gene['metaedge']}) - امتیاز: {gene['score']:.2f}")
                 
@@ -3239,53 +3090,53 @@ class GraphRAGService:
                 answer = "متأسفانه مدل انتخاب شده در دسترس نیست."
                 confidence = 0.0
         else:  # INTELLIGENT
-            # استفاده از روش‌های هوشمند و تخصصی (همان روش‌های عادی با متن زمینه هوشمند)
+            # استفاده از روش‌های هوشمند و تخصصی
             if model == GenerationModel.GENERAL_SIMPLE:
-                answer = self.general_simple_generation(retrieval_result)
+                answer = self.general_simple_generation_intelligent(retrieval_result)
                 confidence = 0.85
             elif model == GenerationModel.SIMPLE:
-                answer = self.simple_template_generation(retrieval_result)
+                answer = self.simple_template_generation_intelligent(retrieval_result)
                 confidence = 0.8
             elif model == GenerationModel.GPT_SIMULATION:
-                answer = self.gpt_simulation_generation(retrieval_result)
+                answer = self.gpt_simulation_generation_intelligent(retrieval_result)
                 confidence = 0.9
             elif model == GenerationModel.CUSTOM:
-                answer = self.custom_generation(retrieval_result)
+                answer = self.custom_generation_intelligent(retrieval_result)
                 confidence = 0.95
             elif model == GenerationModel.HUGGINGFACE:
-                answer = self.huggingface_generation(retrieval_result)
+                answer = self.huggingface_generation_intelligent(retrieval_result)
                 confidence = 0.92
             # OpenAI GPT Models (Intelligent)
             elif model in [GenerationModel.OPENAI_GPT_4O, GenerationModel.OPENAI_GPT_4O_MINI, 
                           GenerationModel.OPENAI_GPT_4_TURBO, GenerationModel.OPENAI_GPT_4,
                           GenerationModel.OPENAI_GPT_3_5_TURBO, GenerationModel.OPENAI_GPT_3_5_TURBO_16K,
                           GenerationModel.OPENAI_GPT]:  # سازگاری با مدل قدیمی
-                answer = self.openai_gpt_generation(retrieval_result, model)
+                answer = self.openai_gpt_generation_intelligent(retrieval_result, model)
                 confidence = 0.97
             # Anthropic Claude Models (Intelligent)
             elif model in [GenerationModel.ANTHROPIC_CLAUDE_3_5_SONNET, GenerationModel.ANTHROPIC_CLAUDE_3_5_HAIKU,
                           GenerationModel.ANTHROPIC_CLAUDE_3_OPUS, GenerationModel.ANTHROPIC_CLAUDE_3_SONNET,
                           GenerationModel.ANTHROPIC_CLAUDE_3_HAIKU, GenerationModel.ANTHROPIC_CLAUDE]:  # سازگاری
-                answer = self.anthropic_claude_generation(retrieval_result, model)
+                answer = self.anthropic_claude_generation_intelligent(retrieval_result, model)
                 confidence = 0.96
             # Google Gemini Models (Intelligent)
             elif model in [GenerationModel.GOOGLE_GEMINI_1_5_PRO, GenerationModel.GOOGLE_GEMINI_1_5_FLASH,
                           GenerationModel.GOOGLE_GEMINI_1_0_PRO, GenerationModel.GOOGLE_GEMINI_1_0_FLASH,
                           GenerationModel.GOOGLE_GEMINI]:  # سازگاری
-                answer = self.google_gemini_generation(retrieval_result, model)
+                answer = self.google_gemini_generation_intelligent(retrieval_result, model)
                 confidence = 0.95
             # سایر مدل‌های پیشرفته (Intelligent)
             elif model == GenerationModel.META_LLAMA_3_1:
-                answer = self.meta_llama_generation(retrieval_result)
+                answer = self.meta_llama_generation_intelligent(retrieval_result)
                 confidence = 0.93
             elif model == GenerationModel.MISTRAL_AI:
-                answer = self.mistral_ai_generation(retrieval_result)
+                answer = self.mistral_ai_generation_intelligent(retrieval_result)
                 confidence = 0.92
             elif model == GenerationModel.COHERE_COMMAND:
-                answer = self.cohere_command_generation(retrieval_result)
+                answer = self.cohere_command_generation_intelligent(retrieval_result)
                 confidence = 0.91
             elif model == GenerationModel.PERPLEXITY_SONAR:
-                answer = self.perplexity_sonar_generation(retrieval_result)
+                answer = self.perplexity_sonar_generation_intelligent(retrieval_result)
                 confidence = 0.90
             else:
                 answer = "متأسفانه مدل انتخاب شده در دسترس نیست."
@@ -3369,136 +3220,248 @@ class GraphRAGService:
             return self._generate_general_structured_answer(retrieval_result)
 
     def _create_simple_context_text(self, retrieval_result: RetrievalResult) -> str:
-        """ایجاد متن زمینه ساده و عمومی"""
+        """
+        ایجاد متن زمینه ساده بهینه شده که به طور صریح از نودها، یال‌ها و مسیرهای بازیابی شده استفاده می‌کند
+        """
         nodes = retrieval_result.nodes
         edges = retrieval_result.edges
+        paths = retrieval_result.paths
         query = retrieval_result.query
-        
-        if not nodes:
-            return "اطلاعات کافی یافت نشد."
-        
-        # گروه‌بندی نودها بر اساس نوع
-        gene_nodes = [n for n in nodes if n.kind == 'Gene']
-        disease_nodes = [n for n in nodes if n.kind == 'Disease']
-        drug_nodes = [n for n in nodes if n.kind == 'Drug']
-        anatomy_nodes = [n for n in nodes if n.kind == 'Anatomy']
         
         context_parts = []
         
-        if gene_nodes:
-            gene_names = [n.name for n in gene_nodes]
-            context_parts.append(f"ژن‌های مرتبط: {', '.join(gene_names)}")
+        # 1. مقدمه و توضیح روش بازیابی
+        context_parts.append(f"📋 **متن زمینه ساده برای سوال:** {query}")
+        context_parts.append("")
+        context_parts.append("🔍 **اطلاعات بازیابی شده از گراف دانش:**")
+        context_parts.append(f"• تعداد نودهای بازیابی شده: {len(nodes)}")
+        context_parts.append(f"• تعداد یال‌های بازیابی شده: {len(edges)}")
+        context_parts.append(f"• تعداد مسیرهای بازیابی شده: {len(paths)}")
+        context_parts.append("")
         
-        if disease_nodes:
-            disease_names = [n.name for n in disease_nodes]
-            context_parts.append(f"بیماری‌های مرتبط: {', '.join(disease_names)}")
+        # 2. نودهای بازیابی شده
+        if nodes:
+            context_parts.append("📍 **نودهای بازیابی شده:**")
+            # دسته‌بندی نودها بر اساس نوع
+            node_types = {}
+            for node in nodes:
+                if node.kind not in node_types:
+                    node_types[node.kind] = []
+                node_types[node.kind].append(node.name)
+            
+            for node_type, node_names in node_types.items():
+                context_parts.append(f"• {node_type}: {', '.join(node_names[:5])}")  # حداکثر 5 نود
+                if len(node_names) > 5:
+                    context_parts.append(f"  (و {len(node_names) - 5} نود دیگر)")
+            context_parts.append("")
         
-        if drug_nodes:
-            drug_names = [n.name for n in drug_nodes]
-            context_parts.append(f"داروهای مرتبط: {', '.join(drug_names)}")
-        
-        if anatomy_nodes:
-            anatomy_names = [n.name for n in anatomy_nodes]
-            context_parts.append(f"بافت‌های مرتبط: {', '.join(anatomy_names)}")
-        
-        # اضافه کردن یال‌های مهم
+        # 3. یال‌های بازیابی شده (روابط)
         if edges:
-            important_edges = edges[:5]  # حداکثر 5 یال
-            edge_descriptions = []
-            for edge in important_edges:
-                edge_descriptions.append(f"{edge.source} → {edge.target} ({edge.relation})")
-            if edge_descriptions:
-                context_parts.append(f"رابطه‌های مهم: {'; '.join(edge_descriptions)}")
+            context_parts.append("🔗 **یال‌های بازیابی شده (روابط):**")
+            # دسته‌بندی یال‌ها بر اساس نوع رابطه
+            edge_types = {}
+            for edge in edges:
+                if edge.relation not in edge_types:
+                    edge_types[edge.relation] = []
+                edge_types[edge.relation].append(f"{edge.source} → {edge.target}")
+            
+            for relation, connections in edge_types.items():
+                context_parts.append(f"• {relation}: {len(connections)} رابطه")
+                # نمایش چند نمونه
+                for connection in connections[:3]:
+                    context_parts.append(f"  - {connection}")
+                if len(connections) > 3:
+                    context_parts.append(f"  (و {len(connections) - 3} رابطه دیگر)")
+            context_parts.append("")
         
-        context_text = "\n".join(context_parts) if context_parts else "اطلاعات کافی یافت نشد."
-        return remove_emojis(context_text)
+        # 4. مسیرهای بازیابی شده
+        if paths:
+            context_parts.append("🛤️ **مسیرهای بازیابی شده:**")
+            for i, path in enumerate(paths[:3]):  # حداکثر 3 مسیر
+                path_str = " → ".join(path)
+                context_parts.append(f"• مسیر {i+1}: {path_str}")
+            if len(paths) > 3:
+                context_parts.append(f"• (و {len(paths) - 3} مسیر دیگر)")
+            context_parts.append("")
+        
+        # 5. دستورالعمل استفاده از اطلاعات
+        context_parts.append("📌 **دستورالعمل:**")
+        context_parts.append("بر اساس نودها، یال‌ها و مسیرهای بازیابی شده از گراف و روابطشان،")
+        context_parts.append("اگر به سوال ربط داشت از آن‌ها استفاده کن و به این سوال پاسخ بده.")
+        context_parts.append("")
+        
+        # 6. خلاصه آماری
+        context_parts.append("📊 **خلاصه آماری:**")
+        context_parts.append(f"• کل عناصر بازیابی شده: {len(nodes) + len(edges) + len(paths)}")
+        context_parts.append(f"• انواع مختلف نودها: {len(set(node.kind for node in nodes))}")
+        context_parts.append(f"• انواع مختلف روابط: {len(set(edge.relation for edge in edges))}")
+        
+        return "\n".join(context_parts)
 
     def _create_scientific_analytical_context(self, retrieval_result: RetrievalResult) -> str:
-        """ایجاد متن زمینه علمی-تحلیلی (تحقیقاتی)"""
+        """
+        ایجاد متن زمینه علمی-تحلیلی (تحقیقاتی)
+        مناسب برای مدل‌هایی که پاسخ‌های تحلیلی و دقیق می‌دهند
+        """
         nodes = retrieval_result.nodes
         edges = retrieval_result.edges
+        paths = retrieval_result.paths
         query = retrieval_result.query
-        
-        if not nodes:
-            return "اطلاعات کافی برای تحلیل علمی یافت نشد."
-        
-        # تحلیل علمی پیشرفته
-        gene_nodes = [n for n in nodes if n.kind == 'Gene']
-        disease_nodes = [n for n in nodes if n.kind == 'Disease']
         
         context_parts = []
         
-        if gene_nodes and disease_nodes:
-            context_parts.append("تحلیل علمی رابطه ژن-بیماری:")
-            for gene in gene_nodes[:3]:  # حداکثر 3 ژن
-                for disease in disease_nodes[:3]:  # حداکثر 3 بیماری
-                    context_parts.append(f"• ژن {gene.name} با بیماری {disease.name} مرتبط است")
+        # 1. مقدمه علمی
+        context_parts.append(f"🔬 **تحلیل علمی-تحقیقاتی برای سوال:** {query}")
+        context_parts.append("")
         
-        # تحلیل یال‌ها
+        # 2. استخراج مسیر اصلی
+        if paths:
+            main_path = paths[0] if paths else []
+            if len(main_path) >= 2:
+                context_parts.append("📊 **مسیر بازیابی شده از Hetionet:**")
+                context_parts.append("")
+                
+                # ساخت مسیر به شکل علمی
+                path_elements = []
+                for i, node in enumerate(main_path):
+                    if i < len(main_path) - 1:
+                        # پیدا کردن رابطه بین این نود و نود بعدی
+                        relation = "→"
+                        for edge in edges:
+                            if edge.source == node and edge.target == main_path[i + 1]:
+                                relation = edge.relation
+                                break
+                        path_elements.append(f"[{node}]")
+                        path_elements.append(f"    ↓ {relation}")
+                    else:
+                        path_elements.append(f"[{node}]")
+                
+                context_parts.append("\n".join(path_elements))
+                context_parts.append("")
+        
+        # 3. تحلیل علمی
+        context_parts.append("🧬 **تحلیل علمی:**")
+        context_parts.append("بر اساس گراف دانش Hetionet، این مسیر نشان می‌دهد که:")
+        context_parts.append("")
+        
         if edges:
-            context_parts.append("\nتحلیل روابط:")
-            for edge in edges[:5]:
-                context_parts.append(f"• {edge.source} {edge.relation} {edge.target}")
+            edge_analysis = {}
+            for edge in edges:
+                if edge.relation not in edge_analysis:
+                    edge_analysis[edge.relation] = []
+                edge_analysis[edge.relation].append(f"{edge.source} → {edge.target}")
+            
+            for relation, connections in edge_analysis.items():
+                context_parts.append(f"• {relation}: {len(connections)} رابطه")
+                for connection in connections[:2]:
+                    context_parts.append(f"  - {connection}")
+            context_parts.append("")
         
-        context_text = "\n".join(context_parts) if context_parts else "اطلاعات کافی برای تحلیل علمی یافت نشد."
-        return remove_emojis(context_text)
+        # 4. استنتاج علمی
+        context_parts.append("💡 **استنتاج علمی:**")
+        context_parts.append("با توجه به این روابط، می‌توان ارتباطات زیستی معناداری را استنتاج کرد.")
+        context_parts.append("")
+        
+        # 5. دستورالعمل علمی
+        context_parts.append("📋 **دستورالعمل:**")
+        context_parts.append("بر اساس داده‌های ارائه شده، تحلیل دقیق و علمی ارائه دهید.")
+        context_parts.append("تمرکز بر مکانیسم‌های زیستی و ارتباطات معنادار باشد.")
+        
+        return "\n".join(context_parts)
 
     def _create_narrative_context(self, retrieval_result: RetrievalResult) -> str:
-        """ایجاد متن زمینه روایی (ساده و توصیفی)"""
+        """
+        ایجاد متن زمینه روایی (ساده و توصیفی)
+        برای مدل‌هایی که با زبان ساده‌تر بهتر نتیجه می‌دهند
+        """
         nodes = retrieval_result.nodes
         edges = retrieval_result.edges
+        paths = retrieval_result.paths
         query = retrieval_result.query
         
-        if not nodes:
-            return "اطلاعات کافی برای توصیف یافت نشد."
+        context_parts = []
         
-        # ایجاد داستان روایی
-        gene_nodes = [n for n in nodes if n.kind == 'Gene']
-        disease_nodes = [n for n in nodes if n.kind == 'Disease']
-        drug_nodes = [n for n in nodes if n.kind == 'Drug']
+        # 1. مقدمه روایی
+        context_parts.append(f"📖 **داستان زیستی برای سوال:** {query}")
+        context_parts.append("")
         
-        narrative_parts = []
+        # 2. استخراج مسیر اصلی
+        if paths:
+            main_path = paths[0] if paths else []
+            if len(main_path) >= 2:
+                context_parts.append("در Hetionet، این داستان زیستی شناسایی شده است:")
+                context_parts.append("")
+                
+                # ساخت داستان ساده
+                path_elements = []
+                for i, node in enumerate(main_path):
+                    if i < len(main_path) - 1:
+                        # پیدا کردن رابطه بین این نود و نود بعدی
+                        relation = "→"
+                        for edge in edges:
+                            if edge.source == node and edge.target == main_path[i + 1]:
+                                relation = edge.relation
+                                break
+                        path_elements.append(f"{node}")
+                        path_elements.append(f"    ↓ {relation}")
+                    else:
+                        path_elements.append(f"{node}")
+                
+                context_parts.append("\n".join(path_elements))
+                context_parts.append("")
         
-        if gene_nodes and disease_nodes:
-            gene_names = [n.name for n in gene_nodes[:2]]
-            disease_names = [n.name for n in disease_nodes[:2]]
-            narrative_parts.append(f"ژن‌های {', '.join(gene_names)} در ارتباط با بیماری‌های {', '.join(disease_names)} هستند.")
+        # 3. توضیح ساده
+        context_parts.append("💡 **توضیح ساده:**")
+        context_parts.append("این روابط نشان می‌دهد که چگونه عناصر زیستی با هم در ارتباط هستند.")
+        context_parts.append("")
         
-        if drug_nodes:
-            drug_names = [n.name for n in drug_nodes[:2]]
-            narrative_parts.append(f"داروهای {', '.join(drug_names)} برای درمان این بیماری‌ها استفاده می‌شوند.")
+        # 4. دستورالعمل ساده
+        context_parts.append("📝 **دستورالعمل:**")
+        context_parts.append("داستان زیستی را به زبان ساده و قابل فهم توضیح دهید.")
         
-        if edges:
-            narrative_parts.append("این روابط نشان‌دهنده شبکه پیچیده‌ای از تعاملات زیستی است.")
-        
-        context_text = " ".join(narrative_parts) if narrative_parts else "اطلاعات کافی برای توصیف یافت نشد."
-        return remove_emojis(context_text)
+        return "\n".join(context_parts)
 
     def _create_data_driven_context(self, retrieval_result: RetrievalResult) -> str:
-        """ایجاد متن زمینه داده‌محور (رابطه‌ها به صورت لیست)"""
+        """
+        ایجاد متن زمینه داده‌محور (رابطه‌ها به صورت لیست)
+        برای مدل‌هایی که با ساختارهای روشن و فکت‌محور بهتر کار می‌کنند
+        """
         nodes = retrieval_result.nodes
         edges = retrieval_result.edges
+        paths = retrieval_result.paths
         query = retrieval_result.query
         
-        if not nodes and not edges:
-            return "داده‌ای یافت نشد."
+        context_parts = []
         
-        data_parts = []
+        # 1. مقدمه داده‌محور
+        context_parts.append(f"📊 **داده‌های گراف برای سوال:** {query}")
+        context_parts.append("")
+        context_parts.append("**فکت‌های استخراج شده از Hetionet:**")
+        context_parts.append("")
         
-        # لیست نودها
-        if nodes:
-            data_parts.append("موجودیت‌های یافت شده:")
-            for node in nodes:
-                data_parts.append(f"• {node.name} ({node.kind})")
-        
-        # لیست یال‌ها
+        # 2. لیست فکت‌ها
         if edges:
-            data_parts.append("\nرابطه‌های یافت شده:")
-            for edge in edges:
-                data_parts.append(f"• {edge.source} → {edge.target} ({edge.relation})")
+            context_parts.append("🔗 **روابط شناسایی شده:**")
+        from node_lookup_system import NodeLookupSystem
+        lookup = NodeLookupSystem()
+        for edge in edges[:10]:
+            source_info = lookup.get_node_info(edge.source)
+            target_info = lookup.get_node_info(edge.target)
+            source_display = f"{source_info.name} ({source_info.kind})" if source_info else edge.source
+            target_display = f"{target_info.name} ({target_info.kind})" if target_info else edge.target
+            relation = edge.relation
+            context_parts.append(f"• {source_display} --[{relation}]--> {target_display}")
         
-        context_text = "\n".join(data_parts) if data_parts else "داده‌ای یافت نشد."
-        return remove_emojis(context_text)
+        # 3. استنتاج داده‌محور
+        context_parts.append("💡 **استنتاج:**")
+        context_parts.append("این روابط نشان می‌دهد که ارتباطات معناداری بین عناصر زیستی وجود دارد.")
+        context_parts.append("")
+        
+        # 4. دستورالعمل داده‌محور
+        context_parts.append("📋 **دستورالعمل:**")
+        context_parts.append("بر اساس فکت‌های ارائه شده، پاسخ دقیق و مبتنی بر داده ارائه دهید.")
+        
+        return "\n".join(context_parts)
 
     def _create_step_by_step_context(self, retrieval_result: RetrievalResult) -> str:
         """
@@ -3513,13 +3476,13 @@ class GraphRAGService:
         context_parts = []
         
         # 1. مقدمه استدلالی
-        context_parts.append(f"**استدلال گام به گام برای سوال:** {query}")
+        context_parts.append(f"🧠 **استدلال گام به گام برای سوال:** {query}")
         context_parts.append("")
         context_parts.append("برای پاسخ به این سوال، مراحل زیر را دنبال می‌کنیم:")
         context_parts.append("")
         
         # 2. گام‌های استدلال
-        context_parts.append("**مراحل استدلال:**")
+        context_parts.append("📝 **مراحل استدلال:**")
         
         if paths:
             main_path = paths[0] if paths else []
@@ -3551,17 +3514,15 @@ class GraphRAGService:
                 context_parts.append("")
         
         # 3. استنتاج منطقی
-        context_parts.append("**استنتاج منطقی:**")
+        context_parts.append("💡 **استنتاج منطقی:**")
         context_parts.append("بر اساس این مسیر، می‌توانیم ارتباطات زیستی را درک کنیم.")
         context_parts.append("")
         
         # 4. دستورالعمل استدلالی
-        context_parts.append("**دستورالعمل:**")
+        context_parts.append("🎯 **دستورالعمل:**")
         context_parts.append("مراحل استدلال را دنبال کرده و پاسخ منطقی ارائه دهید.")
         
-        # حذف ایموجی‌ها از متن نهایی
-        final_text = "\n".join(context_parts)
-        return remove_emojis(final_text)
+        return "\n".join(context_parts)
 
     def _create_compact_direct_context(self, retrieval_result: RetrievalResult) -> str:
         """
@@ -3576,14 +3537,14 @@ class GraphRAGService:
         context_parts = []
         
         # 1. مقدمه فشرده
-        context_parts.append(f"**اطلاعات فشرده برای:** {query}")
+        context_parts.append(f"⚡ **اطلاعات فشرده برای:** {query}")
         context_parts.append("")
         
         # 2. مسیر مستقیم
         if paths:
             main_path = paths[0] if paths else []
             if len(main_path) >= 2:
-                context_parts.append("**مسیر کلیدی:**")
+                context_parts.append("🛤️ **مسیر کلیدی:**")
                 from node_lookup_system import NodeLookupSystem
                 lookup = NodeLookupSystem()
                 path_elements = []
@@ -3596,11 +3557,9 @@ class GraphRAGService:
                 context_parts.append("")
         
         # 3. دستورالعمل فشرده
-        context_parts.append("**دستورالعمل:** پاسخ کوتاه و دقیق ارائه دهید.")
+        context_parts.append("📋 **دستورالعمل:** پاسخ کوتاه و دقیق ارائه دهید.")
         
-        # حذف ایموجی‌ها از متن نهایی
-        final_text = "\n".join(context_parts)
-        return remove_emojis(final_text)
+        return "\n".join(context_parts)
 
     def _create_biological_pathway_context(self, retrieval_result: RetrievalResult) -> str:
         """
@@ -3682,8 +3641,7 @@ class GraphRAGService:
         context_parts.append("• مسیرهای سیگنالینگ")
         context_parts.append("• اهمیت بالینی")
         
-        context_text = "\n".join(context_parts)
-        return remove_emojis(context_text)
+        return "\n".join(context_parts)
 
     def _create_clinical_relevance_context(self, retrieval_result: RetrievalResult) -> str:
         """
@@ -3734,8 +3692,7 @@ class GraphRAGService:
         context_parts.append("🎯 **دستورالعمل بالینی:**")
         context_parts.append("تحلیل بالینی و کاربردهای درمانی را بررسی کنید.")
         
-        context_text = "\n".join(context_parts)
-        return remove_emojis(context_text)
+        return "\n".join(context_parts)
 
     def _create_mechanistic_detailed_context(self, retrieval_result: RetrievalResult) -> str:
         """
@@ -3815,8 +3772,7 @@ class GraphRAGService:
         context_parts.append("• تعاملات پروتئین-پروتئین")
         context_parts.append("• اهمیت بالینی")
         
-        context_text = "\n".join(context_parts)
-        return remove_emojis(context_text)
+        return "\n".join(context_parts)
 
     def _create_intelligent_context_text(self, retrieval_result: RetrievalResult) -> str:
         """
@@ -3866,16 +3822,15 @@ class GraphRAGService:
                 node_kinds[node.kind].append(node.name)
             
             for kind, names in node_kinds.items():
-                context_parts.append(f"• {kind}: {len(names)} نود")
-                # نمایش تمام نودها
-                for i, name in enumerate(names):
-                    context_parts.append(f"  {i+1}. {name}")
+                context_parts.append(f"• {kind}: {len(names)} نود ({', '.join(names[:3])})")
+                if len(names) > 3:
+                    context_parts.append(f"  و {len(names) - 3} نود دیگر")
                 
                 # اضافه کردن توضیحات زیستی برای ژن‌های مهم
                 if kind == "Gene":
-                    for gene_name in names:
+                    for gene_name in names[:3]:  # حداکثر 3 ژن
                         if gene_name in BIOLOGICAL_ROLES:
-                            context_parts.append(f"    - {gene_name}: {BIOLOGICAL_ROLES[gene_name]}")
+                            context_parts.append(f"  - {gene_name}: {BIOLOGICAL_ROLES[gene_name]}")
         
         # 4. تحلیل روابط معنادار با توضیحات کامل
         if edges:
@@ -3973,8 +3928,7 @@ class GraphRAGService:
         context_parts.append("• اهمیت بالینی")
         context_parts.append("• کاربردهای عملی")
         
-        context_text = "\n".join(context_parts)
-        return remove_emojis(context_text)
+        return "\n".join(context_parts)
 
     def _identify_central_gene(self, nodes: List[GraphNode], query: str) -> Optional[str]:
         """
@@ -4092,7 +4046,131 @@ class GraphRAGService:
             return " ".join(inferences)
         return ""
 
-
+    def _create_enhanced_intelligent_context_text(self, retrieval_result: RetrievalResult) -> str:
+        """
+        ایجاد متن زمینه هوشمند کاملاً بهبود یافته با تحلیل عمیق و توصیفات علمی
+        """
+        nodes = retrieval_result.nodes
+        edges = retrieval_result.edges
+        paths = retrieval_result.paths
+        query = retrieval_result.query
+        
+        context_parts = []
+        
+        # 1. مقدمه علمی با تمرکز روی گره مرکزی
+        context_parts.append(f"🧬 **تحلیل علمی پیشرفته برای سوال:** {query}")
+        context_parts.append("")
+        
+        # شناسایی ژن مرکزی و نقش زیستی آن
+        central_gene = self._identify_central_gene(nodes, query)
+        if central_gene:
+            biological_role = BIOLOGICAL_ROLES.get(central_gene, "ژن مهم زیستی")
+            context_parts.append(f"🔬 **ژن مرکزی:** {central_gene}")
+            context_parts.append(f"**نقش زیستی:** {biological_role}")
+            context_parts.append("")
+        
+        # 2. خلاصه آماری با توضیحات
+        context_parts.append("📊 **خلاصه آماری:**")
+        context_parts.append(f"• تعداد نودهای بازیابی شده: {len(nodes)}")
+        context_parts.append(f"• تعداد یال‌های بازیابی شده: {len(edges)}")
+        context_parts.append(f"• تعداد مسیرهای بازیابی شده: {len(paths)}")
+        
+        if nodes and edges:
+            avg_connections = len(edges) / len(nodes)
+            context_parts.append(f"• تراکم متوسط روابط: {avg_connections:.2f} یال به ازای هر نود")
+        context_parts.append("")
+        
+        # 3. تحلیل نودها با توضیحات زیستی
+        if nodes:
+            context_parts.append("🏷️ **تحلیل نودها:**")
+            node_kinds = {}
+            for node in nodes:
+                if node.kind not in node_kinds:
+                    node_kinds[node.kind] = []
+                node_kinds[node.kind].append(node.name)
+            
+            for kind, names in node_kinds.items():
+                context_parts.append(f"• **{kind}:** {len(names)} نود")
+                context_parts.append(f"  نمونه‌ها: {', '.join(names[:3])}")
+                
+                # اضافه کردن توضیحات زیستی برای ژن‌های مهم
+                if kind == "Gene":
+                    important_genes = [name for name in names if name in BIOLOGICAL_ROLES]
+                    if important_genes:
+                        context_parts.append(f"  **ژن‌های مهم:**")
+                        for gene in important_genes[:3]:
+                            context_parts.append(f"    - {gene}: {BIOLOGICAL_ROLES[gene]}")
+                
+                # اضافه کردن توضیحات برای بیماری‌ها
+                elif kind == "Disease":
+                    for disease in names[:3]:
+                        disease_desc = DISEASE_SIGNIFICANCE.get(disease, disease)
+                        context_parts.append(f"    - {disease}: {disease_desc}")
+                
+                if len(names) > 3:
+                    context_parts.append(f"  و {len(names) - 3} نود دیگر")
+                context_parts.append("")
+        
+        # 4. تحلیل روابط با توضیحات کامل
+        if edges:
+            context_parts.append("🔗 **تحلیل روابط:**")
+            edge_analysis = {}
+            for edge in edges:
+                if edge.relation not in edge_analysis:
+                    edge_analysis[edge.relation] = []
+                edge_analysis[edge.relation].append(f"{edge.source} → {edge.target}")
+            
+            # مرتب‌سازی بر اساس فراوانی
+            sorted_relations = sorted(edge_analysis.items(), key=lambda x: len(x[1]), reverse=True)
+            for relation, connections in sorted_relations[:5]:
+                desc = METAEDGE_DESCRIPTIONS.get(relation, relation)
+                context_parts.append(f"• **{desc}** ({len(connections)} رابطه)")
+                
+                # نمایش نمونه‌ای از روابط
+                for connection in connections[:2]:
+                    context_parts.append(f"  - {connection}")
+                context_parts.append("")
+        
+        # 5. تحلیل مسیرها با توضیحات توصیفی
+        if paths:
+            context_parts.append("🛤️ **تحلیل مسیرها:**")
+            context_parts.append("مسیرهای زیستی شناسایی شده:")
+            context_parts.append("")
+            
+            for i, path in enumerate(paths[:3]):
+                path_length = len(path)
+                context_parts.append(f"**مسیر {i+1}** ({path_length} گام):")
+                context_parts.append(f"  {' → '.join(path)}")
+                
+                # تولید توضیح توصیفی برای مسیر
+                path_description = self._create_path_description(path, edges)
+                if path_description:
+                    context_parts.append(f"  **توضیح زیستی:** {path_description}")
+                context_parts.append("")
+        else:
+            context_parts.append("⚠️ **هشدار:** هیچ مسیر مستقیمی یافت نشد.")
+            context_parts.append("**علل احتمالی:**")
+            context_parts.append("• محدودیت عمق جستجو")
+            context_parts.append("• عدم وجود مسیر مستقیم در گراف")
+            context_parts.append("• نیاز به افزایش عمق جستجو")
+            context_parts.append("")
+        
+        # 6. استنتاج زیستی پیشرفته
+        biological_inference = self._create_biological_inference(nodes, edges, paths, query)
+        if biological_inference:
+            context_parts.append("🧬 **استنتاج زیستی:**")
+            context_parts.append(biological_inference)
+            context_parts.append("")
+        
+        # 7. دستورالعمل علمی
+        context_parts.append("🎯 **دستورالعمل علمی:**")
+        context_parts.append("بر اساس تحلیل عمیق داده‌های گراف، پاسخ جامع و تخصصی ارائه دهید که شامل:")
+        context_parts.append("• تحلیل روابط معنادار و مکانیسم‌های زیستی")
+        context_parts.append("• استنتاجات علمی بر اساس داده‌های موجود")
+        context_parts.append("• اهمیت بالینی و کاربردهای عملی")
+        context_parts.append("• محدودیت‌ها و پیشنهادات برای تحقیقات آینده")
+        
+        return "\n".join(context_parts)
 
     def simple_template_generation(self, retrieval_result: RetrievalResult) -> str:
         """تولید پاسخ ساده با قالب بهبود یافته"""
@@ -4148,7 +4226,7 @@ class GraphRAGService:
         
         for relation, edges in relations_by_type.items():
             answer_parts.append(f"\n📌 {relation.upper()} ({len(edges)} connections):")
-            for edge in edges:  # نمایش تمام روابط
+            for edge in edges[:5]:  # حداکثر 5 رابطه از هر نوع
                 source_name = next(n.name for n in retrieval_result.nodes if n.id == edge.source)
                 target_name = next(n.name for n in retrieval_result.nodes if n.id == edge.target)
                 answer_parts.append(f"  • {source_name} → {target_name}")
@@ -4169,7 +4247,7 @@ class GraphRAGService:
         treatment_edges = [e for e in retrieval_result.edges if 'treat' in e.relation.lower() or 'therapy' in e.relation.lower()]
         if treatment_edges:
             answer_parts.append(f"\n✅ TREATMENT RELATIONSHIPS ({len(treatment_edges)} found):")
-            for edge in treatment_edges:
+            for edge in treatment_edges[:10]:
                 source_name = next(n.name for n in retrieval_result.nodes if n.id == edge.source)
                 target_name = next(n.name for n in retrieval_result.nodes if n.id == edge.target)
                 answer_parts.append(f"  • {source_name} treats {target_name}")
@@ -4177,13 +4255,13 @@ class GraphRAGService:
         # داروهای یافت شده
         if drug_nodes:
             answer_parts.append(f"\n💊 DRUGS FOUND ({len(drug_nodes)}):")
-            for drug in drug_nodes:
+            for drug in drug_nodes[:10]:
                 answer_parts.append(f"  • {drug.name}")
         
         # بیماری‌های یافت شده
         if disease_nodes:
             answer_parts.append(f"\n🏥 DISEASES FOUND ({len(disease_nodes)}):")
-            for disease in disease_nodes:
+            for disease in disease_nodes[:10]:
                 answer_parts.append(f"  • {disease.name}")
         
         return "\n".join(answer_parts)
@@ -4200,20 +4278,20 @@ class GraphRAGService:
         
         # ژن‌های یافت شده
         answer_parts.append(f"\n🧬 GENES FOUND ({len(gene_nodes)}):")
-        for gene in gene_nodes:
+        for gene in gene_nodes[:10]:
             answer_parts.append(f"  • {gene.name}")
         
         # فرآیندهای زیستی مرتبط
         if process_nodes:
             answer_parts.append(f"\n⚙️ BIOLOGICAL PROCESSES ({len(process_nodes)}):")
-            for process in process_nodes:
+            for process in process_nodes[:10]:
                 answer_parts.append(f"  • {process.name}")
         
         # روابط ژن-فرآیند
         gene_process_edges = [e for e in retrieval_result.edges if 'participate' in e.relation.lower() or 'regulate' in e.relation.lower()]
         if gene_process_edges:
             answer_parts.append(f"\n🔗 GENE-PROCESS RELATIONSHIPS ({len(gene_process_edges)}):")
-            for edge in gene_process_edges:
+            for edge in gene_process_edges[:10]:
                 source_name = next(n.name for n in retrieval_result.nodes if n.id == edge.source)
                 target_name = next(n.name for n in retrieval_result.nodes if n.id == edge.target)
                 answer_parts.append(f"  • {source_name} → {target_name}")
@@ -4233,19 +4311,19 @@ class GraphRAGService:
         
         # بیماری‌های یافت شده
         answer_parts.append(f"\n🏥 DISEASES FOUND ({len(disease_nodes)}):")
-        for disease in disease_nodes:
+        for disease in disease_nodes[:10]:
             answer_parts.append(f"  • {disease.name}")
         
         # ژن‌های مرتبط
         if gene_nodes:
             answer_parts.append(f"\n🧬 ASSOCIATED GENES ({len(gene_nodes)}):")
-            for gene in gene_nodes:
+            for gene in gene_nodes[:10]:
                 answer_parts.append(f"  • {gene.name}")
         
         # علائم مرتبط
         if symptom_nodes:
             answer_parts.append(f"\n🤒 ASSOCIATED SYMPTOMS ({len(symptom_nodes)}):")
-            for symptom in symptom_nodes:
+            for symptom in symptom_nodes[:10]:
                 answer_parts.append(f"  • {symptom.name}")
         
         return "\n".join(answer_parts)
@@ -4262,20 +4340,20 @@ class GraphRAGService:
         
         # اندام‌های یافت شده
         answer_parts.append(f"\n🫀 ANATOMICAL STRUCTURES ({len(anatomy_nodes)}):")
-        for anatomy in anatomy_nodes:
+        for anatomy in anatomy_nodes[:10]:
             answer_parts.append(f"  • {anatomy.name}")
         
         # ژن‌های بیان شده
         if gene_nodes:
             answer_parts.append(f"\n🧬 EXPRESSED GENES ({len(gene_nodes)}):")
-            for gene in gene_nodes:
+            for gene in gene_nodes[:10]:
                 answer_parts.append(f"  • {gene.name}")
         
         # روابط بیان
         expression_edges = [e for e in retrieval_result.edges if 'express' in e.relation.lower()]
         if expression_edges:
             answer_parts.append(f"\n🔗 EXPRESSION RELATIONSHIPS ({len(expression_edges)}):")
-            for edge in expression_edges:
+            for edge in expression_edges[:10]:
                 source_name = next(n.name for n in retrieval_result.nodes if n.id == edge.source)
                 target_name = next(n.name for n in retrieval_result.nodes if n.id == edge.target)
                 answer_parts.append(f"  • {source_name} expresses {target_name}")
@@ -4298,13 +4376,13 @@ class GraphRAGService:
         
         for kind, nodes in nodes_by_type.items():
             answer_parts.append(f"\n🔹 {kind.upper()} ({len(nodes)} entities):")
-            for node in nodes:
+            for node in nodes[:5]:
                 answer_parts.append(f"  • {node.name}")
         
         # روابط مهم
         if retrieval_result.edges:
             answer_parts.append(f"\n🔗 KEY RELATIONSHIPS ({len(retrieval_result.edges)}):")
-            for edge in retrieval_result.edges:
+            for edge in retrieval_result.edges[:10]:
                 source_name = next(n.name for n in retrieval_result.nodes if n.id == edge.source)
                 target_name = next(n.name for n in retrieval_result.nodes if n.id == edge.target)
                 answer_parts.append(f"  • {source_name} → {target_name} ({edge.relation})")
@@ -4360,9 +4438,9 @@ class GraphRAGService:
         
         # نمایش مهم‌ترین روابط
         answer_parts.append("**روابط مهم یافت شده:**\n")
-        for relation, edges in sorted(important_relations.items(), key=lambda x: len(x[1]), reverse=True):
+        for relation, edges in sorted(important_relations.items(), key=lambda x: len(x[1]), reverse=True)[:3]:
             answer_parts.append(f"• **{relation}** ({len(edges)} رابطه):")
-            for edge in edges:
+            for edge in edges[:3]:
                 source_name = next(n.name for n in retrieval_result.nodes if n.id == edge.source)
                 target_name = next(n.name for n in retrieval_result.nodes if n.id == edge.target)
                 answer_parts.append(f"  - {source_name} → {target_name}")
@@ -4382,14 +4460,14 @@ class GraphRAGService:
         
         if drug_nodes:
             answer_parts.append("**داروهای یافت شده:**")
-            for drug in drug_nodes:
+            for drug in drug_nodes[:5]:
                 score_info = f" (امتیاز: {drug.score:.2f})" if hasattr(drug, 'score') and drug.score != 1.0 else ""
                 answer_parts.append(f"• {drug.name}{score_info}")
             answer_parts.append("")
         
         if disease_nodes:
             answer_parts.append("**بیماری‌های مرتبط:**")
-            for disease in disease_nodes:
+            for disease in disease_nodes[:5]:
                 answer_parts.append(f"• {disease.name}")
             answer_parts.append("")
         
@@ -6061,6 +6139,84 @@ class GraphRAGService:
     # روش‌های تولید متن هوشمند
     # ========================================
     
+    def general_simple_generation_intelligent(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ ساده و عمومی هوشمند"""
+        query = retrieval_result.query
+        context = retrieval_result.context_text
+        
+        # ایجاد متن زمینه هوشمند پیشرفته
+        intelligent_context = self._create_intelligent_context_text(retrieval_result)
+        
+        # تحلیل عمیق‌تر سوال
+        query_lower = query.lower()
+        
+        # تشخیص نوع سوال با دقت بیشتر
+        if any(word in query_lower for word in ["relationship", "interact", "connect", "link"]):
+            return self._generate_intelligent_relationship_answer(retrieval_result, [], [], [])
+        elif any(word in query_lower for word in ["drug", "medicine", "treatment", "therapy", "compound"]):
+            return self._generate_intelligent_drug_answer(retrieval_result, [], [])
+        elif any(word in query_lower for word in ["gene", "protein", "express", "regulate"]):
+            return self._generate_intelligent_gene_answer(retrieval_result, [], [])
+        elif any(word in query_lower for word in ["disease", "disorder", "condition", "cancer"]):
+            return self._generate_intelligent_disease_answer(retrieval_result, [], [])
+        elif any(word in query_lower for word in ["tissue", "organ", "anatomy", "heart", "brain"]):
+            return self._generate_intelligent_anatomy_answer(retrieval_result, [], [])
+        else:
+            return self._generate_intelligent_general_answer(retrieval_result, [], [], [], [], [])
+    
+    def simple_template_generation_intelligent(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ با قالب هوشمند"""
+        query_lower = retrieval_result.query.lower()
+        
+        # ایجاد متن زمینه هوشمند پیشرفته
+        intelligent_context = self._create_intelligent_context_text(retrieval_result)
+        
+        # تحلیل پیشرفته نوع سوال
+        if "relationship" in query_lower or "interact" in query_lower:
+            return self._generate_intelligent_relationship_answer(retrieval_result, [], [], [])
+        elif "drug" in query_lower or "treatment" in query_lower:
+            return self._generate_intelligent_drug_answer(retrieval_result, [], [])
+        elif "gene" in query_lower or "express" in query_lower:
+            return self._generate_intelligent_gene_answer(retrieval_result, [], [])
+        elif "disease" in query_lower or "cancer" in query_lower:
+            return self._generate_intelligent_disease_answer(retrieval_result, [], [])
+        elif "tissue" in query_lower or "anatomy" in query_lower:
+            return self._generate_intelligent_anatomy_answer(retrieval_result, [], [])
+        else:
+            return self._generate_intelligent_general_answer(retrieval_result, [], [], [], [], [])
+    
+    def gpt_simulation_generation_intelligent(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ شبیه‌سازی GPT هوشمند"""
+        # استفاده از روش‌های هوشمند موجود
+        return self.gpt_simulation_generation(retrieval_result)
+    
+    def custom_generation_intelligent(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ سفارشی هوشمند"""
+        # استفاده از روش‌های هوشمند موجود
+        return self.custom_generation(retrieval_result)
+    
+    def huggingface_generation_intelligent(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ HuggingFace هوشمند"""
+        # استفاده از روش‌های هوشمند موجود
+        return self.huggingface_generation(retrieval_result)
+    
+    def openai_gpt_generation_intelligent(self, retrieval_result: RetrievalResult, model: GenerationModel = None) -> str:
+        """تولید پاسخ OpenAI GPT هوشمند"""
+        # استفاده از روش‌های هوشمند موجود
+        return self.openai_gpt_generation(retrieval_result, model)
+    
+    def anthropic_claude_generation_intelligent(self, retrieval_result: RetrievalResult, model: GenerationModel = None) -> str:
+        """تولید پاسخ Anthropic Claude هوشمند"""
+        # استفاده از روش‌های هوشمند موجود
+        return self.anthropic_claude_generation(retrieval_result, model)
+    
+    def google_gemini_generation_intelligent(self, retrieval_result: RetrievalResult, model: GenerationModel = None) -> str:
+        """تولید پاسخ Google Gemini هوشمند"""
+        # استفاده از روش‌های هوشمند موجود
+        return self.google_gemini_generation(retrieval_result, model)
+
+ 
+    
     def meta_llama_generation(self, retrieval_result: RetrievalResult) -> str:
         """تولید پاسخ با Meta Llama 3.1 (محلی)"""
         try:
@@ -6097,6 +6253,22 @@ class GraphRAGService:
         except Exception as e:
             print(f"خطا در Perplexity Sonar: {e}")
             return self._fallback_generation(retrieval_result, "Perplexity Sonar")
+    
+    def meta_llama_generation_intelligent(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ Meta Llama 3.1 هوشمند"""
+        return self.meta_llama_generation(retrieval_result)
+    
+    def mistral_ai_generation_intelligent(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ Mistral AI هوشمند"""
+        return self.mistral_ai_generation(retrieval_result)
+    
+    def cohere_command_generation_intelligent(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ Cohere Command هوشمند"""
+        return self.cohere_command_generation(retrieval_result)
+    
+    def perplexity_sonar_generation_intelligent(self, retrieval_result: RetrievalResult) -> str:
+        """تولید پاسخ Perplexity Sonar هوشمند"""
+        return self.perplexity_sonar_generation(retrieval_result)
 
 # نمونه استفاده
 if __name__ == "__main__":

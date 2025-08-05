@@ -1,4 +1,4 @@
-include README.md
+ضinclude README.md
 include LICENSE
 include CONTRIBUTING.md
 include requirements.txt
