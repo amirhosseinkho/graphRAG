@@ -479,7 +479,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 
                 <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; font-size: 0.9rem; color: #6c757d;">
-                    <strong>نکته:</strong> این تحلیل توسط ${modelName} انجام شده و صرفاً جنبه راهنمایی دارد. برای تصمیم‌گیری نهایی، عوامل دیگری مانند سرعت، هزینه، و نیازهای خاص پروژه نیز باید در نظر گرفته شوند.
+                    <strong>نکته:</strong> این تحلیل توسط ${modelName} انجام شده و صرفاً جنبه راهنمایی دارد. <strong>سیستم به طور ویژه بر عملی بودن و تخصصی بودن محتوا تأکید می‌کند</strong>. برای تصمیم‌گیری نهایی، عوامل دیگری مانند سرعت، هزینه، و نیازهای خاص پروژه نیز باید در نظر گرفته شوند.
                 </div>
             </div>
         `;
@@ -491,11 +491,105 @@ document.addEventListener('DOMContentLoaded', function() {
     function getComparisonTypeText(type) {
         const types = {
             'comprehensive': 'مقایسه جامع',
+            'practical_specialized': 'تمرکز بر عملی بودن و تخصصی بودن',
             'accuracy': 'تمرکز بر دقت',
             'completeness': 'تمرکز بر جامعیت',
             'clarity': 'تمرکز بر وضوح',
             'relevance': 'تمرکز بر مرتبط بودن'
         };
         return types[type] || 'مقایسه';
+    }
+
+    // تابع برای نمایش/مخفی کردن تنظیمات پیشرفته
+    function toggleAdvancedSettings(settingsId) {
+        const settingsElement = document.getElementById(settingsId);
+        if (settingsElement.style.display === 'none' || settingsElement.style.display === '') {
+            settingsElement.style.display = 'block';
+            // تغییر متن دکمه
+            const button = event.target;
+            button.innerHTML = '<i class="fas fa-eye-slash"></i> مخفی کردن تنظیمات';
+        } else {
+            settingsElement.style.display = 'none';
+            // تغییر متن دکمه
+            const button = event.target;
+            button.innerHTML = '<i class="fas fa-cog"></i> تنظیمات پیشرفته';
+        }
+    }
+    
+    // تعریف تابع به صورت global برای استفاده در HTML
+    window.toggleAdvancedSettings = toggleAdvancedSettings;
+
+    // تابع برای جمع‌آوری تنظیمات پیشرفته
+    function getAdvancedSettings(answerBoxNumber) {
+        const prefix = answerBoxNumber === 1 ? '1' : '2';
+        return {
+            max_nodes: parseInt(document.getElementById(`max_nodes${prefix}`).value) || 20,
+            max_edges: parseInt(document.getElementById(`max_edges${prefix}`).value) || 40,
+            similarity_threshold: parseFloat(document.getElementById(`similarity_threshold${prefix}`).value) || 0.3,
+            community_detection_method: document.getElementById(`community_detection_method${prefix}`).value,
+            advanced_retrieval_algorithm: document.getElementById(`advanced_retrieval_algorithm${prefix}`).value,
+            advanced_token_extraction_method: document.getElementById(`advanced_token_extraction_method${prefix}`).value
+        };
+    }
+
+    // بهبود تابع generateAnswer برای استفاده از تنظیمات پیشرفته
+    function generateAnswer(answerBoxNumber) {
+        const query = queryInput.value;
+        if (!query.trim()) {
+            showError('لطفاً ابتدا سوال را وارد کنید');
+            return;
+        }
+
+        const textarea = answerBoxNumber === 1 ? answer1Textarea : answer2Textarea;
+        const tokenExtractionMethod = answerBoxNumber === 1 ? tokenExtractionMethod1Select.value : tokenExtractionMethod2Select.value;
+        const tokenExtractionModel = answerBoxNumber === 1 ? tokenExtractionModel1Select.value : tokenExtractionModel2Select.value;
+        const retrievalMethod = answerBoxNumber === 1 ? retrievalMethod1Select.value : retrievalMethod2Select.value;
+        const generationModel = answerBoxNumber === 1 ? generationModel1Select.value : generationModel2Select.value;
+        const maxDepth = answerBoxNumber === 1 ? maxDepth1Input.value : maxDepth2Input.value;
+        const textGenerationType = textGenerationTypeSelect.value;
+        
+        // اضافه کردن تنظیمات پیشرفته
+        const advancedSettings = getAdvancedSettings(answerBoxNumber);
+
+        // Show loading state
+        textarea.value = 'در حال تولید پاسخ...';
+        textarea.style.color = '#7f8c8d';
+
+        // Call API to generate answer
+        fetch('/api/process_query', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                query: query,
+                token_extraction_method: tokenExtractionMethod,
+                token_extraction_model: tokenExtractionModel,
+                retrieval_method: retrievalMethod,
+                generation_model: generationModel,
+                max_depth: parseInt(maxDepth),
+                text_generation_type: textGenerationType,
+                // اضافه کردن تنظیمات پیشرفته
+                max_nodes: advancedSettings.max_nodes,
+                max_edges: advancedSettings.max_edges,
+                similarity_threshold: advancedSettings.similarity_threshold,
+                community_detection_method: advancedSettings.community_detection_method,
+                advanced_retrieval_algorithm: advancedSettings.advanced_retrieval_algorithm,
+                advanced_token_extraction_method: advancedSettings.advanced_token_extraction_method
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                textarea.value = data.result.answer || 'پاسخ تولید شد اما متن خالی است';
+            } else {
+                textarea.value = `خطا در تولید پاسخ: ${data.error}`;
+            }
+            textarea.style.color = '#2c3e50';
+        })
+        .catch(error => {
+            textarea.value = `خطا در ارتباط با سرور: ${error.message}`;
+            textarea.style.color = '#e74c3c';
+        });
     }
 }); 

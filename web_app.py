@@ -264,9 +264,28 @@ def process_query():
         text_generation_type = data.get('text_generation_type', 'INTELLIGENT')
         max_depth = data.get('max_depth', 2)
         
+        # تنظیمات پیشرفته (اختیاری)
+        max_nodes = data.get('max_nodes', 20)
+        max_edges = data.get('max_edges', 40)
+        similarity_threshold = data.get('similarity_threshold', 0.3)
+        community_detection_method = data.get('community_detection_method', 'louvain')
+        advanced_retrieval_algorithm = data.get('advanced_retrieval_algorithm', 'hybrid')
+        advanced_token_extraction_method = data.get('advanced_token_extraction_method', 'llm_based')
+        
         # تبدیل رشته به enum
         retrieval_enum = RetrievalMethod[retrieval_method]
         generation_enum = GenerationModel[generation_model.replace(' ', '_')]
+        
+        # تنظیم پیکربندی پیشرفته اگر ارائه شده باشد
+        if any([max_nodes != 20, max_edges != 40, similarity_threshold != 0.3]):
+            graphrag_service.set_config(
+                max_nodes=max_nodes,
+                max_edges=max_edges,
+                similarity_threshold=similarity_threshold,
+                community_detection_method=community_detection_method,
+                advanced_retrieval_algorithm=advanced_retrieval_algorithm,
+                advanced_token_extraction_method=advanced_token_extraction_method
+            )
         
         # پردازش سوال
         result = graphrag_service.process_query(
@@ -277,8 +296,16 @@ def process_query():
             max_depth=max_depth
         )
         
-        # اضافه کردن timestamp
+        # اضافه کردن timestamp و تنظیمات استفاده شده
         result['timestamp'] = datetime.now().isoformat()
+        result['advanced_settings'] = {
+            'max_nodes': max_nodes,
+            'max_edges': max_edges,
+            'similarity_threshold': similarity_threshold,
+            'community_detection_method': community_detection_method,
+            'advanced_retrieval_algorithm': advanced_retrieval_algorithm,
+            'advanced_token_extraction_method': advanced_token_extraction_method
+        }
         
         return jsonify({
             'success': True,
@@ -787,7 +814,7 @@ def compare_with_gpt():
             response = openai.chat.completions.create(
                 model=gpt_model,
                 messages=[
-                    {"role": "system", "content": "شما یک متخصص ارزیابی کیفیت متن هستید. وظیفه شما مقایسه دو متن و ارائه تحلیل دقیق و منصفانه است."},
+                    {"role": "system", "content": "شما یک متخصص ارزیابی کیفیت متن در حوزه زیست‌پزشکی، ژنتیک و پزشکی شخصی هستید. وظیفه شما مقایسه دو متن از نظر سطح علمی، ساختار تحلیلی، عمق مفهومی و کاربردپذیری بالینی است.\n\nپاسخی که دارای ویژگی‌های زیر باشد، باید امتیاز بالاتری بگیرد:\n- تحلیل دقیق مسیرهای زیستی و سیگنالینگ \n- اشاره به ژن‌های خاص با نقش بالینی \n- پیوند واضح بین عملکرد ژن و بیماری\n- توضیح در مورد کاربردهای درمانی یا تشخیصی (مانند داروهای هدفمند، بیومارکرها، مهارکننده‌ها)\n- ساختار تحلیلی منظم شامل بخش‌بندی (مثلاً: اهمیت زیستی، اهمیت بالینی، کاربردها، نتیجه‌گیری)\n\nدر مقابل، پاسخ‌هایی که فقط اطلاعات کلی، عمومی یا غیرتحلیلی می‌دهند یا صرفاً فهرستی از اسامی هستند، باید امتیاز کمتری بگیرند.\n\nارزیابی باید دقیق، تحلیلی و با تمرکز بر کیفیت علمی، عمق محتوا و ارزش کاربردی انجام شود. هدف انتخاب پاسخی است که بیشترین ارزش را برای پژوهشگر یا متخصص حوزه زیست‌پزشکی داشته باشد."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.3,
@@ -813,6 +840,7 @@ def create_gpt_comparison_prompt(text1, text2, label1, label2, comparison_type):
     
     comparison_focus = {
         'comprehensive': 'کیفیت کلی، دقت، جامعیت، وضوح، و مرتبط بودن',
+        'practical_specialized': 'عملی بودن، تخصصی بودن، و کاربردی بودن محتوا',
         'accuracy': 'دقت و صحت اطلاعات ارائه شده',
         'completeness': 'جامعیت و کامل بودن پاسخ',
         'clarity': 'وضوح و قابل فهم بودن متن',
@@ -822,7 +850,7 @@ def create_gpt_comparison_prompt(text1, text2, label1, label2, comparison_type):
     focus = comparison_focus.get(comparison_type, comparison_focus['comprehensive'])
     
     prompt = f"""
-لطفاً دو متن زیر را مقایسه کنید و تحلیل دقیقی ارائه دهید:
+لطفاً دو متن زیر را مقایسه کنید و تحلیل دقیقی ارائه دهید. توجه ویژه به عملی بودن و تخصصی بودن محتوا داشته باشید:
 
 **متن اول ({label1}):**
 {text1}
@@ -832,34 +860,41 @@ def create_gpt_comparison_prompt(text1, text2, label1, label2, comparison_type):
 
 **نوع مقایسه:** {focus}
 
+**معیارهای ارزیابی مهم:**
+1. **عملی بودن**: متن باید اطلاعات کاربردی و قابل استفاده ارائه دهد
+2. **تخصصی بودن**: استفاده از اصطلاحات تخصصی و مفاهیم دقیق علمی
+3. **دقت علمی**: صحت اطلاعات و استناد به مفاهیم علمی
+4. **جامعیت**: پوشش کامل جنبه‌های مختلف موضوع
+5. **وضوح**: قابل فهم بودن برای مخاطب تخصصی
+
 لطفاً تحلیل خود را در قالب زیر ارائه دهید:
 
 **خلاصه مقایسه:**
-[یک خلاصه کوتاه از تفاوت‌های اصلی]
+[یک خلاصه کوتاه از تفاوت‌های اصلی با تمرکز بر عملی بودن و تخصصی بودن]
 
 **امتیازدهی (از 0 تا 100):**
 {label1}: [امتیاز]/100
 {label2}: [امتیاز]/100
 
 **توضیح امتیازدهی:**
-[توضیح دلیل امتیازدهی]
+[توضیح دلیل امتیازدهی با تأکید بر عملی بودن و تخصصی بودن محتوا]
 
 **نقاط قوت {label1}:**
-[لیست نقاط قوت]
+[لیست نقاط قوت با تمرکز بر جنبه‌های عملی و تخصصی]
 
 **نقاط قوت {label2}:**
-[لیست نقاط قوت]
+[لیست نقاط قوت با تمرکز بر جنبه‌های عملی و تخصصی]
 
 **نقاط ضعف {label1}:**
-[لیست نقاط ضعف]
+[لیست نقاط ضعف از نظر عملی بودن و تخصصی بودن]
 
 **نقاط ضعف {label2}:**
-[لیست نقاط ضعف]
+[لیست نقاط ضعف از نظر عملی بودن و تخصصی بودن]
 
 **توصیه نهایی:**
-[توصیه کدام روش بهتر است و چرا]
+[توصیه کدام روش بهتر است با تأکید بر عملی بودن و تخصصی بودن]
 
-لطفاً تحلیل خود را به فارسی ارائه دهید و صادقانه و منصفانه قضاوت کنید.
+**نکته مهم**: در ارزیابی، به متن‌هایی که اطلاعات عملی‌تر، تخصصی‌تر و کاربردی‌تری ارائه می‌دهند امتیاز بالاتری بدهید. متن‌های سطحی و عمومی امتیاز کمتری دریافت کنند.
 """
     
     return prompt

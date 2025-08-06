@@ -71,6 +71,148 @@
                     <p>دو پاسخ مختلف را با روش‌های متفاوت تولید کنید</p>
                 </div>
                 
+                <!-- راهنمای روش‌های بازیابی -->
+                <div class="guide-section retrieval-guide">
+                    <div class="guide-header">
+                        <div class="guide-icon">
+                            <i class="fas fa-search"></i>
+                        </div>
+                        <div class="guide-title">
+                            <h4>راهنمای روش‌های بازیابی</h4>
+                            <p>انتخاب بهترین روش بر اساس نوع سوال شما</p>
+                        </div>
+                    </div>
+                    
+                    <div class="guide-content">
+                        <div class="guide-grid">
+                            <div class="guide-card">
+                                <div class="card-header">
+                                    <i class="fas fa-check-circle"></i>
+                                    <h5>روش‌های مناسب برای سوالات تک نودی</h5>
+                                </div>
+                                <div class="card-content">
+                                    <div class="method-item">
+                                        <span class="method-name">BFS</span>
+                                        <span class="method-desc">جستجوی سطح اول - مناسب برای همه سوالات</span>
+                                    </div>
+                                    <div class="method-item">
+                                        <span class="method-name">DFS</span>
+                                        <span class="method-desc">جستجوی عمیق اول - مناسب برای همه سوالات</span>
+                                    </div>
+                                    <div class="method-item">
+                                        <span class="method-name">NEIGHBORS</span>
+                                        <span class="method-desc">همسایه‌های مستقیم - سریع و ساده</span>
+                                    </div>
+                                    <div class="method-item">
+                                        <span class="method-name">INTELLIGENT</span>
+                                        <span class="method-desc">جستجوی هوشمند - بهترین کیفیت</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="guide-card">
+                                <div class="card-header">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    <h5>روش‌های نیازمند چند نود</h5>
+                                </div>
+                                <div class="card-content">
+                                    <div class="method-item">
+                                        <span class="method-name">SHORTEST_PATH</span>
+                                        <span class="method-desc">نیاز به حداقل 2 نود - در صورت عدم یافتن، از BFS استفاده می‌کند</span>
+                                    </div>
+                                    <div class="method-item">
+                                        <span class="method-name">HYBRID</span>
+                                        <span class="method-desc">نیاز به حداقل 2 نود - در صورت عدم یافتن، از BFS استفاده می‌کند</span>
+                                    </div>
+                                    <div class="method-item">
+                                        <span class="method-name">MULTI_METHOD</span>
+                                        <span class="method-desc">ترکیب چند روش - با یک نود نیز کار می‌کند</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="guide-note">
+                            <div class="note-icon">
+                                <i class="fas fa-lightbulb"></i>
+                            </div>
+                            <div class="note-content">
+                                <strong>نکته مهم:</strong> اگر مسیر پیدا نمی‌شود، احتمالاً به دلیل عدم یافتن نودهای کافی در سوال است. 
+                                سوالات دقیق‌تر با نام‌های ژن‌ها، بیماری‌ها یا داروها نتایج بهتری می‌دهند.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- راهنمای تنظیمات پیشرفته -->
+                <div class="guide-section advanced-guide">
+                    <div class="guide-header">
+                        <div class="guide-icon">
+                            <i class="fas fa-cog"></i>
+                        </div>
+                        <div class="guide-title">
+                            <h4>راهنمای تنظیمات پیشرفته</h4>
+                            <p>تنظیمات تخصصی برای کاربران پیشرفته</p>
+                        </div>
+                    </div>
+                    
+                    <div class="guide-content">
+                        <div class="guide-grid">
+                            <div class="guide-card">
+                                <div class="card-header">
+                                    <i class="fas fa-sliders-h"></i>
+                                    <h5>تنظیمات بازیابی</h5>
+                                </div>
+                                <div class="card-content">
+                                    <div class="setting-item">
+                                        <span class="setting-name">حداکثر نودها</span>
+                                        <span class="setting-desc">تعداد نودهای بازیابی شده (پیش‌فرض: 20)</span>
+                                    </div>
+                                    <div class="setting-item">
+                                        <span class="setting-name">حداکثر یال‌ها</span>
+                                        <span class="setting-desc">تعداد یال‌های بازیابی شده (پیش‌فرض: 40)</span>
+                                    </div>
+                                    <div class="setting-item">
+                                        <span class="setting-name">آستانه شباهت</span>
+                                        <span class="setting-desc">حداقل شباهت برای بازیابی (پیش‌فرض: 0.3)</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="guide-card">
+                                <div class="card-header">
+                                    <i class="fas fa-robot"></i>
+                                    <h5>الگوریتم‌های پیشرفته</h5>
+                                </div>
+                                <div class="card-content">
+                                    <div class="setting-item">
+                                        <span class="setting-name">تشخیص جامعه</span>
+                                        <span class="setting-desc">روش تشخیص گروه‌های مرتبط</span>
+                                    </div>
+                                    <div class="setting-item">
+                                        <span class="setting-name">الگوریتم بازیابی</span>
+                                        <span class="setting-desc">روش پیشرفته بازیابی اطلاعات</span>
+                                    </div>
+                                    <div class="setting-item">
+                                        <span class="setting-name">استخراج توکن</span>
+                                        <span class="setting-desc">روش استخراج کلمات کلیدی</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="guide-note">
+                            <div class="note-icon">
+                                <i class="fas fa-info-circle"></i>
+                            </div>
+                            <div class="note-content">
+                                <strong>توصیه:</strong> تنظیمات پیشرفته برای کاربران متخصص طراحی شده است. 
+                                برای شروع، از تنظیمات پیش‌فرض استفاده کنید.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
                 <div class="answers-grid">
                     <!-- Answer Box 1 -->
                     <div class="answer-box">
@@ -157,6 +299,66 @@
                                     <option value="auto">تولید خودکار</option>
                                     <option value="manual">تایپ دستی</option>
                                 </select>
+                            </div>
+                            
+                            <!-- تنظیمات پیشرفته برای پاسخ اول -->
+                            <div class="advanced-settings-toggle">
+                                <button type="button" class="btn btn-sm btn-outline-info" onclick="toggleAdvancedSettings('advanced-settings1')">
+                                    <i class="fas fa-cog"></i> تنظیمات پیشرفته
+                                </button>
+                            </div>
+                            
+                            <div id="advanced-settings1" class="advanced-settings" style="display: none;">
+                                <h5><i class="fas fa-rocket"></i> تنظیمات پیشرفته پاسخ اول</h5>
+                                <div class="advanced-settings-grid">
+                                    <div class="method-selector">
+                                        <label><i class="fas fa-layer-group"></i> حداکثر نودها:</label>
+                                        <input type="number" id="max_nodes1" min="1" max="100" value="20">
+                                    </div>
+                                    
+                                    <div class="method-selector">
+                                        <label><i class="fas fa-link"></i> حداکثر یال‌ها:</label>
+                                        <input type="number" id="max_edges1" min="1" max="200" value="40">
+                                    </div>
+                                    
+                                    <div class="method-selector">
+                                        <label><i class="fas fa-percentage"></i> آستانه شباهت:</label>
+                                        <input type="number" id="similarity_threshold1" min="0" max="1" step="0.1" value="0.3">
+                                    </div>
+                                    
+                                    <div class="method-selector">
+                                        <label><i class="fas fa-users"></i> روش تشخیص جامعه:</label>
+                                        <select id="community_detection_method1">
+                                            <option value="louvain" selected>Louvain</option>
+                                            <option value="label_propagation">Label Propagation</option>
+                                            <option value="girvan_newman">Girvan-Newman</option>
+                                            <option value="spectral">Spectral</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="method-selector">
+                                        <label><i class="fas fa-search-plus"></i> الگوریتم بازیابی پیشرفته:</label>
+                                        <select id="advanced_retrieval_algorithm1">
+                                            <option value="bfs">BFS (جستجوی سطح اول)</option>
+                                            <option value="dfs">DFS (جستجوی عمیق اول)</option>
+                                            <option value="pagerank">PageRank</option>
+                                            <option value="community_detection">تشخیص جامعه</option>
+                                            <option value="semantic_similarity">شباهت معنایی</option>
+                                            <option value="n_hop">N-Hop</option>
+                                            <option value="hybrid" selected>ترکیبی</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="method-selector">
+                                        <label><i class="fas fa-tags"></i> روش استخراج توکن پیشرفته:</label>
+                                        <select id="advanced_token_extraction_method1">
+                                            <option value="llm_based">بر اساس LLM</option>
+                                            <option value="rule_based">بر اساس قوانین</option>
+                                            <option value="hybrid">ترکیبی</option>
+                                            <option value="semantic">معنایی</option>
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         
@@ -250,6 +452,66 @@
                                     <option value="auto">تولید خودکار</option>
                                     <option value="manual">تایپ دستی</option>
                                 </select>
+                            </div>
+                            
+                            <!-- تنظیمات پیشرفته برای پاسخ دوم -->
+                            <div class="advanced-settings-toggle">
+                                <button type="button" class="btn btn-sm btn-outline-info" onclick="toggleAdvancedSettings('advanced-settings2')">
+                                    <i class="fas fa-cog"></i> تنظیمات پیشرفته
+                                </button>
+                            </div>
+                            
+                            <div id="advanced-settings2" class="advanced-settings" style="display: none;">
+                                <h5><i class="fas fa-rocket"></i> تنظیمات پیشرفته پاسخ دوم</h5>
+                                <div class="advanced-settings-grid">
+                                    <div class="method-selector">
+                                        <label><i class="fas fa-layer-group"></i> حداکثر نودها:</label>
+                                        <input type="number" id="max_nodes2" min="1" max="100" value="20">
+                                    </div>
+                                    
+                                    <div class="method-selector">
+                                        <label><i class="fas fa-link"></i> حداکثر یال‌ها:</label>
+                                        <input type="number" id="max_edges2" min="1" max="200" value="40">
+                                    </div>
+                                    
+                                    <div class="method-selector">
+                                        <label><i class="fas fa-percentage"></i> آستانه شباهت:</label>
+                                        <input type="number" id="similarity_threshold2" min="0" max="1" step="0.1" value="0.3">
+                                    </div>
+                                    
+                                    <div class="method-selector">
+                                        <label><i class="fas fa-users"></i> روش تشخیص جامعه:</label>
+                                        <select id="community_detection_method2">
+                                            <option value="louvain" selected>Louvain</option>
+                                            <option value="label_propagation">Label Propagation</option>
+                                            <option value="girvan_newman">Girvan-Newman</option>
+                                            <option value="spectral">Spectral</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="method-selector">
+                                        <label><i class="fas fa-search-plus"></i> الگوریتم بازیابی پیشرفته:</label>
+                                        <select id="advanced_retrieval_algorithm2">
+                                            <option value="bfs">BFS (جستجوی سطح اول)</option>
+                                            <option value="dfs">DFS (جستجوی عمیق اول)</option>
+                                            <option value="pagerank">PageRank</option>
+                                            <option value="community_detection">تشخیص جامعه</option>
+                                            <option value="semantic_similarity">شباهت معنایی</option>
+                                            <option value="n_hop">N-Hop</option>
+                                            <option value="hybrid" selected>ترکیبی</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="method-selector">
+                                        <label><i class="fas fa-tags"></i> روش استخراج توکن پیشرفته:</label>
+                                        <select id="advanced_token_extraction_method2">
+                                            <option value="llm_based">بر اساس LLM</option>
+                                            <option value="rule_based">بر اساس قوانین</option>
+                                            <option value="hybrid">ترکیبی</option>
+                                            <option value="semantic">معنایی</option>
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         
@@ -350,7 +612,7 @@
                     <div class="comparison-info">
                         <div class="info-box">
                             <h4><i class="fas fa-info-circle"></i> نحوه کارکرد</h4>
-                            <p>این بخش دو متن را به مدل GPT انتخاب شده ارسال می‌کند و از آن می‌خواهد که کیفیت، دقت، و جامعیت پاسخ‌ها را مقایسه کند. برچسب‌ها بر اساس روش بازیابی و نوع متن زمینه به صورت خودکار تولید می‌شوند.</p>
+                            <p>این بخش دو متن را به مدل GPT انتخاب شده ارسال می‌کند و از آن می‌خواهد که کیفیت، دقت، و جامعیت پاسخ‌ها را مقایسه کند. <strong>سیستم به طور ویژه بر عملی بودن و تخصصی بودن محتوا تأکید می‌کند</strong>. برچسب‌ها بر اساس روش بازیابی و نوع متن زمینه به صورت خودکار تولید می‌شوند.</p>
                         </div>
                     </div>
 
@@ -386,6 +648,7 @@
                             <label><i class="fas fa-cog"></i> نوع مقایسه:</label>
                             <select id="comparisonType">
                                 <option value="comprehensive">مقایسه جامع (کیفیت، دقت، جامعیت)</option>
+                                <option value="practical_specialized" selected>تمرکز بر عملی بودن و تخصصی بودن</option>
                                 <option value="accuracy">تمرکز بر دقت و صحت اطلاعات</option>
                                 <option value="completeness">تمرکز بر جامعیت و کامل بودن</option>
                                 <option value="clarity">تمرکز بر وضوح و قابل فهم بودن</option>

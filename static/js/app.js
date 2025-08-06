@@ -412,8 +412,6 @@ class GraphRAGApp {
 
     displayAnswer(answer, confidence, model) {
         document.getElementById('answer-text').textContent = answer;
-        document.getElementById('confidence-score').textContent = (confidence * 100).toFixed(1) + '%';
-        document.getElementById('model-name').textContent = model;
     }
 
     displayEnhancedResults(result) {

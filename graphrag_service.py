@@ -2033,7 +2033,7 @@ class GraphRAGService:
         if max_nodes is None:
             max_nodes = self.config['max_nodes']
         """بازیابی اطلاعات از گراف"""
-        print(f"🔍 بازیابی اطلاعات با روش {method.value if hasattr(method, 'value') else method}...")
+        print(f"🔍 بازیابی اطلاعات با روش {method}...")
         
         # استخراج کلمات کلیدی
         keywords = self.extract_keywords(query)
@@ -2088,6 +2088,18 @@ class GraphRAGService:
                                     kind=self.G.nodes[node]['kind'],
                                     depth=k
                                 ))
+            else:
+                # اگر کمتر از 2 نود پیدا شد، از BFS استفاده کن
+                print("⚠️ کمتر از 2 نود برای SHORTEST_PATH پیدا شد. استفاده از BFS...")
+                for token, node_id in matches.items():
+                    bfs_result = self.bfs_search(node_id, max_depth)
+                    for node, depth in bfs_result[:max_nodes]:
+                        nodes.append(GraphNode(
+                            id=node,
+                            name=self.G.nodes[node]['name'],
+                            kind=self.G.nodes[node]['kind'],
+                            depth=depth
+                        ))
         
         elif method == RetrievalMethod.NEIGHBORS:
             # همسایه‌های مستقیم
@@ -2113,44 +2125,65 @@ class GraphRAGService:
                         kind=self.G.nodes[node]['kind'],
                         depth=depth
                     ))
+            else:
+                # اگر کمتر از 2 نود پیدا شد، از BFS استفاده کن
+                print("⚠️ کمتر از 2 نود برای HYBRID پیدا شد. استفاده از BFS...")
+                for token, node_id in matches.items():
+                    bfs_result = self.bfs_search(node_id, max_depth)
+                    for node, depth in bfs_result[:max_nodes]:
+                        nodes.append(GraphNode(
+                            id=node,
+                            name=self.G.nodes[node]['name'],
+                            kind=self.G.nodes[node]['kind'],
+                            depth=depth
+                        ))
         
         elif method == RetrievalMethod.MULTI_METHOD:
             # جستجوی چند روشی
-            node_ids = list(matches.values())
-            multi_result = self.multi_method_search(node_ids, max_depth)
-            for node, depth, methods in multi_result[:max_nodes]:
-                nodes.append(GraphNode(
-                    id=node,
-                    name=self.G.nodes[node]['name'],
-                    kind=self.G.nodes[node]['kind'],
-                    depth=depth,
-                    score=len(methods.split(', '))  # امتیاز بر اساس تعداد روش‌ها
-                ))
+            if len(matches) >= 1:
+                node_ids = list(matches.values())
+                multi_result = self.multi_method_search(node_ids, max_depth)
+                for node, depth, methods in multi_result[:max_nodes]:
+                    nodes.append(GraphNode(
+                        id=node,
+                        name=self.G.nodes[node]['name'],
+                        kind=self.G.nodes[node]['kind'],
+                        depth=depth,
+                        score=len(methods.split(', '))  # امتیاز بر اساس تعداد روش‌ها
+                    ))
+            else:
+                print("⚠️ هیچ نودی برای MULTI_METHOD پیدا نشد.")
         
         elif method == RetrievalMethod.ENSEMBLE:
             # جستجوی گروهی
-            node_ids = list(matches.values())
-            ensemble_result = self.ensemble_search(node_ids, max_depth)
-            for node, depth, score in ensemble_result[:max_nodes]:
-                nodes.append(GraphNode(
-                    id=node,
-                    name=self.G.nodes[node]['name'],
-                    kind=self.G.nodes[node]['kind'],
-                    depth=depth,
-                    score=score
-                ))
+            if len(matches) >= 1:
+                node_ids = list(matches.values())
+                ensemble_result = self.ensemble_search(node_ids, max_depth)
+                for node, depth, score in ensemble_result[:max_nodes]:
+                    nodes.append(GraphNode(
+                        id=node,
+                        name=self.G.nodes[node]['name'],
+                        kind=self.G.nodes[node]['kind'],
+                        depth=depth,
+                        score=score
+                    ))
+            else:
+                print("⚠️ هیچ نودی برای ENSEMBLE پیدا نشد.")
         
         elif method == RetrievalMethod.ADAPTIVE:
             # جستجوی تطبیقی با پاس دادن query
-            node_ids = list(matches.values())
-            adaptive_result = self.adaptive_search(node_ids, max_depth, query)
-            for node, depth, method in adaptive_result[:max_nodes]:
-                nodes.append(GraphNode(
-                    id=node,
-                    name=self.G.nodes[node]['name'],
-                    kind=self.G.nodes[node]['kind'],
-                    depth=depth
-                ))
+            if len(matches) >= 1:
+                node_ids = list(matches.values())
+                adaptive_result = self.adaptive_search(node_ids, max_depth, query)
+                for node, depth, method in adaptive_result[:max_nodes]:
+                    nodes.append(GraphNode(
+                        id=node,
+                        name=self.G.nodes[node]['name'],
+                        kind=self.G.nodes[node]['kind'],
+                        depth=depth
+                    ))
+            else:
+                print("⚠️ هیچ نودی برای ADAPTIVE پیدا نشد.")
         
         elif method == RetrievalMethod.INTELLIGENT:
             # جستجوی معنایی هوشمند
@@ -2548,7 +2581,7 @@ class GraphRAGService:
             edges=edges,
             paths=paths,
             context_text="",
-            method=method.value,
+            method=str(method),
             query=query
         )
         context_text = self._create_enhanced_context_text(retrieval_result)
