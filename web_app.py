@@ -441,40 +441,41 @@ def token_extraction_methods():
 def retrieval_algorithms():
     """دریافت الگوریتم‌های بازیابی"""
     algorithms = [
-        {
-            'value': 'bfs',
-            'label': 'BFS (جستجوی سطح اول)',
-            'description': 'جستجوی سطح اول در گراف'
-        },
-        {
-            'value': 'dfs',
-            'label': 'DFS (جستجوی عمیق اول)',
-            'description': 'جستجوی عمیق اول در گراف'
-        },
-        {
-            'value': 'pagerank',
-            'label': 'PageRank',
-            'description': 'رتبه‌بندی بر اساس الگوریتم PageRank'
-        },
-        {
-            'value': 'community_detection',
-            'label': 'تشخیص جامعه',
-            'description': 'بازیابی بر اساس تشخیص جامعه‌ها'
-        },
+        # الگوریتم‌های اصلی
         {
             'value': 'semantic_similarity',
-            'label': 'شباهت معنایی',
-            'description': 'بازیابی بر اساس شباهت معنایی'
-        },
-        {
-            'value': 'n_hop',
-            'label': 'N-Hop',
-            'description': 'بازیابی مسیرهای N-Hop'
+            'label': 'شباهت معنایی (بهبود یافته)',
+            'description': 'بازیابی بر اساس شباهت معنایی با افزایش دقت و پوشش ژن‌ها'
         },
         {
             'value': 'hybrid',
-            'label': 'ترکیبی',
-            'description': 'ترکیب چندین الگوریتم'
+            'label': 'ترکیبی (بهبود یافته)',
+            'description': 'ترکیب چندین الگوریتم با بهینه‌سازی عملکرد و افزایش دقت'
+        },
+        {
+            'value': 'pagerank',
+            'label': 'PageRank (بهبود یافته)',
+            'description': 'رتبه‌بندی بر اساس الگوریتم PageRank با تمرکز روی ژن‌های مهم'
+        },
+        {
+            'value': 'community_detection',
+            'label': 'تشخیص جامعه (بهبود یافته)',
+            'description': 'بازیابی بر اساس تشخیص جامعه‌ها با افزایش دقت خوشه‌بندی'
+        },
+        {
+            'value': 'bfs',
+            'label': 'BFS (جستجوی سطح اول - بهبود یافته)',
+            'description': 'جستجوی سطح اول در گراف با افزایش عمق و بهینه‌سازی'
+        },
+        {
+            'value': 'dfs',
+            'label': 'DFS (جستجوی عمیق اول - بهبود یافته)',
+            'description': 'جستجوی عمیق اول در گراف با افزایش دقت و کاهش زمان'
+        },
+        {
+            'value': 'n_hop',
+            'label': 'N-Hop (بهبود یافته)',
+            'description': 'بازیابی مسیرهای N-Hop با افزایش عمق و رتبه‌بندی هوشمند'
         }
     ]
     return jsonify({'algorithms': algorithms})
