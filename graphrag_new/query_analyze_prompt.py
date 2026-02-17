@@ -7,123 +7,74 @@ Reference:
 PROMPTS = {}
 
 PROMPTS["minirag_query2kwd"] = """---Role---
-
-You are a helpful assistant tasked with identifying both answer-type and low-level keywords in the user's query.
+You are an assistant that maps a biomedical question to Hetionet concepts and relations.
 
 ---Goal---
+Given the user query, return STRICT JSON capturing:
+1) the expected answer types (chosen ONLY from the provided Answer type pool),
+2) extracted entities from the query,
+3) the KG intent and the corresponding Hetionet metaedges allow/deny lists.
 
-Given the query, list both answer-type and low-level keywords.
-answer_type_keywords focus on the type of the answer to the certain query, while low-level keywords focus on specific entities, details, or concrete terms.
-The answer_type_keywords must be selected from Answer type pool. 
-This pool is in the form of a dictionary, where the key represents the Type you should choose from and the value represents the example samples.
+---Hetionet cheat-sheet---
+MetaNodes: Gene(G), Disease(D), Compound(C), Pathway(PW), Biological Process(BP), Molecular Function(MF), Anatomy(A), Symptom(S), Pharmacologic Class(PC), Cellular Component(CC)
+MetaEdges (subset, abbreviations): 
+- CtD (Compound–treats–Disease), CpD (Compound–palliates–Disease)
+- CbG (Compound–binds–Gene), CuG/CdG (Compound–up/down–regulates–Gene)
+- DaG/DuG/DdG (Disease–associates/up/down–regulates–Gene)
+- GpPW/GpBP/GpMF/GpCC (Gene–participates–Pathway/Process/Function/Component)
+- GiG (Gene–interacts–Gene), Gr>G (Gene>regulates>Gene), GcG (Gene–covaries–Gene)
+- DlA (Disease–localizes–Anatomy), DpS (Disease–presents–Symptom)
+- PCiC (Class–includes–Compound)
+- CrC (Compound–resembles–Compound), DrD (Disease–resembles–Disease)
 
 ---Instructions---
+- Output MUST be VALID JSON ONLY. No prose.
+- "answer_type_keywords": pick ≤3 types PRESENT in the given Answer type pool. Do not invent new types.
+- "entities_from_query": list canonical surface strings from the query (e.g., "BRCA1", "breast cancer", "trastuzumab"). Keep ≤10.
+- Detect intent and fill "kg_intent" from this finite set:
+  ["Gene->Gene(covaries)","Gene->Gene(interacts)","Gene->Gene(regulates)",
+   "Disease->Drug","Gene->Drug","Gene->Disease","Disease->Symptom","Disease->Anatomy",
+   "Drug->Target","Gene->Pathway","Mixed"]
+- Provide "allow_metaedges" and "deny_metaedges" arrays consistent with the intent. Prefer minimal allowlists.
+- Provide "must_include_entities": entities that MUST be present in the subgraph (e.g., the gene/drug/disease explicitly named).
+- If the query is ambiguous or lacks entities, leave "must_include_entities" empty.
 
-- Output the keywords in JSON format.
-- The JSON should have three keys:
-  - "answer_type_keywords" for the types of the answer. In this list, the types with the highest likelihood should be placed at the forefront. No more than 3.
-  - "entities_from_query" for specific entities or details. It must be extracted from the query.
-
-######################
--Examples-
-######################
-Example 1:
-
-Query: "How does international trade influence global economic stability?"
-Answer type pool: {{
- 'PERSONAL LIFE': ['FAMILY TIME', 'HOME MAINTENANCE'],
- 'STRATEGY': ['MARKETING PLAN', 'BUSINESS EXPANSION'],
- 'SERVICE FACILITATION': ['ONLINE SUPPORT', 'CUSTOMER SERVICE TRAINING'],
- 'PERSON': ['JANE DOE', 'JOHN SMITH'],
- 'FOOD': ['PASTA', 'SUSHI'],
- 'EMOTION': ['HAPPINESS', 'ANGER'],
- 'PERSONAL EXPERIENCE': ['TRAVEL ABROAD', 'STUDYING ABROAD'],
- 'INTERACTION': ['TEAM MEETING', 'NETWORKING EVENT'],
- 'BEVERAGE': ['COFFEE', 'TEA'],
- 'PLAN': ['ANNUAL BUDGET', 'PROJECT TIMELINE'],
- 'GEO': ['NEW YORK CITY', 'SOUTH AFRICA'],
- 'GEAR': ['CAMPING TENT', 'CYCLING HELMET'],
- 'EMOJI': ['🎉', '🚀'],
- 'BEHAVIOR': ['POSITIVE FEEDBACK', 'NEGATIVE CRITICISM'],
- 'TONE': ['FORMAL', 'INFORMAL'],
- 'LOCATION': ['DOWNTOWN', 'SUBURBS']
-}}
-
-################
+---Examples---
+Query: "Which genes covary with BRCA1?"
 Output:
-{{
-  "answer_type_keywords": ["STRATEGY","PERSONAL LIFE"],
-  "entities_from_query": ["Trade agreements", "Tariffs", "Currency exchange", "Imports", "Exports"]
-}}
+{
+  "answer_type_keywords": ["Gene"],
+  "entities_from_query": ["BRCA1"],
+  "kg_intent": "Gene->Gene(covaries)",
+  "allow_metaedges": ["GcG"],
+  "deny_metaedges": ["GiG","Gr>G","DaG","GpBP","GpPW","AeG","AuG","AdG","CtD","CbG","PCiC","DpS","DlA","CrC","DrD"],
+  "must_include_entities": ["BRCA1"]
+}
 
-#############################
-Example 2:
-
-Query: "When was SpaceX's first rocket launch?"
-Answer type pool: {{
- 'DATE AND TIME': ['2023-10-10 10:00', 'THIS AFTERNOON'],
- 'ORGANIZATION': ['GLOBAL INITIATIVES CORPORATION', 'LOCAL COMMUNITY CENTER'],
- 'PERSONAL LIFE': ['DAILY EXERCISE ROUTINE', 'FAMILY VACATION PLANNING'],
- 'STRATEGY': ['NEW PRODUCT LAUNCH', 'YEAR-END SALES BOOST'],
- 'SERVICE FACILITATION': ['REMOTE IT SUPPORT', 'ON-SITE TRAINING SESSIONS'],
- 'PERSON': ['ALEXANDER HAMILTON', 'MARIA CURIE'],
- 'FOOD': ['GRILLED SALMON', 'VEGETARIAN BURRITO'],
- 'EMOTION': ['EXCITEMENT', 'DISAPPOINTMENT'],
- 'PERSONAL EXPERIENCE': ['BIRTHDAY CELEBRATION', 'FIRST MARATHON'],
- 'INTERACTION': ['OFFICE WATER COOLER CHAT', 'ONLINE FORUM DEBATE'],
- 'BEVERAGE': ['ICED COFFEE', 'GREEN SMOOTHIE'],
- 'PLAN': ['WEEKLY MEETING SCHEDULE', 'MONTHLY BUDGET OVERVIEW'],
- 'GEO': ['MOUNT EVEREST BASE CAMP', 'THE GREAT BARRIER REEF'],
- 'GEAR': ['PROFESSIONAL CAMERA EQUIPMENT', 'OUTDOOR HIKING GEAR'],
- 'EMOJI': ['📅', '⏰'],
- 'BEHAVIOR': ['PUNCTUALITY', 'HONESTY'],
- 'TONE': ['CONFIDENTIAL', 'SATIRICAL'],
- 'LOCATION': ['CENTRAL PARK', 'DOWNTOWN LIBRARY']
-}}
-
-################
+Query: "Which drugs treat breast cancer?"
 Output:
-{{
-  "answer_type_keywords": ["DATE AND TIME", "ORGANIZATION", "PLAN"],
-  "entities_from_query": ["SpaceX", "Rocket launch", "Aerospace", "Power Recovery"]
-}}
+{
+  "answer_type_keywords": ["Compound","Pharmacologic Class"],
+  "entities_from_query": ["breast cancer"],
+  "kg_intent": "Disease->Drug",
+  "allow_metaedges": ["CtD","CpD","PCiC"],
+  "deny_metaedges": ["CbG","DaG","GiG","Gr>G","GcG","GpPW","GpBP","CrC","DrD","DpS","DlA","AeG","AuG","AdG"],
+  "must_include_entities": ["breast cancer"]
+}
 
-#############################
-Example 3:
-
-Query: "What is the role of education in reducing poverty?"
-Answer type pool: {{
- 'PERSONAL LIFE': ['MANAGING WORK-LIFE BALANCE', 'HOME IMPROVEMENT PROJECTS'],
- 'STRATEGY': ['MARKETING STRATEGIES FOR Q4', 'EXPANDING INTO NEW MARKETS'],
- 'SERVICE FACILITATION': ['CUSTOMER SATISFACTION SURVEYS', 'STAFF RETENTION PROGRAMS'],
- 'PERSON': ['ALBERT EINSTEIN', 'MARIA CALLAS'],
- 'FOOD': ['PAN-FRIED STEAK', 'POACHED EGGS'],
- 'EMOTION': ['OVERWHELM', 'CONTENTMENT'],
- 'PERSONAL EXPERIENCE': ['LIVING ABROAD', 'STARTING A NEW JOB'],
- 'INTERACTION': ['SOCIAL MEDIA ENGAGEMENT', 'PUBLIC SPEAKING'],
- 'BEVERAGE': ['HERBAL TEA', 'FRESH JUICE'],
- 'PLAN': ['STRATEGIC INITIATIVE', 'RESEARCH PROPOSAL'],
- 'GEO': ['URBAN CENTER', 'RURAL COMMUNITY'],
- 'GEAR': ['EDUCATIONAL TOOLS', 'LEARNING MATERIALS'],
- 'EMOJI': ['📚', '🎓'],
- 'BEHAVIOR': ['LEARNING', 'TEACHING'],
- 'TONE': ['INFORMATIVE', 'PERSUASIVE'],
- 'LOCATION': ['SCHOOL CAMPUS', 'COMMUNITY CENTER']
-}}
-
-################
+Query: "What is the relationship between AKT3, trastuzumab and breast cancer?"
 Output:
-{{
-  "answer_type_keywords": ["STRATEGY", "SERVICE FACILITATION", "PLAN"],
-  "entities_from_query": ["Education", "Poverty reduction", "Social programs", "Economic development"]
-}}
+{
+  "answer_type_keywords": ["Pathway","Compound","Disease","Gene"],
+  "entities_from_query": ["AKT3","trastuzumab","breast cancer"],
+  "kg_intent": "Mixed",
+  "allow_metaedges": ["GpPW","GiG","Gr>G","CbG","CtD","DaG"],
+  "deny_metaedges": ["CrC","DrD","DpS","DlA","AeG","AuG","AdG","GpMF","GpCC"],
+  "must_include_entities": ["AKT3","trastuzumab","breast cancer"]
+}
 
-#############################
-Now, please analyze the following query:
-
+---Now process the following---
 Query: "{query}"
-
 Answer type pool: {TYPE_POOL}
 
-################
-Output:""" 
+Output:"""

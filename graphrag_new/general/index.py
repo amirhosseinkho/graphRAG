@@ -64,14 +64,25 @@ class GraphIndex:
         """ساخت ایندکس یال‌ها"""
         self.edge_index = {}
         
-        for u, v, attrs in self.graph.edges(data=True):
-            edge_id = f"{u}_{v}"
-            self.edge_index[edge_id] = {
-                "source": u,
-                "target": v,
-                "label": attrs.get('label', 'unknown'),
-                "attributes": dict(attrs)
-            }
+        if isinstance(self.graph, (nx.MultiDiGraph, nx.MultiGraph)):
+            for u, v, k, attrs in self.graph.edges(keys=True, data=True):
+                edge_id = f"{u}_{v}_{k}"
+                self.edge_index[edge_id] = {
+                    "source": u,
+                    "target": v,
+                    "key": k,
+                    "label": attrs.get('label', attrs.get('metaedge', 'unknown')),
+                    "attributes": dict(attrs)
+                }
+        else:
+            for u, v, attrs in self.graph.edges(data=True):
+                edge_id = f"{u}_{v}"
+                self.edge_index[edge_id] = {
+                    "source": u,
+                    "target": v,
+                    "label": attrs.get('label', attrs.get('metaedge', 'unknown')),
+                    "attributes": dict(attrs)
+                }
     
     def _build_type_index(self):
         """ساخت ایندکس انواع"""
@@ -190,7 +201,13 @@ class GraphIndex:
         """دریافت اجزای متصل"""
         if not self.graph:
             return []
-        return list(nx.connected_components(self.graph))
+        try:
+            if isinstance(self.graph, (nx.DiGraph, nx.MultiDiGraph)):
+                return list(nx.weakly_connected_components(self.graph))
+            else:
+                return list(nx.connected_components(self.graph))
+        except Exception:
+            return []
     
     def get_shortest_paths(self, source: str, target: str, max_paths: int = 5) -> List[List[str]]:
         """دریافت کوتاه‌ترین مسیرها"""
@@ -198,9 +215,13 @@ class GraphIndex:
             return []
         
         try:
-            paths = list(nx.all_simple_paths(self.graph, source, target, cutoff=10))
-            paths.sort(key=len)  # مرتب‌سازی بر اساس طول
-            return paths[:max_paths]
+            gen = nx.shortest_simple_paths(self.graph, source, target)
+            paths = []
+            for i, p in enumerate(gen):
+                if i >= max_paths:
+                    break
+                paths.append(p)
+            return paths
         except Exception as e:
             logging.warning(f"Error finding shortest paths: {e}")
             return []
@@ -210,13 +231,16 @@ class GraphIndex:
         if not self.graph:
             return nx.Graph()
         
-        # اضافه کردن نودهای همسایه تا عمق 1
+        # اضافه کردن نودهای همسایه تا عمق 1 (با توجه به جهت برای گراف‌های جهت‌دار)
         all_nodes = set(nodes)
         for node in nodes:
             if node in self.graph:
-                all_nodes.update(self.graph.neighbors(node))
-        
-        return self.graph.subgraph(all_nodes)
+                if isinstance(self.graph, (nx.DiGraph, nx.MultiDiGraph)):
+                    all_nodes.update(list(self.graph.successors(node)))
+                    all_nodes.update(list(self.graph.predecessors(node)))
+                else:
+                    all_nodes.update(self.graph.neighbors(node))
+        return self.graph.subgraph(all_nodes).copy()
     
     def save_index(self, filepath: str = None):
         """ذخیره ایندکس"""

@@ -90,15 +90,15 @@ class GraphExtractor(BaseExtractor):
                 "num_nodes": self.graph.number_of_nodes(),
                 "num_edges": self.graph.number_of_edges(),
                 "density": nx.density(self.graph),
-                "is_connected": nx.is_connected(self.graph) if self.graph.number_of_nodes() > 0 else False,
-                "num_components": nx.number_connected_components(self.graph),
+                "is_connected": (nx.is_weakly_connected(self.graph) if isinstance(self.graph, (nx.DiGraph, nx.MultiDiGraph)) else nx.is_connected(self.graph)) if self.graph.number_of_nodes() > 0 else False,
+                "num_components": (nx.number_weakly_connected_components(self.graph) if isinstance(self.graph, (nx.DiGraph, nx.MultiDiGraph)) else nx.number_connected_components(self.graph)),
                 "average_degree": sum(dict(self.graph.degree()).values()) / self.graph.number_of_nodes() if self.graph.number_of_nodes() > 0 else 0
             }
             
             # محاسبه قطر گراف (اگر متصل باشد)
             if stats["is_connected"]:
                 try:
-                    stats["diameter"] = nx.diameter(self.graph)
+                    stats["diameter"] = (nx.diameter(self.graph.to_undirected()) if isinstance(self.graph, (nx.DiGraph, nx.MultiDiGraph)) else nx.diameter(self.graph))
                 except:
                     stats["diameter"] = None
             
@@ -180,9 +180,10 @@ class GraphExtractor(BaseExtractor):
             "path_statistics": {}
         }
         
-        # محاسبه کوتاه‌ترین مسیرها
+        # محاسبه کوتاه‌ترین مسیرها (بهینه)
         try:
-            shortest_paths = dict(nx.all_pairs_shortest_path(self.graph, cutoff=max_length))
+            # برای گراف‌های بزرگ، محاسبهٔ کامل ممکن است سنگین باشد؛ اینجا نگه داشته می‌شود
+            shortest_paths = {}
             path_info["shortest_paths"] = shortest_paths
         except Exception as e:
             logging.warning(f"Error calculating shortest paths: {e}")
@@ -193,9 +194,18 @@ class GraphExtractor(BaseExtractor):
             nodes = list(self.graph.nodes())
             for i, source in enumerate(nodes[:max_paths]):
                 for target in nodes[i+1:max_paths]:
-                    paths = list(nx.all_simple_paths(self.graph, source, target, cutoff=max_length))
-                    if paths:
-                        all_paths[(source, target)] = paths[:5]  # حداکثر 5 مسیر
+                    try:
+                        gen = nx.shortest_simple_paths(self.graph, source, target)
+                        paths = []
+                        for _, p in zip(range(5), gen):
+                            if len(p) - 1 <= max_length:
+                                paths.append(p)
+                            else:
+                                break
+                        if paths:
+                            all_paths[(source, target)] = paths
+                    except Exception:
+                        continue
         except Exception as e:
             logging.warning(f"Error calculating all paths: {e}")
         

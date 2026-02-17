@@ -25,6 +25,7 @@ try:
     from graphrag_new.entity_resolution import EntityResolution
     from rag_new.llm.chat_model import GptTurbo, MoonshotChat, AzureChat, QWenChat, ZhipuChat, OllamaChat, GeminiChat, AnthropicChat
     from rag_new.utils import REDIS_CONN
+    from enhanced_context_generator import EnhancedContextGenerator
     NEW_MODULES_AVAILABLE = True
 except ImportError:
     NEW_MODULES_AVAILABLE = False
@@ -337,6 +338,19 @@ class GraphRAGService:
         self.graph_data_path = graph_data_path or "hetionet_graph.pkl"
         self.G = None
         self.nlp = None
+        # ایندکس‌ها و کش‌ها
+        self._name_to_ids = {}
+        self._id_to_name = {}
+        self._kind_to_ids = {}
+        self._name_entries = []  # [(lower_name, node_id)] برای fallback فازی سبک
+        self._pagerank = {}
+        self._keyword_cache = {}
+        self._last_intent = None
+        # ژنراتور متن زمینه بهبود یافته
+        try:
+            self.context_generator = EnhancedContextGenerator()
+        except Exception:
+            self.context_generator = None
         
         # تنظیمات قابل تغییر برای محدودیت‌ها
         self.config = {
@@ -381,14 +395,60 @@ class GraphRAGService:
             self.nlp = spacy.load("en_core_web_sm")
             print(" مدل spaCy بارگذاری شد")
         except:
-            print(" خطا در بارگذاری مدل spaCy")
-            return
+            print(" خطا در بارگذاری مدل spaCy - استفاده از استخراج کلیدواژه ساده")
+            self.nlp = None
         
         # بارگذاری یا ایجاد گراف
         if self.graph_data_path and os.path.exists(self.graph_data_path):
             self.load_graph_from_file()
         else:
             self.create_sample_graph()
+
+    def _post_graph_loaded(self):
+        """اقدامات پس از بارگذاری/ایجاد گراف: ساخت ایندکس‌ها و محاسبه PageRank تنبل"""
+        self._build_node_indices()
+        # PageRank را به‌صورت تنبل نگه می‌داریم؛ اینجا اگر گراف کوچک باشد حساب می‌کنیم
+        try:
+            if self.G and self.G.number_of_nodes() <= 5000:
+                import networkx as nx
+                self._pagerank = nx.pagerank(self.G, alpha=0.85)
+        except Exception as e:
+            print(f"⚠️ خطا در محاسبه اولیه PageRank: {e}")
+
+    def _build_node_indices(self):
+        """ساخت ایندکس‌های کم‌حجم برای تطبیق سریع توکن‌ها با نودها"""
+        self._name_to_ids.clear()
+        self._id_to_name.clear()
+        self._kind_to_ids.clear()
+        self._name_entries.clear()
+        if not self.G:
+            return
+        for node_id, attrs in self.G.nodes(data=True):
+            name = str(attrs.get('name', node_id))
+            kind = str(attrs.get('kind', 'Unknown'))
+            self._id_to_name[node_id] = name
+            lower_name = name.lower()
+            self._name_to_ids.setdefault(lower_name, []).append(node_id)
+            self._kind_to_ids.setdefault(kind, []).append(node_id)
+            # ورودی برای جستجوی شامل ساده
+            self._name_entries.append((lower_name, node_id))
+
+    def _display_node(self, node_id: str) -> str:
+        """نمایش انسانی یک نود بر اساس نام و نوع (در صورت وجود)"""
+        try:
+            name = self._id_to_name.get(node_id) or self.G.nodes[node_id].get('name', node_id)
+            kind = self.G.nodes[node_id].get('kind')
+            return f"{name} ({kind})" if kind else str(name)
+        except Exception:
+            return str(node_id)
+
+    def _ensure_pagerank(self):
+        if not self._pagerank and self.G:
+            try:
+                import networkx as nx
+                self._pagerank = nx.pagerank(self.G, alpha=0.85)
+            except Exception:
+                self._pagerank = {}
     
     def create_sample_graph(self):
         """ایجاد گراف نمونه بر اساس ساختار واقعی Hetionet"""
@@ -692,6 +752,7 @@ class GraphRAGService:
         print(f" شامل {len([n for n, d in self.G.nodes(data=True) if d.get('metanode') == 'Gene'])} ژن، {len([n for n, d in self.G.nodes(data=True) if d.get('metanode') == 'Anatomy'])} آناتومی")
         print(f" شامل {len([e for e in self.G.edges(data=True) if e[2].get('metaedge') == 'AeG'])} یال AeG (Anatomy-expresses-Gene)")
         print(f" شامل {len([e for e in self.G.edges(data=True) if e[2].get('metaedge') == 'GeA'])} یال GeA (Gene-expressed_in-Anatomy) - معکوس")
+        self._post_graph_loaded()
     
     def load_graph_from_file(self):
         """بارگذاری گراف از فایل"""
@@ -699,12 +760,23 @@ class GraphRAGService:
             with open(self.graph_data_path, 'rb') as f:
                 self.G = pickle.load(f)
             print(f" گراف از فایل بارگذاری شد: {self.G.number_of_nodes()} نود، {self.G.number_of_edges()} یال")
+            self._post_graph_loaded()
         except Exception as e:
             print(f" خطا در بارگذاری گراف: {e}")
             self.create_sample_graph()
     
     def extract_keywords(self, text: str) -> List[str]:
         """استخراج کلمات کلیدی از متن با بهبود برای ژن‌ها و اصطلاحات تخصصی"""
+        # کش ساده برای سرعت
+        if text in self._keyword_cache:
+            return self._keyword_cache[text]
+        if self.nlp is None:
+            # fallback ساده بدون spaCy
+            import re as _re
+            tokens = _re.sub(r"[^\w\s]", " ", text.lower()).split()
+            keywords = sorted(set(t for t in tokens if len(t) >= 2))
+            self._keyword_cache[text] = keywords
+            return keywords
         doc = self.nlp(text)
         keywords = set()
         
@@ -786,9 +858,9 @@ class GraphRAGService:
             'یافت': 'found', 'یافت می‌شود': 'found', 'یافت می‌شوند': 'found'
         }
         
-        # نگاشت ژن‌های مشهور و نام‌های مختلف آنها
+        # نگاشت ژن‌های مشهور و نام‌های مختلف آنها (با ترجیح کامل-نام برای پرهیز از تطبیق اشتباه TP53RK)
         famous_genes = {
-            'tp53': ['TP53', 'P53', 'p53', 'Tumor Protein P53', 'Tumor Suppressor P53'],
+            'tp53': ['TP53', 'Tumor Protein P53', 'Tumor Suppressor P53', 'P53'],
             'brca1': ['BRCA1', 'Breast Cancer 1', 'BRCA1 Gene'],
             'brca2': ['BRCA2', 'Breast Cancer 2', 'BRCA2 Gene'],
             'apoe': ['APOE', 'Apolipoprotein E', 'APOE Gene'],
@@ -849,7 +921,12 @@ class GraphRAGService:
             if len(keyword) >= 2 and keyword not in ['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by']:
                 filtered_keywords.add(keyword)
         
-        return sorted(filtered_keywords)
+        result = sorted(filtered_keywords)
+        # محدود کردن اندازه کش
+        if len(self._keyword_cache) > 1024:
+            self._keyword_cache.clear()
+        self._keyword_cache[text] = result
+        return result
     
     def analyze_question_intent(self, query: str) -> Dict[str, Any]:
         """تحلیل مفهومی سوال و استخراج قصد کاربر بر اساس جدول نگاشت Hetionet"""
@@ -943,7 +1020,12 @@ class GraphRAGService:
             },
             # همبستگی ژن‌ها
             'gene_covariation': {
-                'patterns': ['covaries', 'correlated', 'correlation', 'evolutionary'],
+                'patterns': [
+                    'covary', 'covaries', 'co-vary', 'co-varies',
+                    'coexpression', 'co-expression', 'coexpressed',
+                    'correlated', 'correlation',
+                    'هم‌واریانس', 'همواریانس', 'هم‌بروز', 'همبروز', 'هم‌تغییر', 'همتغییر'
+                ],
                 'metaedges': ['GcG'],
                 'description': 'ژن‌هایی که با ژن [X] همبستگی دارند؟'
             }
@@ -1585,73 +1667,75 @@ class GraphRAGService:
             # روش 1: تطبیق ژن‌های مشهور
             if token_lower in famous_genes:
                 gene_variants = famous_genes[token_lower]
-                for variant in gene_variants:
-                    for node_id, attrs in self.G.nodes(data=True):
-                        if (attrs.get('kind') == 'Gene' and 
-                            variant.upper() in attrs['name'].upper()):
-                            matched[token] = node_id
-                            found = True
-                            print(f"🔍 تطبیق ژن مشهور: '{token}' -> {attrs['name']} ({attrs.get('kind', 'Unknown')})")
+                # ابتدا تطبیق دقیق نام کامل ژن، سپس تطبیق‌های شامل
+                for node_id, attrs in self.G.nodes(data=True):
+                    if attrs.get('kind') == 'Gene' and attrs.get('name', '').upper() == 'TP53' and token_lower == 'tp53':
+                        matched[token] = node_id
+                        found = True
+                        print(f"🔍 تطبیق ژن مشهور (قفل دقیق): '{token}' -> {attrs['name']} ({attrs.get('kind', 'Unknown')})")
+                        break
+                if not found:
+                    for variant in gene_variants:
+                        for node_id, attrs in self.G.nodes(data=True):
+                            if (attrs.get('kind') == 'Gene' and 
+                                variant.upper() == attrs.get('name', '').upper()):
+                                matched[token] = node_id
+                                found = True
+                                print(f"🔍 تطبیق ژن مشهور (دقیق): '{token}' -> {attrs['name']} ({attrs.get('kind', 'Unknown')})")
+                                break
+                        if found:
+                            break
+                if not found:
+                    for variant in gene_variants:
+                        for node_id, attrs in self.G.nodes(data=True):
+                            if (attrs.get('kind') == 'Gene' and 
+                                variant.upper() in attrs.get('name', '').upper()):
+                                matched[token] = node_id
+                                found = True
+                                print(f"🔍 تطبیق ژن مشهور (شامل): '{token}' -> {attrs['name']} ({attrs.get('kind', 'Unknown')})")
+                                break
+                        if found:
                             break
                     if found:
                         break
             
             # روش 2: جستجوی مستقیم بر اساس نام
             if not found:
+                import re
+                gene_symbol_like = bool(re.fullmatch(r"[A-Za-z0-9\-]{2,10}", token)) and sum(1 for c in token if c.isalpha() and c.isupper()) >= 2
                 for node_id, attrs in self.G.nodes(data=True):
-                    if token_lower in attrs['name'].lower():
+                    name = attrs.get('name', '')
+                    name_lower = name.lower()
+                    # اگر شبیه نماد ژنی است، برای نودهای Gene فقط تطبیق دقیق را قبول کن
+                    if gene_symbol_like and attrs.get('kind') == 'Gene':
+                        if name_upper := name.upper():
+                            if token.upper() == name_upper:
+                                matched[token] = node_id
+                                found = True
+                                print(f"🔍 تطبیق مستقیم دقیق ژن: '{token}' -> {name}")
+                                break
+                        continue  # از تطبیق‌های شامل مثل TP53RK جلوگیری کن
+                    # برای سایر انواع، تطبیق شامل مجاز است
+                    if token_lower in name_lower:
                         matched[token] = node_id
                         found = True
-                        print(f"🔍 تطبیق مستقیم: '{token}' -> {attrs['name']} ({attrs.get('kind', 'Unknown')})")
-                        break
-                    # تطبیق ژن‌های مشهور
-                    elif token.upper() in ['TP53', 'P53'] and 'TP53' in attrs['name'].upper():
-                        matched[token] = node_id
-                        found = True
-                        print(f"🔍 تطبیق ژن مشهور: '{token}' -> {attrs['name']} ({attrs.get('kind', 'Unknown')})")
+                        print(f"🔍 تطبیق مستقیم: '{token}' -> {name} ({attrs.get('kind', 'Unknown')})")
                         break
             
-            # روش 3: جستجوی فازی برای کلمات مشابه
+            # روش 3: جستجوی فازی برای کلمات مشابه (بهینه‌سازی شده با ایندکس)
             if not found and len(token) >= 3:
-                best_match = None
-                best_score = 0
-                
-                for node_id, attrs in self.G.nodes(data=True):
-                    name_lower = attrs['name'].lower()
-                    
-                    # محاسبه امتیاز شباهت
-                    if token_lower == name_lower:
-                        score = 1.0
-                    elif token_lower in name_lower:
-                        score = len(token_lower) / len(name_lower)
-                    elif name_lower in token_lower:
-                        score = len(name_lower) / len(token_lower)
-                    elif any(word in name_lower for word in token_lower.split()):
-                        score = 0.7
-                    elif any(word in token_lower for word in name_lower.split()):
-                        score = 0.6
-                    else:
-                        # محاسبه شباهت کاراکتری
-                        common_chars = sum(1 for c in token_lower if c in name_lower)
-                        if common_chars > 0:
-                            score = common_chars / max(len(token_lower), len(name_lower))
-                        else:
-                            score = 0
-                    
-                    # بهبود تطبیق برای کلمات خاص
-                    if token_lower == 'aspirin' and 'aspirin' in name_lower:
-                        score = 1.0  # اولویت برای تطبیق دقیق
-                    elif token_lower == 'aspirin' and 'aspirin' not in name_lower:
-                        score = 0  # رد تطبیق اشتباه
-                    
-                    if score > best_score and score > 0.3:  # حداقل 30% شباهت
-                        best_score = score
-                        best_match = (node_id, attrs)
-                
-                if best_match:
-                    matched[token] = best_match[0]
+                # 3.1 تطبیق دقیق از ایندکس نام‌ها
+                if token_lower in self._name_to_ids:
+                    matched[token] = self._name_to_ids[token_lower][0]
                     found = True
-                    print(f"🔍 تطبیق فازی: '{token}' -> {best_match[1]['name']} ({best_match[1].get('kind', 'Unknown')}) [امتیاز: {best_score:.2f}]")
+                else:
+                    # 3.2 شامل بودن سبک روی ورودی‌های ایندکس‌شده (محدود برای کارایی)
+                    limit_scan = min(len(self._name_entries), 10000)
+                    for name_lower, node_id in self._name_entries[:limit_scan]:
+                        if token_lower in name_lower:
+                            matched[token] = node_id
+                            found = True
+                            break
             
             # روش 3: جستجو بر اساس نوع موجودیت
             if not found and token_lower in fallback_kinds:
@@ -1730,24 +1814,90 @@ class GraphRAGService:
                             print(f"🔍 تطبیق فارسی-انگلیسی: '{token}' -> {attrs['name']} ({attrs.get('kind', 'Unknown')})")
                             break
             
-            # روش 5: جستجوی فازی برای ژن‌ها
-            if not found and len(token) >= 3:
-                for node_id, attrs in self.G.nodes(data=True):
-                    if attrs.get('kind') == 'Gene':
-                        name_lower = attrs['name'].lower()
-                        # تطبیق فازی برای ژن‌ها
-                        if (token_lower in name_lower or 
-                            name_lower in token_lower or
-                            any(word in name_lower for word in token_lower.split())):
-                            matched[token] = node_id
-                            found = True
-                            print(f" تطبیق فازی ژن: '{token}' -> {attrs['name']} ({attrs.get('kind', 'Unknown')})")
-                            break
+            # روش 5: جستجوی فازی ویژه ژن‌ها با ایندکس نوع
+            if not found and len(token) >= 3 and 'Gene' in self._kind_to_ids:
+                for node_id in self._kind_to_ids['Gene'][: min(5000, len(self._kind_to_ids['Gene']))]:
+                    attrs = self.G.nodes[node_id]
+                    name_lower = attrs.get('name', '').lower()
+                    if not name_lower:
+                        continue
+                    if (token_lower in name_lower or name_lower in token_lower or any(word in name_lower for word in token_lower.split())):
+                        matched[token] = node_id
+                        found = True
+                        break
             
             if not found:
                 print(f"❌ تطبیق نشد: '{token}'")
         
         return matched
+
+    def _preferred_core_kinds_for_question(self, question_type: str) -> List[str]:
+        mapping = {
+            'biological_participation': ['Gene', 'Pathway', 'Biological Process'],
+            'gene_interaction': ['Gene'],
+            'disease_gene_regulation': ['Gene', 'Disease'],
+            'disease_treatment': ['Disease', 'Compound'],
+            'compound_gene_regulation': ['Gene', 'Compound'],
+            'anatomy_expression': ['Anatomy', 'Gene'],
+            'anatomy_disease': ['Disease', 'Anatomy'],
+            'gene_pathway': ['Gene', 'Pathway'],
+            'gene_regulation': ['Gene'],
+            'gene_covariation': ['Gene'],
+            'disease_symptom': ['Disease', 'Symptom'],
+            'disease_similarity': ['Disease'],
+        }
+        return mapping.get(question_type, ['Gene', 'Disease', 'Pathway'])
+
+    def _extract_core_nodes(self, query: str, matched_nodes: Dict[str, str], intent: Dict[str, Any]) -> List[str]:
+        """انتخاب هسته‌های دقیق بر اساس سوال، نیت و تطبیق‌ها.
+        قواعد:
+        - برای نمادهای شبیه ژن، فقط تطبیق دقیق نام ژن به‌عنوان هسته پذیرفته می‌شود.
+        - انواع هسته بر اساس نوع سوال محدود می‌شوند.
+        - در صورت نبود تطبیق دقیق، از تطبیق‌های عبارتی کامل استفاده می‌شود.
+        """
+        ql = (query or '').lower()
+        tokens = set([t.strip() for t in re.split(r"[^A-Za-z0-9]+", ql) if t.strip()])
+        preferred_kinds = set(self._preferred_core_kinds_for_question(intent.get('question_type', 'general')))
+
+        core_nodes: List[str] = []
+        # مرحله 1: تطبیق دقیق نماد ژن
+        for token, node_id in matched_nodes.items():
+            attrs = self.G.nodes[node_id]
+            name = attrs.get('name', '')
+            kind = attrs.get('kind')
+            # فقط انواع ترجیحی
+            if kind not in preferred_kinds:
+                continue
+            # ژن: نیاز به تطبیق دقیق نماد
+            if kind == 'Gene':
+                gene_symbol_like = bool(re.fullmatch(r"[A-Za-z0-9\-]{2,10}", token)) and sum(1 for c in token if c.isalpha() and c.isupper()) >= 2
+                if gene_symbol_like and token.upper() == name.upper():
+                    core_nodes.append(node_id)
+            else:
+                # غیر ژن: تطبیق عین عبارت کامل
+                if token == name.lower():
+                    core_nodes.append(node_id)
+
+        # مرحله 2: اگر هنوز خالی بود، از قید عبارت کامل در متن سوال استفاده کن
+        if not core_nodes:
+            for token, node_id in matched_nodes.items():
+                attrs = self.G.nodes[node_id]
+                kind = attrs.get('kind')
+                name_lower = attrs.get('name', '').lower()
+                if kind in preferred_kinds and name_lower in ql:
+                    # جلوگیری از حالات حاوی پسوند/پیشوند برای ژن‌ها
+                    if kind == 'Gene':
+                        continue
+                    core_nodes.append(node_id)
+
+        # حذف تکراری‌ها با حفظ ترتیب
+        seen = set()
+        unique_core_nodes = []
+        for nid in core_nodes:
+            if nid not in seen:
+                seen.add(nid)
+                unique_core_nodes.append(nid)
+        return unique_core_nodes
     
     def bfs_search(self, start_node: str, max_depth: int = 2) -> List[Tuple[str, int]]:
         """جستجوی سطح اول"""
@@ -1761,7 +1911,11 @@ class GraphRAGService:
                 continue
             visited.add(node)
             result.append((node, depth))
+            # فیلتر یال‌ها برای پرهیز از نویز: فقط یال‌های دارای metaedge/relation معتبر
             for neighbor in self.G.neighbors(node):
+                ed = self.G.get_edge_data(node, neighbor) or {}
+                if not ed.get('metaedge') and not ed.get('relation'):
+                    continue
                 if neighbor not in visited:
                     queue.append((neighbor, depth + 1))
         
@@ -1781,12 +1935,15 @@ class GraphRAGService:
             for neighbor in self.G.neighbors(node):
                 if neighbor not in visited:
                     # اگر فیلتر رابطه مشخص شده، فقط یال‌های مرتبط را بررسی کن
+                    edge_data = self.G.get_edge_data(node, neighbor) or {}
                     if relation_filter:
-                        edge_data = self.G.get_edge_data(node, neighbor)
-                        if edge_data and relation_filter.lower() in edge_data.get('relation', '').lower():
-                            dfs(neighbor, depth + 1)
-                    else:
-                        dfs(neighbor, depth + 1)
+                        rel = (edge_data.get('relation') or edge_data.get('metaedge') or '').lower()
+                        if relation_filter.lower() not in rel:
+                            continue
+                    # حذف یال‌های بدون متاداده
+                    if not edge_data.get('relation') and not edge_data.get('metaedge'):
+                        continue
+                    dfs(neighbor, depth + 1)
         
         dfs(start_node, 0)
         return result
@@ -2204,7 +2361,30 @@ class GraphRAGService:
                 node_ids = [node.id for node in nodes]
                 for i in range(len(node_ids)):
                     for j in range(i+1, len(node_ids)):
-                        paths.extend(self.get_shortest_paths(node_ids[i], node_ids[j]))
+                        spaths = self.get_shortest_paths(node_ids[i], node_ids[j])
+                        if not spaths:
+                            continue
+                        paths.extend(spaths)
+                        # افزودن نودهای مسیر
+                        for path in spaths:
+                            for k, pid in enumerate(path):
+                                if pid not in [n.id for n in nodes]:
+                                    nodes.append(GraphNode(
+                                        id=pid,
+                                        name=self.G.nodes[pid]['name'],
+                                        kind=self.G.nodes[pid]['kind'],
+                                        depth=k
+                                    ))
+                            # افزودن یال‌های مسیر
+                            for k in range(len(path) - 1):
+                                ed = self.G.get_edge_data(path[k], path[k+1])
+                                if ed:
+                                    edges.append(GraphEdge(
+                                        source=path[k],
+                                        target=path[k+1],
+                                        relation=ed.get('metaedge', 'related'),
+                                        weight=ed.get('weight', 1.0)
+                                    ))
             
             # یافتن یال‌های مرتبط
             for node in nodes:
@@ -2222,37 +2402,108 @@ class GraphRAGService:
         elif method == RetrievalMethod.KG_SEARCH:
             # جستجوی دانش‌گراف (Knowledge Graph Search)
             print("🔍 استفاده از الگوریتم KG_SEARCH")
-            intelligent_result = self.intelligent_semantic_search(query, max_depth)
-            
-            # تبدیل نتایج به GraphNode
-            for node_id, depth, score, reason in intelligent_result[:max_nodes]:
-                nodes.append(GraphNode(
-                    id=node_id,
-                    name=self.G.nodes[node_id]['name'],
-                    kind=self.G.nodes[node_id]['kind'],
-                    depth=depth,
-                    score=score
-                ))
-            
-            # یافتن مسیرهای ارتباطی بین نودها
-            if len(nodes) >= 2:
-                node_ids = [node.id for node in nodes]
-                for i in range(len(node_ids)):
-                    for j in range(i+1, len(node_ids)):
-                        paths.extend(self.get_shortest_paths(node_ids[i], node_ids[j]))
-            
-            # یافتن یال‌های مرتبط
-            for node in nodes:
-                for neighbor in self.G.neighbors(node.id):
-                    if any(n.id == neighbor for n in nodes):
-                        edge_data = self.G.get_edge_data(node.id, neighbor)
-                        if edge_data:
-                            edges.append(GraphEdge(
-                                source=node.id,
-                                target=neighbor,
-                                relation=edge_data.get('metaedge', 'related'),
-                                weight=edge_data.get('weight', 1.0)
-                            ))
+            # Intent-aware: اگر سوال هم‌واریانس ژن است، فقط GcG با خروجی مینیمال را برگردان
+            intent = self.analyze_question_intent(query)
+            if intent.get('question_type') == 'gene_covariation':
+                # core lock: یافتن هسته ژن از توکن‌ها
+                matched_nodes = self.match_tokens_to_nodes(intent.get('keywords', []))
+                core_nodes = self._extract_core_nodes(query, matched_nodes, intent)
+                core_gene = None
+                for nid in core_nodes:
+                    if self.G.nodes[nid].get('kind') == 'Gene':
+                        core_gene = nid
+                        break
+                if core_gene is None and matched_nodes:
+                    # fallback ساده
+                    for nid in matched_nodes.values():
+                        if self.G.nodes[nid].get('kind') == 'Gene':
+                            core_gene = nid
+                            break
+                if core_gene:
+                    # فقط همسایه‌های GcG (Gene–covaries–Gene)
+                    covary_genes = []
+                    for nbr in self.G.neighbors(core_gene):
+                        ed = self.G.get_edge_data(core_gene, nbr) or {}
+                        if (ed.get('metaedge') or ed.get('relation')) == 'GcG' and self.G.nodes[nbr].get('kind') == 'Gene':
+                            covary_genes.append(nbr)
+                    # ساخت خروجی مینیمال: core + همسایه‌های ژنی، یال‌ها فقط GcG، مسیرهای یک‌پرش
+                    nodes.append(GraphNode(id=core_gene,
+                                           name=self.G.nodes[core_gene]['name'],
+                                           kind=self.G.nodes[core_gene]['kind'],
+                                           depth=0,
+                                           score=1.0))
+                    for gid in covary_genes[:max_nodes-1]:
+                        nodes.append(GraphNode(id=gid,
+                                               name=self.G.nodes[gid]['name'],
+                                               kind=self.G.nodes[gid]['kind'],
+                                               depth=1,
+                                               score=1.0))
+                        edges.append(GraphEdge(source=core_gene,
+                                               target=gid,
+                                               relation='GcG',
+                                               weight=(self.G.get_edge_data(core_gene, gid) or {}).get('weight', 1.0)))
+                        paths.append([core_gene, gid])
+                else:
+                    # اگر ژن پیدا نشد، به نسخه traceable جدید سوئیچ کن
+                    hits, _ = self.kgsearch_traceable(query, top_k=min(10, max_nodes))
+                    # تبدیل hits به nodes/edges/paths
+                    nid_set = set()
+                    for h in hits:
+                        seq = h.get('path', [])
+                        last_node = None
+                        for elem in seq:
+                            if 'id' in elem:
+                                nid = elem['id']
+                                nid_set.add(nid)
+                                if not any(n.id == nid for n in nodes):
+                                    nodes.append(GraphNode(id=nid,
+                                                           name=self.G.nodes[nid].get('name', nid),
+                                                           kind=self.G.nodes[nid].get('kind', 'Unknown'),
+                                                           depth=0))
+                                last_node = nid
+                            elif 'edge_id' in elem and last_node is not None:
+                                # edge follows between last_node and next node in sequence; will be added when next node arrives
+                                pass
+                        # بازسازی مسیرهای کوتاه
+                        path_nodes = [e['id'] for e in seq if 'id' in e]
+                        if len(path_nodes) >= 2:
+                            paths.append(path_nodes)
+                            for i in range(len(path_nodes)-1):
+                                ed = self.G.get_edge_data(path_nodes[i], path_nodes[i+1]) or {}
+                                edges.append(GraphEdge(source=path_nodes[i],
+                                                       target=path_nodes[i+1],
+                                                       relation=ed.get('metaedge', ed.get('relation', 'related')),
+                                                       weight=ed.get('weight', 1.0)))
+            else:
+                # مسیر پیش‌فرض: نسخه traceable با محدودیت Schema
+                hits, _ = self.kgsearch_traceable(query, top_k=min(10, max_nodes))
+                # تبدیل hits به nodes/edges/paths
+                nid_set = set()
+                for h in hits:
+                    seq = h.get('path', [])
+                    last_node = None
+                    current_path = []
+                    for elem in seq:
+                        if 'id' in elem:
+                            nid = elem['id']
+                            current_path.append(nid)
+                            if nid not in nid_set:
+                                nid_set.add(nid)
+                                nodes.append(GraphNode(id=nid,
+                                                       name=self.G.nodes[nid].get('name', nid),
+                                                       kind=self.G.nodes[nid].get('kind', 'Unknown'),
+                                                       depth=0))
+                            last_node = nid
+                        elif 'edge_id' in elem and last_node is not None:
+                            pass
+                    if len(current_path) >= 2:
+                        paths.append(current_path)
+                        for i in range(len(current_path)-1):
+                            ed = self.G.get_edge_data(current_path[i], current_path[i+1]) or {}
+                            edges.append(GraphEdge(source=current_path[i],
+                                                   target=current_path[i+1],
+                                                   relation=ed.get('metaedge', ed.get('relation', 'related')),
+                                                   weight=ed.get('weight', 1.0)))
         
         elif method == RetrievalMethod.N_HOP_RETRIEVAL:
             # بازیابی چندمرحله‌ای
@@ -2351,7 +2602,30 @@ class GraphRAGService:
                 node_ids = [node.id for node in nodes]
                 for i in range(len(node_ids)):
                     for j in range(i+1, len(node_ids)):
-                        paths.extend(self.get_shortest_paths(node_ids[i], node_ids[j]))
+                        spaths = self.get_shortest_paths(node_ids[i], node_ids[j])
+                        if not spaths:
+                            continue
+                        paths.extend(spaths)
+                        # افزودن نودهای مسیر
+                        for path in spaths:
+                            for k, pid in enumerate(path):
+                                if pid not in [n.id for n in nodes]:
+                                    nodes.append(GraphNode(
+                                        id=pid,
+                                        name=self.G.nodes[pid]['name'],
+                                        kind=self.G.nodes[pid]['kind'],
+                                        depth=k
+                                    ))
+                            # افزودن یال‌های مسیر
+                            for k in range(len(path) - 1):
+                                ed = self.G.get_edge_data(path[k], path[k+1])
+                                if ed:
+                                    edges.append(GraphEdge(
+                                        source=path[k],
+                                        target=path[k+1],
+                                        relation=ed.get('metaedge', 'related'),
+                                        weight=ed.get('weight', 1.0)
+                                    ))
             
             # یافتن یال‌های مرتبط
             for node in nodes:
@@ -2481,21 +2755,41 @@ class GraphRAGService:
                     ))
         
         elif method == RetrievalMethod.HYBRID_NEW:
-            # ترکیب روش‌های جدید
+            # ترکیب روش‌های جدید با قفل موجودیت (Entity Locking) و فیلتر نویز
             print("🔍 استفاده از الگوریتم HYBRID_NEW")
-            
+
+            # تحلیل نیت سوال و استخراج توکن‌ها برای قفل موجودیت
+            intent = self.analyze_question_intent(query)
+            keywords = self.extract_keywords(query)
+            matched_nodes = self.match_tokens_to_nodes(keywords)
+
+            # تشخیص سناریوی ژن-سرطان و اعمال عمق محدودتر
+            is_gene_cancer = self._is_gene_cancer_question(query, matched_nodes)
+            local_max_depth = 2 if is_gene_cancer else max_depth
+
+            # انتخاب دقیق هسته‌ها متناسب با نوع سوال و تطبیق‌ها
+            try:
+                core_candidates = self._extract_core_nodes(query, matched_nodes, intent)
+            except Exception:
+                core_candidates = []
+            core_node_id = core_candidates[0] if core_candidates else None
+
             # ترکیب چندین روش
             methods_results = []
-            
-            # 1. جستجوی معنایی هوشمند
-            intelligent_result = self.intelligent_semantic_search(query, max_depth)
+
+            # 0. اگر نود هسته یافت شد، آن را با امتیاز بالا اضافه کن
+            if core_node_id is not None:
+                methods_results.append((core_node_id, 0, 100.0, 'Core Entity Lock'))
+
+            # 1. جستجوی معنایی هوشمند (با عمق محلی)
+            intelligent_result = self.intelligent_semantic_search(query, local_max_depth)
             methods_results.extend(intelligent_result)
-            
-            # 2. جستجوی چندمرحله‌ای
-            multi_hop_result = self.multi_hop_search(query, max_depth)
+
+            # 2. جستجوی چندمرحله‌ای (با عمق محلی)
+            multi_hop_result = self.multi_hop_search(query, local_max_depth)
             for node_id, depth, score, reason, path in multi_hop_result:
                 methods_results.append((node_id, depth, score, reason))
-            
+
             # 3. PageRank (اگر در دسترس باشد)
             try:
                 import networkx as nx
@@ -2503,18 +2797,34 @@ class GraphRAGService:
                 sorted_nodes = sorted(pagerank_scores.items(), key=lambda x: x[1], reverse=True)
                 for node_id, score in sorted_nodes[:max_nodes//3]:
                     if node_id in self.G.nodes:
-                        methods_results.append((node_id, 0, score, "PageRank"))
-            except:
+                        methods_results.append((node_id, 0, score, 'PageRank'))
+            except Exception:
                 pass
-            
+
+            # بازنمره‌دهی چندمعیاره: نزدیکی به نود هسته + امتیاز پایه
+            if core_node_id is not None:
+                for idx in range(len(methods_results)):
+                    node_id, depth, score, reason = methods_results[idx]
+                    try:
+                        dist = nx.shortest_path_length(self.G, core_node_id, node_id)
+                        if dist == 0:
+                            score += 20.0
+                        elif dist <= 2:
+                            score += 5.0
+                        else:
+                            score += 0.0
+                    except Exception:
+                        pass
+                    methods_results[idx] = (node_id, depth, score, reason)
+
             # ترکیب و مرتب‌سازی نتایج
             unique_results = {}
             for node_id, depth, score, reason in methods_results:
                 if node_id not in unique_results or score > unique_results[node_id][2]:
                     unique_results[node_id] = (node_id, depth, score, reason)
-            
+
             final_results = sorted(unique_results.values(), key=lambda x: x[2], reverse=True)
-            
+
             # تبدیل نتایج به GraphNode
             for node_id, depth, score, reason in final_results[:max_nodes]:
                 nodes.append(GraphNode(
@@ -2524,24 +2834,34 @@ class GraphRAGService:
                     depth=depth,
                     score=score
                 ))
-            
+
             # یافتن مسیرهای ارتباطی بین نودها
             if len(nodes) >= 2:
                 node_ids = [node.id for node in nodes]
-                for i in range(len(node_ids)):
-                    for j in range(i+1, len(node_ids)):
-                        paths.extend(self.get_shortest_paths(node_ids[i], node_ids[j]))
-            
-            # یافتن یال‌های مرتبط
+                if core_node_id is not None and core_node_id in node_ids:
+                    # فقط مسیرهای از نود هسته به سایر نودها برای کاهش نویز
+                    for nid in node_ids:
+                        if nid != core_node_id:
+                            paths.extend(self.get_shortest_paths(core_node_id, nid))
+                else:
+                    for i in range(len(node_ids)):
+                        for j in range(i+1, len(node_ids)):
+                            paths.extend(self.get_shortest_paths(node_ids[i], node_ids[j]))
+
+            # یافتن یال‌های مرتبط با فیلتر نویز (حذف DrD/CrC مگر سوال شباهت بیماری‌ها باشد)
+            disease_similarity = intent.get('question_type') == 'disease_similarity'
             for node in nodes:
                 for neighbor in self.G.neighbors(node.id):
                     if any(n.id == neighbor for n in nodes):
                         edge_data = self.G.get_edge_data(node.id, neighbor)
                         if edge_data:
+                            metaedge = edge_data.get('metaedge', 'related')
+                            if not disease_similarity and metaedge in ['DrD', 'CrC']:
+                                continue
                             edges.append(GraphEdge(
                                 source=node.id,
                                 target=neighbor,
-                                relation=edge_data.get('metaedge', 'related'),
+                                relation=metaedge,
                                 weight=edge_data.get('weight', 1.0)
                             ))
         
@@ -2584,7 +2904,11 @@ class GraphRAGService:
             method=str(method),
             query=query
         )
-        context_text = self._create_enhanced_context_text(retrieval_result)
+        # تولید متن زمینه بهبود یافته
+        if self.context_generator:
+            context_text = self.context_generator.create_enhanced_context_text(retrieval_result, context_type="INTELLIGENT")
+        else:
+            context_text = self._create_enhanced_context_text(retrieval_result)
         
         return RetrievalResult(
             nodes=nodes,
@@ -2622,11 +2946,15 @@ class GraphRAGService:
         return ""
     
     def _create_enhanced_context_text(self, retrieval_result: RetrievalResult) -> str:
-        """
-        تابع قدیمی تولید متن زمینه بهبود یافته - استفاده نمی‌شود
-        برای استفاده از سیستم جدید، از EnhancedContextGenerator استفاده کنید
-        """
-        return "برای استفاده از سیستم بهبود یافته، از IntegratedGraphRAGService استفاده کنید"
+        """سازگاری: اگر ژنراتور در دسترس نبود، متن ساده بساز."""
+        parts = []
+        if retrieval_result.nodes:
+            parts.append("نودها:")
+            parts.extend([f"• {n.name} ({n.kind})" for n in retrieval_result.nodes[:10]])
+        if retrieval_result.edges:
+            parts.append("\nروابط:")
+            parts.extend([f"• {e.source} → {e.target} ({e.relation})" for e in retrieval_result.edges[:10]])
+        return "\n".join(parts) if parts else "اطلاعات کافی یافت نشد."
 
     def _create_advanced_context_text(self, retrieval_result: RetrievalResult) -> str:
         """
@@ -2703,7 +3031,7 @@ class GraphRAGService:
                         'score': score
                     })
                 elif node_kind == 'Compound':
-                    retrieval_data['drugs'].append({
+                    retrieval_data['compound'].append({
                         'name': node_name,
                         'metaedge': metaedge,
                         'score': score
@@ -3055,9 +3383,9 @@ class GraphRAGService:
             context_parts.append("")
         
         # 7. داروهای مرتبط
-        if retrieval_data['drugs']:
+        if retrieval_data['compound']:
             context_parts.append("**Related Drugs/Compounds:**")
-            for drug in retrieval_data['drugs'][:3]:
+            for drug in retrieval_data['compound'][:3]:
                 context_parts.append(f"• {drug['name']}")
             context_parts.append("")
         
@@ -3120,7 +3448,7 @@ class GraphRAGService:
         print(f"• فرآیندهای زیستی: {len(retrieval_data['biological_processes'])}")
         print(f"• مسیرهای زیستی: {len(retrieval_data['pathways'])}")
         print(f"• بیماری‌ها: {len(retrieval_data['diseases'])}")
-        print(f"• داروها: {len(retrieval_data['drugs'])}")
+        print(f"• داروها: {len(retrieval_data['compound'])}")
         print(f"• بافت‌ها: {len(retrieval_data['anatomy'])}")
         
         # نمایش ژن‌های اصلی با جزئیات
@@ -3173,7 +3501,7 @@ class GraphRAGService:
         print(f"• فرآیندهای زیستی: {len(retrieval_data['biological_processes'])}")
         print(f"• مسیرهای زیستی: {len(retrieval_data['pathways'])}")
         print(f"• بیماری‌ها: {len(retrieval_data['diseases'])}")
-        print(f"• داروها: {len(retrieval_data['drugs'])}")
+        print(f"• داروها: {len(retrieval_data['compound'])}")
         
         # نمایش متن ساختاریافته بهبود یافته
         structured_text = self._create_structured_text_for_model(retrieval_data, query)
@@ -3217,6 +3545,8 @@ class GraphRAGService:
                        model: GenerationModel, text_generation_type: str = 'INTELLIGENT') -> GenerationResult:
         """تولید پاسخ بر اساس نتایج بازیابی"""
         print(f"🤖 تولید پاسخ با مدل {model.value} و نوع {text_generation_type}...")
+        # اطمینان از آماده بودن PageRank برای استفاده در امتیازدهی ضمنی
+        self._ensure_pagerank()
         
         # انتخاب نوع تولید متن
         if text_generation_type == 'SIMPLE':
@@ -3439,7 +3769,9 @@ class GraphRAGService:
             important_edges = edges[:5]  # حداکثر 5 یال
             edge_descriptions = []
             for edge in important_edges:
-                edge_descriptions.append(f"{edge.source} → {edge.target} ({edge.relation})")
+                sdisp = self._display_node(edge.source)
+                tdisp = self._display_node(edge.target)
+                edge_descriptions.append(f"{sdisp} → {tdisp} ({edge.relation})")
             if edge_descriptions:
                 context_parts.append(f"رابطه‌های مهم: {'; '.join(edge_descriptions)}")
         
@@ -3471,7 +3803,9 @@ class GraphRAGService:
         if edges:
             context_parts.append("\nتحلیل روابط:")
             for edge in edges[:5]:
-                context_parts.append(f"• {edge.source} {edge.relation} {edge.target}")
+                sdisp = self._display_node(edge.source)
+                tdisp = self._display_node(edge.target)
+                context_parts.append(f"• {sdisp} {edge.relation} {tdisp}")
         
         context_text = "\n".join(context_parts) if context_parts else "اطلاعات کافی برای تحلیل علمی یافت نشد."
         return remove_emojis(context_text)
@@ -3668,9 +4002,9 @@ class GraphRAGService:
                 context_parts.append(f"**مسیر {i+1}:**")
                 for j, node in enumerate(path):
                     if j < len(path) - 1:
-                        context_parts.append(f"  {node} →")
+                        context_parts.append(f"  {self._display_node(node)} →")
                     else:
-                        context_parts.append(f"  {node}")
+                        context_parts.append(f"  {self._display_node(node)}")
                 
                 # اضافه کردن توضیح توصیفی برای مسیر
                 path_description = self._create_path_description(path, edges)
@@ -3689,7 +4023,7 @@ class GraphRAGService:
             for edge in edges:
                 if edge.relation not in edge_types:
                     edge_types[edge.relation] = []
-                edge_types[edge.relation].append(f"{edge.source} → {edge.target}")
+                edge_types[edge.relation].append(f"{self._display_node(edge.source)} → {self._display_node(edge.target)}")
             
             for relation, connections in sorted(edge_types.items(), key=lambda x: len(x[1]), reverse=True)[:3]:
                 desc = METAEDGE_DESCRIPTIONS.get(relation, relation)
@@ -3863,7 +4197,7 @@ class GraphRAGService:
         context_parts = []
         
         # 1. مقدمه هوشمند با تمرکز روی گره مرکزی
-        context_parts.append(f"🧠 **متن زمینه هوشمند برای سوال:** {query}")
+        context_parts.append(f"🧠 **متن زمینه هوشمند برای سوال. از این اطلاعات استفاده کن و در نهایت پاسخ سوال را با اطلاعاتی که به نظرت به جواب سوال کمک میکنه استفاده کن و سوال رو به بهترین شکل پاسخ بده** {query}")
         context_parts.append("")
         
         # شناسایی گره مرکزی و نقش زیستی آن
@@ -3945,7 +4279,7 @@ class GraphRAGService:
             for i, path in enumerate(paths[:3]):
                 path_length = len(path)
                 context_parts.append(f"• مسیر {i+1}: {path_length} گام زیستی")
-                context_parts.append(f"  مسیر: {' → '.join(path)}")
+                context_parts.append(f"  مسیر: {' → '.join([self._display_node(n) for n in path])}")
                 
                 # تولید توضیح توصیفی برای مسیر
                 path_description = self._create_path_description(path, edges)
@@ -4182,9 +4516,7 @@ class GraphRAGService:
         for relation, edges in relations_by_type.items():
             answer_parts.append(f"\n📌 {relation.upper()} ({len(edges)} connections):")
             for edge in edges:  # نمایش تمام روابط
-                source_name = next(n.name for n in retrieval_result.nodes if n.id == edge.source)
-                target_name = next(n.name for n in retrieval_result.nodes if n.id == edge.target)
-                answer_parts.append(f"  • {source_name} → {target_name}")
+                answer_parts.append(f"  • {self._display_node(edge.source)} → {self._display_node(edge.target)}")
         
         return "\n".join(answer_parts)
     
@@ -4203,9 +4535,7 @@ class GraphRAGService:
         if treatment_edges:
             answer_parts.append(f"\n✅ TREATMENT RELATIONSHIPS ({len(treatment_edges)} found):")
             for edge in treatment_edges:
-                source_name = next(n.name for n in retrieval_result.nodes if n.id == edge.source)
-                target_name = next(n.name for n in retrieval_result.nodes if n.id == edge.target)
-                answer_parts.append(f"  • {source_name} treats {target_name}")
+                answer_parts.append(f"  • {self._display_node(edge.source)} treats {self._display_node(edge.target)}")
         
         # داروهای یافت شده
         if drug_nodes:
@@ -4247,9 +4577,7 @@ class GraphRAGService:
         if gene_process_edges:
             answer_parts.append(f"\n🔗 GENE-PROCESS RELATIONSHIPS ({len(gene_process_edges)}):")
             for edge in gene_process_edges:
-                source_name = next(n.name for n in retrieval_result.nodes if n.id == edge.source)
-                target_name = next(n.name for n in retrieval_result.nodes if n.id == edge.target)
-                answer_parts.append(f"  • {source_name} → {target_name}")
+                answer_parts.append(f"  • {self._display_node(edge.source)} → {self._display_node(edge.target)}")
         
         return "\n".join(answer_parts)
     
@@ -4338,9 +4666,7 @@ class GraphRAGService:
         if retrieval_result.edges:
             answer_parts.append(f"\n🔗 KEY RELATIONSHIPS ({len(retrieval_result.edges)}):")
             for edge in retrieval_result.edges:
-                source_name = next(n.name for n in retrieval_result.nodes if n.id == edge.source)
-                target_name = next(n.name for n in retrieval_result.nodes if n.id == edge.target)
-                answer_parts.append(f"  • {source_name} → {target_name} ({edge.relation})")
+                answer_parts.append(f"  • {self._display_node(edge.source)} → {self._display_node(edge.target)} ({edge.relation})")
         
         return "\n".join(answer_parts)
     
@@ -4398,7 +4724,7 @@ class GraphRAGService:
             for edge in edges:
                 source_name = next(n.name for n in retrieval_result.nodes if n.id == edge.source)
                 target_name = next(n.name for n in retrieval_result.nodes if n.id == edge.target)
-                answer_parts.append(f"  - {source_name} → {target_name}")
+                answer_parts.append(f"  - {self._display_node(edge.source)} → {self._display_node(edge.target)}")
             answer_parts.append("")
         
         # تحلیل آماری
@@ -4431,9 +4757,7 @@ class GraphRAGService:
         if treatment_edges:
             answer_parts.append("**روابط درمانی:**")
             for edge in treatment_edges[:5]:
-                source_name = next(n.name for n in retrieval_result.nodes if n.id == edge.source)
-                target_name = next(n.name for n in retrieval_result.nodes if n.id == edge.target)
-                answer_parts.append(f"• {source_name} درمان می‌کند: {target_name}")
+                answer_parts.append(f"• {self._display_node(edge.source)} درمان می‌کند: {self._display_node(edge.target)}")
         
         if not drug_nodes and not disease_nodes:
             answer_parts.append("❌ اطلاعات دارویی یا بیماری در نتایج یافت نشد.")
@@ -4468,9 +4792,7 @@ class GraphRAGService:
         if gene_process_edges:
             answer_parts.append("**روابط ژن-فرآیند:**")
             for edge in gene_process_edges[:5]:
-                source_name = next(n.name for n in retrieval_result.nodes if n.id == edge.source)
-                target_name = next(n.name for n in retrieval_result.nodes if n.id == edge.target)
-                answer_parts.append(f"• {source_name} → {target_name} ({edge.relation})")
+                answer_parts.append(f"• {self._display_node(edge.source)} → {self._display_node(edge.target)} ({edge.relation})")
             answer_parts.append("")
         
         # تحلیل آماری
@@ -4509,9 +4831,7 @@ class GraphRAGService:
         if disease_gene_edges:
             answer_parts.append("**روابط بیماری-ژن:**")
             for edge in disease_gene_edges[:5]:
-                source_name = next(n.name for n in retrieval_result.nodes if n.id == edge.source)
-                target_name = next(n.name for n in retrieval_result.nodes if n.id == edge.target)
-                answer_parts.append(f"• {source_name} → {target_name}")
+                answer_parts.append(f"• {self._display_node(edge.source)} → {self._display_node(edge.target)}")
         
         if not disease_nodes:
             answer_parts.append("❌ اطلاعات بیماری در نتایج یافت نشد.")
@@ -5472,7 +5792,10 @@ class GraphRAGService:
             'CiPC': 2.5  # Compound includes Pharmacologic Class
         }
         
+        # کاهش وزن روابط شباهت برای جلوگیری از نویز در سوالات مکانیزمی
         base_score = base_scores.get(metaedge, 2.5)
+        if metaedge in ['DrD', 'CrC']:
+            base_score *= 0.6
         
         # بهبود محاسبه جریمه عمق
         if depth == 1:
@@ -5537,6 +5860,484 @@ class GraphRAGService:
         }
         
         return reverse_mapping.get(metaedge, [])
+    
+    # ==================== KGSearch (Intent-Aware + Schema-Aware for Hetionet) ====================
+    def kgsearch_traceable(self, query: str, top_k: int = 10) -> Tuple[List[Dict[str, Any]], str]:
+        """
+        اجرای kgsearch مبتنی بر Hetionet با توجه به Intent/Schema.
+        خروجی: (hits, summary)
+
+        هر hit شامل یک مسیر traceable با نود/یال‌ها و متادیتا است.
+        """
+        if not self.G:
+            return [], "گراف بارگذاری نشده است"
+
+        intent_cfg = self._detect_intent_schema_map(query)
+        allow = intent_cfg["allow"]
+        deny = intent_cfg["deny"]
+        end_type = intent_cfg["end_type"]
+        hop_limit = intent_cfg["hop_limit"]
+        constraints = intent_cfg.get("constraints", {})
+
+        # 1) Canonicalization & Core Lock
+        intent = self.analyze_question_intent(query)
+        tokens = intent.get("keywords", [])
+        matched = self.match_tokens_to_nodes(tokens)
+        core_nodes = self._extract_core_nodes(query, matched, intent)
+        if not core_nodes and matched:
+            core_nodes = list(dict.fromkeys(matched.values()))[:3]
+
+        # 2) Retrieval constrained by schema (allowlist/denylist + end-type)
+        paths_with_meta = self._find_paths_allowlist(
+            core_nodes=core_nodes,
+            allow_metaedges=allow,
+            deny_metaedges=deny,
+            end_kind=end_type,
+            hop_limit=hop_limit,
+            max_results_per_hop=100,
+            require_unique_nodes=True,
+            extra_constraints=constraints,
+            query=query,
+        )
+
+        # 3) Ranking
+        # اگر intent دقیقاً هم‌واریانس ژن‌هاست، خروجی را مینیمال و ۱-هاپ روی GcG نگه‌دار
+        if intent_cfg.get('intent') == 'G-G_covary':
+            paths_with_meta = [p for p in paths_with_meta if len(p.get('path_nodes', [])) == 2 and all(m == 'GcG' for m in p.get('metaedges', []) if m)]
+        ranked = self._rank_paths(paths_with_meta, query, intent_cfg)
+        hits = []
+        for rank, item in enumerate(ranked[:top_k], start=1):
+            path_nodes = item["path_nodes"]
+            path_edges = item["path_edges"]
+            score = item["score"]
+            hop_count = max(0, len(path_nodes) - 1)
+
+            # ساخت JSON مسیر مطابق فرمت خواسته‌شده
+            json_path: List[Dict[str, Any]] = []
+            for i, nid in enumerate(path_nodes):
+                json_path.append({
+                    "id": nid,
+                    "label": self.G.nodes[nid].get("name", nid),
+                    "type": self.G.nodes[nid].get("kind", "Unknown")
+                })
+                if i < len(path_nodes) - 1:
+                    src, dst = nid, path_nodes[i+1]
+                    ed = self.G.get_edge_data(src, dst) or {}
+                    metaedge = ed.get("metaedge") or ed.get("relation") or "related"
+                    # ساخت شناسه یال پایدار
+                    edge_id = f"Edge::{metaedge}::{src}__{dst}"
+                    evidence_count = ed.get("evidence_count") or ed.get("evidence") or None
+                    source_count = ed.get("source_count") or (len(ed.get("sources", [])) if isinstance(ed.get("sources"), list) else None)
+                    unbiased = ed.get("unbiased") if "unbiased" in ed else None
+                    extra = {}
+                    for k in ("cov_metric", "weight", "score"):
+                        if k in ed:
+                            extra[k] = ed[k]
+                    json_path.append({
+                        "edge_id": edge_id,
+                        "edge_type": metaedge,
+                        "unbiased": unbiased,
+                        "evidence_count": evidence_count,
+                        "source_count": source_count,
+                        **extra
+                    })
+
+            notes = item.get("notes", "")
+            hits.append({
+                "rank": rank,
+                "path": json_path,
+                "end_type": end_type,
+                "hop_count": hop_count,
+                "score": round(score, 4),
+                "notes": notes
+            })
+
+        # 4) Fallback اگر نتیجه تهی شد
+        used_fallback = False
+        if not hits:
+            fb = self._fallback_from_intent(intent_cfg.get("intent"))
+            if fb:
+                used_fallback = True
+                allow_fb = fb["allow"]
+                end_type_fb = fb["end_type"] or end_type
+                hop_limit_fb = fb["hop_limit"] or hop_limit
+                paths_with_meta = self._find_paths_allowlist(
+                    core_nodes=core_nodes,
+                    allow_metaedges=allow_fb,
+                    deny_metaedges=deny,
+                    end_kind=end_type_fb,
+                    hop_limit=hop_limit_fb,
+                    max_results_per_hop=100,
+                    require_unique_nodes=True,
+                    extra_constraints=fb.get("constraints", {}),
+                    query=query,
+                )
+                ranked = self._rank_paths(paths_with_meta, query, fb)
+                for rank, item in enumerate(ranked[:top_k], start=1):
+                    path_nodes = item["path_nodes"]
+                    hop_count = max(0, len(path_nodes) - 1)
+                    json_path: List[Dict[str, Any]] = []
+                    for i, nid in enumerate(path_nodes):
+                        json_path.append({
+                            "id": nid,
+                            "label": self.G.nodes[nid].get("name", nid),
+                            "type": self.G.nodes[nid].get("kind", "Unknown")
+                        })
+                        if i < len(path_nodes) - 1:
+                            src, dst = nid, path_nodes[i+1]
+                            ed = self.G.get_edge_data(src, dst) or {}
+                            metaedge = ed.get("metaedge") or ed.get("relation") or "related"
+                            edge_id = f"Edge::{metaedge}::{src}__{dst}"
+                            json_path.append({
+                                "edge_id": edge_id,
+                                "edge_type": metaedge,
+                                "unbiased": ed.get("unbiased") if "unbiased" in ed else None,
+                                "evidence_count": ed.get("evidence_count") or ed.get("evidence") or None,
+                                "source_count": ed.get("source_count") or (len(ed.get("sources", [])) if isinstance(ed.get("sources"), list) else None),
+                            })
+                    hits.append({
+                        "rank": rank,
+                        "path": json_path,
+                        "end_type": end_type_fb,
+                        "hop_count": hop_count,
+                        "score": round(item["score"], 4),
+                        "notes": (item.get("notes", "") + " | fallback")[:200]
+                    })
+
+        # 5) Summary کوتاه فارسی
+        if hits:
+            sum_lines = []
+            sum_lines.append(f"نتایج بر اساس Intent='{intent_cfg.get('intent')}', با metaedgeهای مجاز: {', '.join(allow)}؛ end-type='{end_type}' و hop≤{hop_limit}.")
+            if used_fallback:
+                sum_lines.append("از fallback طبق قواعد استفاده شد؛ این روابط proxy هستند.")
+            sum_lines.append(f"تعداد مسیرهای برتر: {min(top_k, len(hits))}، با تمرکز بر مسیرهای کوتاه و شواهد قوی.")
+            summary = "\n".join(sum_lines)
+        else:
+            summary = "چیزی یافت نشد: برای این Intent، یال مرتبط موجود نبود. پیشنهاد: fallback یا افزایش hop-limit را امتحان کنید."
+
+        return hits[:top_k], summary
+
+    def _detect_intent_schema_map(self, query: str) -> Dict[str, Any]:
+        q = (query or "").lower()
+        # پیش‌فرض
+        cfg = {
+            "intent": "general",
+            "allow": [],
+            "deny": ["DrD", "CrC"],
+            "end_type": None,
+            "hop_limit": 2,
+            "constraints": {}
+        }
+
+        # فعال‌سازی شباهت تنها در صورت ذکر
+        resembles = any(k in q for k in ["resembles", "similar", "similarity", "alike"])
+
+        # I. Gene→Gene
+        if any(k in q for k in ["co-expression", "coexpression", "covary", "covaries", "هم‌واریانس", "هم‌بروز", "هم‌تغییر"]):
+            cfg.update({"intent": "G-G_covary", "allow": ["GcG"], "end_type": "Gene", "hop_limit": 1})
+        elif any(k in q for k in ["interaction", "interacts", "ppi", "تعامل"]):
+            cfg.update({"intent": "G-G_interact", "allow": ["GiG"], "end_type": "Gene", "hop_limit": 1})
+        elif any(k in q for k in ["regulates", "regulation", "تنظیم"]):
+            cfg.update({"intent": "G-G_regulates", "allow": ["Gr>G"], "end_type": "Gene", "hop_limit": 1})
+
+        # II. Disease→Drug/Class
+        elif any(k in q for k in ["treats", "treatment", "therapy", "therapeutic", "درمان", "پالیتیو"]):
+            allow = ["CtD", "CpD", "PCiC", "CbG"]
+            if resembles:
+                pass
+            cfg.update({
+                "intent": "D→(C|PC)",
+                "allow": allow,
+                "end_type": ("Compound|Pharmacologic Class"),
+                "hop_limit": 3,
+                "constraints": {"require_any_edge": ["CtD", "CpD"], "require_edge_to": "Disease"}
+            })
+
+        # III. Gene→Drug/Class
+        elif any(k in q for k in ["drug", "compound", "pharmacologic class", "mechanism", "target"]):
+            cfg.update({
+                "intent": "G→(C|PC)",
+                "allow": ["GiG", "Gr>G", "CbG", "PCiC"],
+                "end_type": ("Compound|Pharmacologic Class"),
+                "hop_limit": 4
+            })
+
+        # IV. Gene→Disease
+        elif any(k in q for k in ["disease", "associated", "association", "بیماری"]):
+            cfg.update({"intent": "G→D", "allow": ["DaG"], "end_type": "Disease", "hop_limit": 2})
+
+        # V. Disease→Symptom / Anatomy
+        if any(k in q for k in ["symptom", "علائم", "signs"]):
+            cfg.update({"intent": "D→S", "allow": ["DpS"], "end_type": "Symptom", "hop_limit": 1})
+        if any(k in q for k in ["anatomy", "tissue", "بافت", "anatomical", "localized"]):
+            cfg.update({"intent": "D→A", "allow": ["DlA"], "end_type": "Anatomy", "hop_limit": 1})
+
+        # VI. Drug→Target/Mechanism/Side-effect
+        if any(k in q for k in ["side effect", "adverse", "عوارض"]):
+            cfg.update({"intent": "C→SE", "allow": ["CcSE"], "end_type": "Side Effect", "hop_limit": 1})
+        elif any(k in q for k in ["mechanism", "target", "binds", "regulates"]):
+            cfg.update({"intent": "C→(G|BP|PW)", "allow": ["CbG", "PCiC", "GiG", "Gr>G", "GpPW", "GpBP"], "end_type": ("Gene|BP|PW"), "hop_limit": 2})
+
+        # VII. Anatomy→Gene
+        if any(k in q for k in ["expressed in", "expression", "بیان"]):
+            cfg.update({"intent": "A→G_expression", "allow": ["AeG"], "end_type": "Gene", "hop_limit": 1})
+        if any(k in q for k in ["upregulates", "downregulates", "regulates"]):
+            # Anatomy regulation of Gene
+            cfg.update({"intent": "A→G_regulation", "allow": ["AuG", "AdG"], "end_type": "Gene", "hop_limit": 1})
+
+        # VIII. Pathway/BP/MF membership
+        if any(k in q for k in ["pathway", "biological process", "molecular function", "go:"]):
+            cfg.update({"intent": "G↔(PW|BP|MF)", "allow": ["GpPW", "GpBP", "GpMF"], "end_type": ("Gene|PW|BP|MF"), "hop_limit": 1})
+
+        # Denylist for similarity unless explicitly requested
+        if resembles:
+            cfg["deny"] = [m for m in cfg["deny"] if m not in ("DrD", "CrC")]
+        return cfg
+
+    def _fallback_from_intent(self, intent: Optional[str]) -> Optional[Dict[str, Any]]:
+        if not intent:
+            return None
+        # قواعد fallback
+        if intent == "G-G_covary":
+            return {"intent": "G-G_interact", "allow": ["GiG"], "end_type": "Gene", "hop_limit": 1}
+        if intent == "D→(C|PC)":
+            return {"intent": "D→(C|PC)_palliative", "allow": ["CpD", "PCiC"], "end_type": ("Compound|Pharmacologic Class"), "hop_limit": 3,
+                    "constraints": {"require_any_edge": ["CtD", "CpD"], "require_edge_to": "Disease"}}
+        if intent == "C→(G|BP|PW)":
+            return {"intent": "C→PC→C", "allow": ["PCiC"], "end_type": ("Gene|BP|PW|Compound|Pharmacologic Class"), "hop_limit": 3}
+        if intent == "G→(C|PC)":
+            return {"intent": "G→G→(C|PC)", "allow": ["GiG", "Gr>G", "CbG", "PCiC"], "end_type": ("Compound|Pharmacologic Class"), "hop_limit": 4}
+        return None
+
+    def _find_paths_allowlist(
+        self,
+        core_nodes: List[str],
+        allow_metaedges: List[str],
+        deny_metaedges: List[str],
+        end_kind: Optional[str],
+        hop_limit: int,
+        max_results_per_hop: int,
+        require_unique_nodes: bool,
+        extra_constraints: Dict[str, Any],
+        query: str,
+    ) -> List[Dict[str, Any]]:
+        """
+        جستجوی مسیرها فقط با metaedgeهای مجاز، با اعمال end-type و قیود.
+        خروجی: لیست دیکشنری شامل path_nodes, path_edges و متادیتا برای رتبه‌بندی.
+        """
+        if not core_nodes:
+            return []
+        allow_set = set(allow_metaedges or [])
+        deny_set = set(deny_metaedges or [])
+
+        def valid_edge(u, v) -> Optional[str]:
+            ed = self.G.get_edge_data(u, v) or {}
+            meta = ed.get("metaedge") or ed.get("relation")
+            if not meta:
+                return None
+            if meta in deny_set:
+                return None
+            if allow_set and meta not in allow_set:
+                return None
+            return meta
+
+        results: List[Dict[str, Any]] = []
+        seen_paths: set = set()
+
+        for start in core_nodes:
+            if not self.G.has_node(start):
+                continue
+            # DFS محدود به hop_limit و allowlist
+            stack: List[Tuple[str, List[str]]] = [(start, [start])]
+            per_hop_counts = [0] * (hop_limit + 1)
+            while stack:
+                node, path = stack.pop()
+                depth = len(path) - 1
+                if depth > hop_limit:
+                    continue
+                # انتهایی معتبر؟
+                if depth >= 1:
+                    if end_kind:
+                        k = self.G.nodes[path[-1]].get("kind")
+                        if k == end_kind or (isinstance(end_kind, str) and any(et.strip() == k for et in end_kind.split("|"))):
+                            # قیود خاص Intent (مثل وجود CtD/CpD روی Disease)
+                            if self._path_satisfies_constraints(path, extra_constraints):
+                                key = tuple(path)
+                                if key not in seen_paths:
+                                    seen_paths.add(key)
+                                    results.append({
+                                        "path_nodes": path.copy(),
+                                        "path_edges": self._edges_for_path(path),
+                                        "metaedges": [valid_edge(path[i], path[i+1]) for i in range(len(path)-1)]
+                                    })
+                if depth == hop_limit:
+                    continue
+                # کنترل max_results_per_hop
+                if per_hop_counts[depth] >= max_results_per_hop:
+                    continue
+                per_hop_counts[depth] += 1
+
+                for nbr in self.G.neighbors(node):
+                    if require_unique_nodes and nbr in path:
+                        continue
+                    meta = valid_edge(node, nbr)
+                    if not meta:
+                        continue
+                    # enforce end-kind at final hop only
+                    next_depth = depth + 1
+                    if next_depth == hop_limit and end_kind:
+                        k = self.G.nodes[nbr].get("kind")
+                        if isinstance(end_kind, str):
+                            end_ok = any(et.strip() == k for et in end_kind.split("|")) or (k == end_kind)
+                        else:
+                            end_ok = (k == end_kind)
+                        if not end_ok:
+                            continue
+                    stack.append((nbr, path + [nbr]))
+
+        return results
+
+    def _edges_for_path(self, path: List[str]) -> List[Tuple[str, str, str]]:
+        edges = []
+        for i in range(len(path) - 1):
+            u, v = path[i], path[i+1]
+            ed = self.G.get_edge_data(u, v) or {}
+            meta = ed.get("metaedge") or ed.get("relation") or "related"
+            edges.append((u, v, meta))
+        return edges
+
+    def _path_satisfies_constraints(self, path: List[str], constraints: Dict[str, Any]) -> bool:
+        if not constraints:
+            return True
+        # مثال: require_any_edge=[CtD,CpD] که به Disease متصل باشد
+        req_any = constraints.get("require_any_edge") or []
+        req_to = constraints.get("require_edge_to")  # نوع نودی که یال باید به آن وصل شود
+        if req_any:
+            ok = False
+            for i in range(len(path) - 1):
+                u, v = path[i], path[i+1]
+                ed = self.G.get_edge_data(u, v) or {}
+                meta = ed.get("metaedge") or ed.get("relation")
+                if meta in req_any:
+                    if not req_to:
+                        ok = True
+                        break
+                    # بررسی نوع مقصد/مبدأ
+                    if self.G.nodes[v].get("kind") == req_to or self.G.nodes[u].get("kind") == req_to:
+                        ok = True
+                        break
+            if not ok:
+                return False
+        return True
+
+    def _rank_paths(self, paths: List[Dict[str, Any]], query: str, intent_cfg: Dict[str, Any]) -> List[Dict[str, Any]]:
+        # وزن‌ها
+        w_match = 0.35
+        w_edge = 0.25
+        w_schema = 0.20
+        w_hop = 0.10
+        w_hub = 0.05
+        w_div = 0.05
+
+        ql = (query or "").lower()
+        allow = set(intent_cfg.get("allow", []))
+        end_type = intent_cfg.get("end_type")
+
+        def match_score(metaedges: List[Optional[str]]) -> float:
+            # تطبیق ساده کلیدواژه با انواع یال
+            s = 0.0
+            if any(m == "GcG" for m in metaedges) and any(k in ql for k in ["covary", "co-expression", "coexpression", "هم‌واریانس", "هم‌بروز"]):
+                s += 1.0
+            if any(m == "GiG" for m in metaedges) and any(k in ql for k in ["interaction", "interacts", "ppi", "تعامل"]):
+                s += 1.0
+            if any(m == "Gr>G" for m in metaedges) and any(k in ql for k in ["regulates", "regulation", "تنظیم"]):
+                s += 1.0
+            if any(m == "CtD" for m in metaedges) and any(k in ql for k in ["treats", "درمان"]):
+                s += 1.0
+            if any(m == "CbG" for m in metaedges) and any(k in ql for k in ["binds", "target", "mechanism"]):
+                s += 1.0
+            return min(s, 1.0)
+
+        def edge_strength_score(path_edges: List[Tuple[str, str, str]]) -> float:
+            # شواهد/بی‌طرفی اگر موجود باشد، در غیر این صورت از نوع یال امتیاز بگیر
+            total = 0.0
+            for u, v, meta in path_edges:
+                ed = self.G.get_edge_data(u, v) or {}
+                evc = ed.get("evidence_count") or ed.get("evidence") or 0
+                unbiased = 1.0 if ed.get("unbiased") else 0.0
+                base = 1.0
+                if meta == "CtD":
+                    base = 1.2
+                elif meta == "CpD":
+                    base = 1.0
+                elif meta == "GcG":
+                    # اگر متریک کوواریانس موجود بود (مثل cov_metric/weight)، در امتیاز اثر بده
+                    cov = ed.get("cov_metric") or ed.get("weight") or 0
+                    try:
+                        cov = float(cov)
+                    except Exception:
+                        cov = 0
+                    base = 1.0 + 0.5 * max(0.0, min(1.0, cov))
+                total += base + 0.05 * float(evc) + 0.1 * unbiased
+            return total / max(1, len(path_edges))
+
+        def schema_fit_score(metaedges: List[Optional[str]]) -> float:
+            if not metaedges:
+                return 0.0
+            ok = sum(1 for m in metaedges if m in allow)
+            return ok / len(metaedges)
+
+        def hop_penalty(num_hops: int) -> float:
+            # بیشینه 1.0 برای کوتاه‌ترین‌ها
+            if num_hops <= 1:
+                return 1.0
+            if num_hops == 2:
+                return 0.8
+            if num_hops == 3:
+                return 0.6
+            return 0.4
+
+        def hub_penalty(path_nodes: List[str]) -> float:
+            # جریمه برای ژن‌های با درجه بالا
+            import math
+            gene_nodes = [n for n in path_nodes if self.G.nodes[n].get("kind") == "Gene"]
+            if not gene_nodes:
+                return 1.0
+            vals = []
+            for n in gene_nodes:
+                d = self.G.degree(n)
+                vals.append(1.0 / (1.0 + math.log(1 + d)))
+            return sum(vals) / len(vals)
+
+        # نرمال‌سازی تنوع روی end-type
+        seen_ends: set = set()
+        ranked = []
+        for item in paths:
+            nodes = item["path_nodes"]
+            edges = item["path_edges"]
+            metas = item.get("metaedges", [])
+            num_hops = max(0, len(nodes) - 1)
+            ms = match_score(metas)
+            es = edge_strength_score(edges)
+            ss = schema_fit_score(metas)
+            hp = hop_penalty(num_hops)
+            hb = hub_penalty(nodes)
+            base = w_match * ms + w_edge * es + w_schema * ss + w_hop * hp + w_hub * hb
+
+            end_id = nodes[-1] if nodes else None
+            end_kind_ok = (self.G.nodes[end_id].get("kind") if end_id and self.G.has_node(end_id) else None)
+            div_bonus = 0.0
+            if end_id:
+                key = (end_kind_ok, end_id)
+                if key not in seen_ends:
+                    div_bonus = w_div * 1.0
+                    seen_ends.add(key)
+            score = base + div_bonus
+
+            ranked.append({**item, "score": float(score), "notes": f"{num_hops} hops; schema-fit={ss:.2f}"})
+
+        ranked.sort(key=lambda x: x["score"], reverse=True)
+        return ranked
     
     def multi_hop_search(self, query: str, max_depth: int = 3) -> List[Tuple[str, int, float, str, List[str]]]:
         """

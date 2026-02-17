@@ -33,8 +33,18 @@
 
         <!-- Main Content -->
         <main class="main-content">
-            <!-- Upload Section -->
-            <section class="upload-section">
+            <!-- Tab Navigation -->
+            <div class="upload-tabs">
+                <button class="tab-btn active" onclick="switchTab('file')" id="tab-file">
+                    <i class="fas fa-file-upload"></i> آپلود فایل
+                </button>
+                <button class="tab-btn" onclick="switchTab('text')" id="tab-text">
+                    <i class="fas fa-file-alt"></i> تبدیل متن به گراف
+                </button>
+            </div>
+
+            <!-- File Upload Section -->
+            <section class="upload-section" id="section-file">
                 <div class="upload-form">
                     <h2><i class="fas fa-cloud-upload-alt"></i> آپلود فایل گراف</h2>
                     
@@ -119,6 +129,337 @@
                 </div>
             </section>
 
+            </section>
+
+            <!-- Text to Graph Section -->
+            <section class="upload-section" id="section-text" style="display: none;">
+                <div class="upload-form">
+                    <h2><i class="fas fa-file-alt"></i> تبدیل متن به گراف دانش</h2>
+                    
+                    <div class="upload-info">
+                        <h3><i class="fas fa-info-circle"></i> درباره تبدیل متن به گراف:</h3>
+                        <p>با استفاده از تکنیک‌های پردازش زبان طبیعی (NLP)، مفاهیم و موجودیت‌های کلیدی از متن استخراج می‌شوند. سپس، با شناسایی روابط بین این مفاهیم، یک گراف دانش ساختاریافته ایجاد می‌شود.</p>
+                    </div>
+
+                    <div class="text-input-section">
+                        <div class="form-group" style="margin-bottom: 15px;">
+                            <label for="url-input"><i class="fas fa-link"></i> یا URL صفحه وب را وارد کنید:</label>
+                            <input type="url" id="url-input" class="form-control" placeholder="https://fa.wikipedia.org/wiki/... یا https://example.com/article">
+                            <small class="form-text text-muted">
+                                سیستم به صورت خودکار متن را از URL استخراج می‌کند.
+                                <strong>برای صفحات ویکی‌پدیا:</strong> استخراج تخصصی شامل Infobox، Categories و لینک‌ها فعال است.
+                            </small>
+                            <div class="form-check" style="margin-top: 10px;">
+                                <input class="form-check-input" type="checkbox" id="use-wikipedia-extraction" checked>
+                                <label class="form-check-label" for="use-wikipedia-extraction">
+                                    استفاده از استخراج تخصصی ویکی‌پدیا (برای صفحات ویکی‌پدیا)
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div style="text-align: center; margin: 10px 0;">
+                            <strong>یا</strong>
+                        </div>
+                        
+                        <label for="text-input"><i class="fas fa-align-right"></i> متن خود را وارد کنید:</label>
+                        <textarea id="text-input" class="text-input" rows="10" placeholder="متن خود را اینجا وارد کنید یا paste کنید...&#10;&#10;مثال:&#10;TP53 participates in apoptosis and interacts with BRCA1. Trastuzumab treats breast cancer."></textarea>
+                        <div class="text-stats">
+                            <span id="text-length">0</span> کاراکتر
+                        </div>
+                    </div>
+
+                    <div class="extraction-settings">
+                        <h3><i class="fas fa-cog"></i> تنظیمات استخراج</h3>
+                        
+                        <div class="form-group">
+                            <label for="extraction-method">روش استخراج:</label>
+                            <select id="extraction-method" class="form-control">
+                                <option value="simple">ساده (Rule-based) - سریع و مناسب برای متن‌های ساختاریافته</option>
+                                <option value="spacy" selected>spaCy - استفاده از پردازش زبان طبیعی (پیشنهادی برای ویکی‌پدیا)</option>
+                                <option value="spacy_svo_enhanced">spaCy SVO Enhanced - استخراج روابط Subject-Verb-Object پیشرفته</option>
+                                <option value="llm">LLM (Single-pass) - استفاده از مدل‌های زبانی پیشرفته</option>
+                                <option value="llm_multipass">LLM Multi-pass - استخراج با چندین پاس برای recall بالاتر</option>
+                                <option value="hybrid">Hybrid - ترکیب چندین روش برای بهترین نتیجه</option>
+                                <option value="persian">Persian - استخراج از متن فارسی با مدل‌های ParsBERT و mT5 (پیشنهادی برای ویکی‌پدیا فارسی)</option>
+                                <option value="span_based">Span-based - استخراج مبتنی بر Span با BioBERT/SciBERT</option>
+                                <option value="with_coreference">With Coreference - استخراج با حل ارجاعات</option>
+                                <option value="long_text">Long Text - پردازش متن‌های طولانی با chunking</option>
+                                <option value="joint_er">Joint ER - استخراج همزمان موجودیت و رابطه (Graph Structure Learning)</option>
+                                <option value="autoregressive">Autoregressive - تولید گراف به صورت sequential با Transformer</option>
+                                <option value="edc">EDC Framework - Extract-Define-Canonicalize (روش سه مرحله‌ای)</option>
+                                <option value="incremental">Incremental - ساخت تدریجی گراف برای متن‌های طولانی</option>
+                            </select>
+                            <small class="form-text text-muted">
+                                <strong>برای ویکی‌پدیا:</strong> از "Persian" (فارسی) یا "spaCy" (انگلیسی) استفاده کنید.
+                                استخراج تخصصی ویکی‌پدیا به صورت خودکار فعال است.
+                            </small>
+                        </div>
+
+                        <div class="form-group" id="llm-settings" style="display: none;">
+                            <label for="hf-token">توکن HuggingFace:</label>
+                            <input type="password" id="hf-token" class="form-control" placeholder="hf_xxxxxxxxxxxxx" value="">
+                            <small class="form-text text-muted">توکن HuggingFace خود را وارد کنید. می‌توانید از <a href="https://huggingface.co/settings/tokens" target="_blank">اینجا</a> دریافت کنید.</small>
+                            
+                            <label for="llm-model" style="margin-top: 15px;">مدل LLM (رایگان):</label>
+                            <select id="llm-model" class="form-control">
+                                <option value="mistralai/Mistral-7B-Instruct-v0.2">Mistral-7B-Instruct (پیشنهادی)</option>
+                                <option value="HuggingFaceH4/zephyr-7b-beta">Zephyr-7B-Beta (رایگان)</option>
+                                <option value="microsoft/Phi-3-mini-4k-instruct">Phi-3-Mini (رایگان)</option>
+                                <option value="Qwen/Qwen2.5-7B-Instruct">Qwen2.5-7B-Instruct (رایگان)</option>
+                                <option value="TinyLlama/TinyLlama-1.1B-Chat-v1.0">TinyLlama-1.1B (رایگان - سریع)</option>
+                                <option value="google/gemma-2b-it">Gemma-2B-IT (رایگان - سبک)</option>
+                                <option value="meta-llama/Llama-3.2-3B-Instruct">Llama-3.2-3B (رایگان)</option>
+                            </select>
+                            <small class="form-text text-muted">مدل‌های رایگان HuggingFace که بدون نیاز به پرداخت قابل استفاده هستند.</small>
+                        </div>
+
+                        <div class="form-group" id="multipass-settings" style="display: none;">
+                            <label for="max-gleanings">تعداد پاس‌های Iterative (max_gleanings):</label>
+                            <input type="number" id="max-gleanings" class="form-control" value="2" min="1" max="5">
+                            <small class="form-text text-muted">تعداد پاس‌های تکرار برای حداکثر کردن recall (پیش‌فرض: 2)</small>
+                        </div>
+
+                        <div class="form-group" id="hybrid-settings" style="display: none;">
+                            <label>روش‌های ترکیبی:</label>
+                            <div class="checkbox-group">
+                                <label><input type="checkbox" value="spacy" checked> spaCy</label>
+                                <label><input type="checkbox" value="llm" checked> LLM</label>
+                                <label><input type="checkbox" value="spacy_svo_enhanced"> spaCy SVO Enhanced</label>
+                                <label><input type="checkbox" value="llm_multipass"> LLM Multi-pass</label>
+                            </div>
+                            <small class="form-text text-muted">انتخاب روش‌هایی که باید ترکیب شوند</small>
+                        </div>
+
+                        <div class="form-group" id="persian-settings" style="display: none;">
+                            <label for="language-select">زبان:</label>
+                            <select id="language-select" class="form-control">
+                                <option value="auto">تشخیص خودکار</option>
+                                <option value="fa">فارسی</option>
+                                <option value="en">انگلیسی</option>
+                            </select>
+                            <small class="form-text text-muted">زبان متن ورودی</small>
+                        </div>
+
+                        <div class="form-group" id="span-based-settings" style="display: none;">
+                            <label for="span-model-type">نوع مدل Span:</label>
+                            <select id="span-model-type" class="form-control">
+                                <option value="biobert">BioBERT - برای موجودیت‌های زیست‌پزشکی</option>
+                                <option value="scibert">SciBERT - برای متون علمی</option>
+                                <option value="auto">انتخاب خودکار</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group" id="long-text-settings" style="display: none;">
+                            <label for="chunking-strategy">استراتژی Chunking:</label>
+                            <select id="chunking-strategy" class="form-control">
+                                <option value="smart">هوشمند - ترکیب پاراگراف و جمله</option>
+                                <option value="sliding_window">Sliding Window - با overlap</option>
+                                <option value="sentence">بر اساس جملات</option>
+                                <option value="paragraph">بر اساس پاراگراف</option>
+                            </select>
+                            
+                            <label for="chunk-overlap" style="margin-top: 15px;">نسبت Overlap (0.0 تا 1.0):</label>
+                            <input type="number" id="chunk-overlap" class="form-control" value="0.2" min="0" max="1" step="0.1">
+                            <small class="form-text text-muted">نسبت overlap بین chunkها در sliding window</small>
+                            
+                            <label for="max-tokens" style="margin-top: 15px;">حداکثر توکن در هر Chunk:</label>
+                            <input type="number" id="max-tokens" class="form-control" value="512" min="128" max="2048" step="128">
+                        </div>
+
+                        <div class="form-group" id="joint-er-settings" style="display: none;">
+                            <label for="structure-iterations">تعداد تکرار برای بهینه‌سازی ساختار:</label>
+                            <input type="number" id="structure-iterations" class="form-control" value="3" min="1" max="10">
+                            <small class="form-text text-muted">تعداد تکرار برای بهینه‌سازی ساختار گراف (پیش‌فرض: 3)</small>
+                        </div>
+
+                        <div class="form-group" id="autoregressive-settings" style="display: none;">
+                            <label for="max-generation-length">حداکثر طول تولید:</label>
+                            <input type="number" id="max-generation-length" class="form-control" value="2048" min="512" max="4096" step="256">
+                            <small class="form-text text-muted">حداکثر طول تولید برای مدل autoregressive (پیش‌فرض: 2048)</small>
+                        </div>
+
+                        <div class="form-group" id="edc-settings" style="display: none;">
+                            <label>
+                                <input type="checkbox" id="use-rag" checked>
+                                استفاده از RAG برای بهبود استخراج
+                            </label>
+                            <small class="form-text text-muted">استفاده از Retrieval Augmented Generation برای بهبود کیفیت استخراج</small>
+                        </div>
+
+                        <div class="form-group" id="incremental-settings" style="display: none;">
+                            <label for="chunk-size">اندازه هر Chunk:</label>
+                            <input type="number" id="chunk-size" class="form-control" value="500" min="100" max="2000" step="100">
+                            <small class="form-text text-muted">اندازه هر chunk برای پردازش incremental (پیش‌فرض: 500)</small>
+                            
+                            <label for="overlap-size" style="margin-top: 15px;">Overlap بین Chunkها:</label>
+                            <input type="number" id="overlap-size" class="form-control" value="100" min="0" max="500" step="50">
+                            <small class="form-text text-muted">تعداد کاراکترهای overlap بین chunkها (پیش‌فرض: 100)</small>
+                            
+                            <label for="incremental-base-method" style="margin-top: 15px;">روش پایه:</label>
+                            <select id="incremental-base-method" class="form-control">
+                                <option value="spacy">spaCy</option>
+                                <option value="simple">Simple</option>
+                                <option value="llm">LLM</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="max-entities">حداکثر موجودیت‌ها:</label>
+                            <input type="number" id="max-entities" class="form-control" value="100" min="10" max="1000">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="max-relationships">حداکثر روابط:</label>
+                            <input type="number" id="max-relationships" class="form-control" value="200" min="10" max="2000">
+                        </div>
+
+                        <div class="form-group" id="confidence-setting" style="display: none;">
+                            <label for="confidence-threshold">آستانه اطمینان (0-1):</label>
+                            <input type="number" id="confidence-threshold" class="form-control" value="0.5" min="0" max="1" step="0.1">
+                        </div>
+
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="enable-preprocessing">
+                                فعال‌سازی پیش‌پردازش متن (حذف کلمات غیر مهم از گراف)
+                            </label>
+                            <small class="form-text text-muted">
+                                کلمات توقف (stop words) از گراف حذف می‌شوند اما برای مدل‌های زبانی حفظ می‌شوند تا معنی کامل حفظ شود.
+                                این گزینه برای روش‌های rule-based و spaCy توصیه می‌شود.
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="advanced-settings">
+                        <h3><i class="fas fa-sliders-h"></i> تنظیمات پیشرفته</h3>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="toggleAdvancedSettings()">
+                            <i class="fas fa-chevron-down"></i> نمایش/مخفی کردن تنظیمات پیشرفته
+                        </button>
+                        
+                        <div id="advanced-settings-content" style="display: none; margin-top: 15px;">
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="enable-entity-resolution" checked>
+                                    فعال‌سازی Entity Resolution (ادغام موجودیت‌های مشابه)
+                                </label>
+                                <small class="form-text text-muted">ادغام خودکار موجودیت‌های مشابه برای بهبود کیفیت گراف</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="enable-coreference">
+                                    فعال‌سازی Coreference Resolution (حل ارجاعات)
+                                </label>
+                                <small class="form-text text-muted">ادغام ارجاعات مانند «این ژن»، «آن پروتئین» با موجودیت‌های اصلی</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="enable-relationship-weighting" checked>
+                                    فعال‌سازی Relationship Weighting
+                                </label>
+                                <small class="form-text text-muted">وزن‌دهی روابط بر اساس تکرار و confidence</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="min-relationship-weight">حداقل وزن رابطه:</label>
+                                <input type="number" id="min-relationship-weight" class="form-control" value="0.0" min="0" max="10" step="0.1">
+                                <small class="form-text text-muted">روابط با وزن کمتر از این مقدار حذف می‌شوند</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="remove-isolated-nodes">
+                                    حذف نودهای ایزوله
+                                </label>
+                                <small class="form-text text-muted">حذف نودهایی که هیچ رابطه‌ای ندارند</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-upload-actions">
+                        <button id="build-graph-btn" class="btn btn-primary">
+                            <i class="fas fa-project-diagram"></i> ساخت گراف
+                        </button>
+                        <button id="clear-text-btn" class="btn btn-secondary">
+                            <i class="fas fa-eraser"></i> پاک کردن
+                        </button>
+                    </div>
+
+                    <!-- Text Processing Progress -->
+                    <section class="progress-section" id="text-progress-section" style="display: none;">
+                        <h3><i class="fas fa-spinner fa-spin"></i> در حال پردازش...</h3>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="text-progress-fill"></div>
+                        </div>
+                        <p id="text-progress-text">در حال استخراج موجودیت‌ها...</p>
+                    </section>
+
+                    <!-- Text Processing Result -->
+                    <section class="result-section" id="text-result-section" style="display: none;">
+                        <div class="result-content">
+                            <div class="success-message" id="text-success-message" style="display: none;">
+                                <i class="fas fa-check-circle"></i>
+                                <h3>گراف با موفقیت ساخته شد!</h3>
+                                <div id="graph-stats" class="graph-stats"></div>
+                                <p id="text-success-text"></p>
+                                
+                                <!-- Graph Preview Section -->
+                                <div class="graph-preview-section">
+                                    <h4><i class="fas fa-project-diagram"></i> پیش‌نمایش گراف</h4>
+                                    <div id="graph-preview-container" class="graph-preview-container">
+                                        <div id="graph-visualization" class="graph-visualization"></div>
+                                    </div>
+                                    <div class="graph-legend">
+                                        <div class="legend-item">
+                                            <span class="legend-color" style="background: #667eea;"></span>
+                                            <span>نود (موجودیت)</span>
+                                        </div>
+                                        <div class="legend-item">
+                                            <span class="legend-line"></span>
+                                            <span>یال (رابطه)</span>
+                                        </div>
+                                    </div>
+                                    <div class="graph-details-toggle">
+                                        <button class="btn btn-sm btn-secondary" onclick="toggleGraphDetails()">
+                                            <i class="fas fa-list"></i> نمایش جزئیات
+                                        </button>
+                                    </div>
+                                    <div id="graph-details" class="graph-details" style="display: none;">
+                                        <div class="details-section">
+                                            <h5><i class="fas fa-circle"></i> نودها</h5>
+                                            <div id="nodes-list" class="nodes-list"></div>
+                                        </div>
+                                        <div class="details-section">
+                                            <h5><i class="fas fa-link"></i> روابط</h5>
+                                            <div id="edges-list" class="edges-list"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="result-actions">
+                                    <a href="/manage_graphs" class="btn btn-primary">
+                                        <i class="fas fa-list"></i> مشاهده گراف‌ها
+                                    </a>
+                                    <button class="btn btn-secondary" onclick="resetTextUpload()">
+                                        <i class="fas fa-plus"></i> ساخت گراف دیگر
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="error-message" id="text-error-message" style="display: none;">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <h3>خطا در ساخت گراف!</h3>
+                                <p id="text-error-text"></p>
+                                <button class="btn btn-primary" onclick="resetTextUpload()">
+                                    <i class="fas fa-redo"></i> تلاش مجدد
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </section>
+
             <!-- Instructions -->
             <section class="instructions-section">
                 <h2><i class="fas fa-question-circle"></i> راهنمای آپلود</h2>
@@ -155,6 +496,8 @@
         </main>
     </div>
 
+    <!-- vis-network for graph visualization -->
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <script src="{{ url_for('static', filename='js/upload.js') }}"></script>
 </body>
 </html> 

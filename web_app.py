@@ -4,11 +4,18 @@ GraphRAG Web Application - رابط وب تعاملی
 """
 
 from flask import Flask, render_template, request, jsonify, send_from_directory, redirect, url_for
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
 from graphrag_service import GraphRAGService, RetrievalMethod, GenerationModel
 from enhanced_graphrag_service import EnhancedGraphRAGService, TokenExtractionMethod, RetrievalAlgorithm, CommunityDetectionMethod
+from text_to_graph_service import TextToGraphService
 import json
 import os
 import shutil
+import logging
 from datetime import datetime
 from werkzeug.utils import secure_filename
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -43,6 +50,26 @@ except:
 
 app = Flask(__name__)
 
+# تنظیمات CORS برای جلوگیری از خطای Failed to fetch
+@app.after_request
+def after_request(response):
+    """اضافه کردن header های CORS"""
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
+
+# Error handler برای خطاهای عمومی
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """مدیریت خطاهای عمومی"""
+    logging.error(f"Unhandled exception: {e}", exc_info=True)
+    return jsonify({
+        'success': False,
+        'error': f'خطای سرور: {str(e)}',
+        'error_type': type(e).__name__
+    }), 500
+
 # تنظیمات آپلود فایل
 UPLOAD_FOLDER = 'uploaded_graphs'
 ALLOWED_EXTENSIONS = {'pkl', 'sif', 'tsv', 'csv', 'txt', 'gz'}
@@ -70,10 +97,29 @@ else:
     graphrag_service = GraphRAGService()
     enhanced_graphrag_service = EnhancedGraphRAGService()
 
-# تنظیم API Key های OpenAI
-OPENAI_API_KEY = "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"
-graphrag_service.set_openai_api_key(OPENAI_API_KEY)
-print("✅ OpenAI API Key تنظیم شد")
+# تنظیم API Key های OpenAI (از متغیر محیطی یا secrets.json)
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+
+# تلاش برای خواندن از secrets.json اگر متغیر محیطی خالی بود
+if not OPENAI_API_KEY:
+    try:
+        import json as _json
+        if os.path.exists('secrets.json'):
+            with open('secrets.json', 'r', encoding='utf-8') as _sf:
+                _secrets = _json.load(_sf) or {}
+                OPENAI_API_KEY = _secrets.get('OPENAI_API_KEY', '')
+    except Exception as _e:
+        pass
+
+# اگر هنوز API key تنظیم نشده، از API key پیش‌فرض استفاده کن (برای تست)
+if not OPENAI_API_KEY:
+    OPENAI_API_KEY = """  # API key باید از متغیرهای محیطی یا secrets تنظیم شود"
+
+if OPENAI_API_KEY:
+    graphrag_service.set_openai_api_key(OPENAI_API_KEY)
+    print("✅ OpenAI API Key تنظیم شد")
+else:
+    print("⚠️ OPENAI_API_KEY تنظیم نشده است؛ تولید پاسخ با OpenAI غیرفعال خواهد بود")
 
 @app.route('/')
 def index():
@@ -84,6 +130,29 @@ def index():
 def upload_graph_page():
     """صفحه آپلود گراف"""
     return render_template('upload_graph.html')
+
+@app.route('/view_graph')
+def view_graph_page():
+    """صفحه نمایش گراف انتخاب‌شده (ویژوال + آمار)"""
+    graph_name = request.args.get('graph_name', '')
+    graph_path = request.args.get('graph_path', '')
+    
+    # Decode URL-encoded path
+    if graph_path:
+        from urllib.parse import unquote
+        graph_path = unquote(graph_path)
+    
+    # Validate path exists
+    if graph_path and not os.path.exists(graph_path):
+        # Try to resolve relative paths
+        if not os.path.isabs(graph_path):
+            uploaded_path = os.path.join(UPLOAD_FOLDER, graph_path)
+            if os.path.exists(uploaded_path):
+                graph_path = uploaded_path
+            elif os.path.exists(os.path.join('.', graph_path)):
+                graph_path = os.path.join('.', graph_path)
+    
+    return render_template('view_graph.html', graph_name=graph_name, graph_path=graph_path)
 
 @app.route('/manage_graphs')
 def manage_graphs_page():
@@ -146,6 +215,476 @@ def upload_graph():
         return jsonify({
             'success': False,
             'error': str(e)
+        }), 500
+
+@app.route('/api/text_to_graph', methods=['POST'])
+def text_to_graph():
+    """تبدیل متن به گراف دانش"""
+    try:
+        data = request.get_json()
+        
+        # Import URL extractor
+        try:
+            from url_extractor import extract_text_from_url, is_valid_url
+            URL_EXTRACTOR_AVAILABLE = True
+        except ImportError:
+            URL_EXTRACTOR_AVAILABLE = False
+            logging.warning("URL extractor not available")
+        
+        # Import Wikipedia extractor
+        try:
+            from wikipedia_extractor import WikipediaExtractor
+            WIKIPEDIA_EXTRACTOR_AVAILABLE = True
+        except ImportError:
+            WIKIPEDIA_EXTRACTOR_AVAILABLE = False
+            logging.warning("Wikipedia extractor not available")
+        
+        # Validate input - check for text or URL
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'متن یا URL ورودی الزامی است'
+            }), 400
+        
+        text = data.get('text', '').strip()
+        url = data.get('url', '').strip()
+        use_wikipedia_extraction = data.get('use_wikipedia_extraction', True)  # پیش‌فرض: فعال
+        
+        # اگر URL داده شده، متن را از URL استخراج کن
+        if url:
+            if not URL_EXTRACTOR_AVAILABLE:
+                return jsonify({
+                    'success': False,
+                    'error': 'استخراج از URL در دسترس نیست. لطفاً متن را مستقیماً وارد کنید.'
+                }), 400
+            
+            if not is_valid_url(url):
+                return jsonify({
+                    'success': False,
+                    'error': 'URL نامعتبر است'
+                }), 400
+            
+            # بررسی اینکه آیا URL ویکی‌پدیا است
+            is_wikipedia = 'wikipedia.org' in url.lower()
+            
+            if is_wikipedia and WIKIPEDIA_EXTRACTOR_AVAILABLE and use_wikipedia_extraction:
+                # استفاده از استخراج تخصصی ویکی‌پدیا
+                try:
+                    wiki_extractor = WikipediaExtractor(language='fa' if 'fa.wikipedia' in url else 'en')
+                    wiki_data = wiki_extractor.extract_from_url(url)
+                    
+                    if "error" in wiki_data:
+                        # Fallback به استخراج عادی با clean_content
+                        extracted_text = extract_text_from_url(url, clean_content=True, max_length=10000)
+                        if not extracted_text:
+                            return jsonify({
+                                'success': False,
+                                'error': wiki_data.get("error", "خطا در استخراج از ویکی‌پدیا")
+                            }), 400
+                        text = extracted_text
+                    else:
+                        # استفاده از داده‌های استخراج شده از ویکی‌پدیا
+                        text = wiki_data.get("text", "")
+                        if not text:
+                            text = wiki_extractor.get_full_text(wiki_data.get("title", ""))
+                        
+                        # اگر متن خالی است، از API استخراج کن
+                        if not text or len(text.strip()) < 100:
+                            # تلاش مجدد با API
+                            api_result = wiki_extractor._extract_via_api(wiki_data.get("title", ""))
+                            if api_result and api_result.get("text"):
+                                text = api_result.get("text")
+                        
+                        # اضافه کردن موجودیت‌ها و روابط از ویکی‌پدیا به extraction_params
+                        if "entities" in wiki_data and "relationships" in wiki_data:
+                            # این داده‌ها بعداً در process_text_to_graph استفاده می‌شوند
+                            data['wikipedia_entities'] = wiki_data.get("entities", [])
+                            data['wikipedia_relationships'] = wiki_data.get("relationships", [])
+                        
+                        logging.info(f"Wikipedia data extracted from URL: {url} ({len(text)} characters, {len(wiki_data.get('entities', []))} entities)")
+                except Exception as e:
+                    logging.warning(f"Wikipedia extraction failed, falling back to regular extraction: {e}")
+                    extracted_text = extract_text_from_url(url, clean_content=True, max_length=10000)
+                    if not extracted_text:
+                        return jsonify({
+                            'success': False,
+                            'error': f'خطا در استخراج از URL: {str(e)}'
+                        }), 400
+                    text = extracted_text
+            else:
+                # استخراج عادی از URL با clean_content=True برای حذف محتوای غیرضروری
+                extracted_text = extract_text_from_url(url, clean_content=True, max_length=10000)
+                if not extracted_text:
+                    return jsonify({
+                        'success': False,
+                        'error': 'خطا در استخراج متن از URL. لطفاً URL را بررسی کنید.'
+                    }), 400
+                
+                text = extracted_text
+                logging.info(f"Text extracted from URL: {url} ({len(text)} characters)")
+        
+        # بررسی اینکه متن وجود دارد
+        if not text:
+            return jsonify({
+                'success': False,
+                'error': 'متن نمی‌تواند خالی باشد'
+            }), 400
+        
+        # Get extraction parameters
+        method = data.get('method', 'simple')
+        max_entities = data.get('max_entities', 100)
+        max_relationships = data.get('max_relationships', 200)
+        llm_model = data.get('llm_model', 'mistralai/Mistral-7B-Instruct-v0.2')
+        confidence_threshold = data.get('confidence_threshold', 0.5)
+        hf_token = data.get('hf_token')  # Get token from request
+        max_gleanings = data.get('max_gleanings', 2)
+        enable_entity_resolution = data.get('enable_entity_resolution', True)
+        enable_relationship_weighting = data.get('enable_relationship_weighting', True)
+        min_relationship_weight = data.get('min_relationship_weight', 0.0)
+        remove_isolated_nodes = data.get('remove_isolated_nodes', False)
+        hybrid_methods = data.get('hybrid_methods', ['spacy', 'llm'])
+        
+        # New parameters for Persian and advanced features
+        language = data.get('language', 'auto')  # auto/fa/en
+        enable_coreference = data.get('enable_coreference', False)
+        chunking_strategy = data.get('chunking_strategy', 'smart')  # smart/sliding_window/sentence/paragraph
+        chunk_overlap = data.get('chunk_overlap', 0.2)  # 0.0 to 1.0
+        max_tokens = data.get('max_tokens', 512)
+        span_model_type = data.get('span_model_type', 'biobert')  # biobert/scibert/auto
+        enable_preprocessing = data.get('enable_preprocessing', False)  # پیش‌پردازش متن (حذف stop words)
+        
+        # Validate method
+        valid_methods = ['simple', 'spacy', 'spacy_svo_enhanced', 'llm', 'llm_multipass', 'hybrid',
+                        'persian', 'span_based', 'with_coreference', 'long_text',
+                        'joint_er', 'autoregressive', 'edc', 'incremental']
+        if method not in valid_methods:
+            return jsonify({
+                'success': False,
+                'error': f'روش استخراج نامعتبر است. روش‌های مجاز: {", ".join(valid_methods)}'
+            }), 400
+        
+        # Initialize text to graph service
+        try:
+            # Ensure environment variables are loaded
+            try:
+                from dotenv import load_dotenv
+                load_dotenv(override=True)
+            except Exception:
+                pass
+            
+            # Set HF_TOKEN from request if provided
+            if hf_token:
+                os.environ['HF_TOKEN'] = hf_token
+                logging.info(f"HF_TOKEN set from request (length: {len(hf_token)})")
+            
+            text_to_graph_service = TextToGraphService(
+                openai_api_key=OPENAI_API_KEY,
+                spacy_model='en_core_web_sm',
+                hf_token=hf_token  # Pass token directly to service
+            )
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': f'خطا در راه‌اندازی سرویس: {str(e)}'
+            }), 500
+        
+        # Prepare extraction parameters
+        extraction_params = {
+            'max_entities': max_entities,
+            'max_relationships': max_relationships
+        }
+        
+        if method in ['llm', 'llm_multipass', 'autoregressive', 'edc']:
+            extraction_params['model'] = llm_model
+            extraction_params['confidence_threshold'] = confidence_threshold
+        
+        if method == 'llm_multipass':
+            extraction_params['max_gleanings'] = max_gleanings
+        
+        if method == 'hybrid':
+            extraction_params['methods'] = hybrid_methods
+            extraction_params['confidence_threshold'] = confidence_threshold
+        
+        # New method-specific parameters
+        if method == 'joint_er':
+            extraction_params['structure_iterations'] = data.get('structure_iterations', 3)
+        
+        if method == 'autoregressive':
+            extraction_params['max_generation_length'] = data.get('max_generation_length', 2048)
+        
+        if method == 'edc':
+            extraction_params['use_rag'] = data.get('use_rag', True)
+        
+        if method == 'incremental':
+            extraction_params['chunk_size'] = data.get('chunk_size', 500)
+            extraction_params['overlap'] = data.get('overlap', 100)
+            extraction_params['base_method'] = data.get('base_method', 'spacy')
+        
+        # New method-specific parameters
+        if method == 'persian':
+            extraction_params['enable_coreference'] = enable_coreference
+        
+        if method == 'span_based':
+            extraction_params['model_type'] = span_model_type
+        
+        if method == 'with_coreference':
+            extraction_params['base_method'] = data.get('base_method', 'spacy')
+        
+        if method == 'long_text':
+            extraction_params['chunking_strategy'] = chunking_strategy
+            extraction_params['chunk_overlap'] = chunk_overlap
+            extraction_params['max_tokens'] = max_tokens
+            extraction_params['base_method'] = data.get('base_method', 'spacy')
+        
+        # Prepare processing parameters
+        processing_params = {
+            'enable_entity_resolution': enable_entity_resolution,
+            'enable_relationship_weighting': enable_relationship_weighting,
+            'min_relationship_weight': min_relationship_weight,
+            'remove_isolated_nodes': remove_isolated_nodes,
+            'enable_preprocessing': enable_preprocessing,
+            'language': language
+        }
+        
+        # Extract and build graph
+        try:
+            # اگر URL داده شده، از process_url_to_graph استفاده کن
+            if url:
+                result = text_to_graph_service.process_url_to_graph(
+                    url=url,
+                    method=method,
+                    use_wikipedia_extraction=use_wikipedia_extraction,
+                    save=True,
+                    output_dir=UPLOAD_FOLDER,
+                    **extraction_params,
+                    **processing_params
+                )
+            else:
+                # استفاده از process_text_to_graph برای متن مستقیم
+                result = text_to_graph_service.process_text_to_graph(
+                    text=text,
+                    method=method,
+                    save=True,
+                    output_dir=UPLOAD_FOLDER,
+                    **extraction_params,
+                    **processing_params
+                )
+            
+            # اگر داده‌های ویکی‌پدیا وجود دارد، آن‌ها را با نتایج استخراج ادغام کن
+            if 'wikipedia_entities' in data and 'wikipedia_relationships' in data:
+                wiki_entities = data.get('wikipedia_entities', [])
+                wiki_relationships = data.get('wikipedia_relationships', [])
+                
+                if wiki_entities or wiki_relationships:
+                    extraction_result = result.get('extraction_result', {})
+                    existing_entities = extraction_result.get('entities', [])
+                    existing_relationships = extraction_result.get('relationships', [])
+                    
+                    # ایجاد map برای موجودیت‌های موجود (بر اساس name)
+                    entity_map = {}
+                    entity_id_map = {}  # name -> id
+                    for ent in existing_entities:
+                        ent_name = ent.get('name', '').lower().strip()
+                        if ent_name:
+                            entity_map[ent_name] = ent
+                            entity_id_map[ent_name] = ent.get('id')
+                    
+                    # ادغام موجودیت‌های ویکی‌پدیا
+                    next_id = len(existing_entities)
+                    for wiki_ent in wiki_entities:
+                        ent_name = wiki_ent.get('name', '').strip()
+                        if not ent_name:
+                            continue
+                        
+                        ent_name_lower = ent_name.lower()
+                        
+                        # بررسی تکراری بودن
+                        if ent_name_lower in entity_map:
+                            # موجودیت موجود است - به‌روزرسانی attributes
+                            existing_ent = entity_map[ent_name_lower]
+                            if 'wikipedia' not in existing_ent.get('attributes', {}).get('source', ''):
+                                # اضافه کردن اطلاعات ویکی‌پدیا
+                                if 'attributes' not in existing_ent:
+                                    existing_ent['attributes'] = {}
+                                existing_ent['attributes']['wikipedia_source'] = True
+                        else:
+                            # موجودیت جدید - اضافه کردن
+                            wiki_ent['id'] = f"ENTITY_{next_id}"
+                            wiki_ent['attributes'] = wiki_ent.get('attributes', {})
+                            wiki_ent['attributes']['source'] = 'wikipedia'
+                            existing_entities.append(wiki_ent)
+                            entity_map[ent_name_lower] = wiki_ent
+                            entity_id_map[ent_name_lower] = wiki_ent['id']
+                            next_id += 1
+                    
+                    # ادغام روابط
+                    rel_set = set()
+                    for rel in existing_relationships:
+                        source = rel.get('source', '')
+                        target = rel.get('target', '')
+                        metaedge = rel.get('metaedge', '')
+                        rel_set.add((source, target, metaedge))
+                    
+                    # تبدیل source/target در روابط ویکی‌پدیا به ID
+                    for wiki_rel in wiki_relationships:
+                        source_name = wiki_rel.get('source', '').strip()
+                        target_name = wiki_rel.get('target', '').strip()
+                        
+                        # پیدا کردن ID موجودیت‌ها
+                        source_id = None
+                        target_id = None
+                        
+                        # جستجو در entity_id_map
+                        for name, eid in entity_id_map.items():
+                            if source_name.lower() == name or source_name.lower() in name or name in source_name.lower():
+                                source_id = eid
+                            if target_name.lower() == name or target_name.lower() in name or name in target_name.lower():
+                                target_id = eid
+                        
+                        # اگر پیدا نشد، از ID مستقیم استفاده کن
+                        if not source_id:
+                            source_id = wiki_rel.get('source', '')
+                        if not target_id:
+                            target_id = wiki_rel.get('target', '')
+                        
+                        if source_id and target_id:
+                            key = (source_id, target_id, wiki_rel.get('metaedge', ''))
+                            if key not in rel_set:
+                                wiki_rel['source'] = source_id
+                                wiki_rel['target'] = target_id
+                                wiki_rel['attributes'] = wiki_rel.get('attributes', {})
+                                wiki_rel['attributes']['source'] = 'wikipedia'
+                                existing_relationships.append(wiki_rel)
+                                rel_set.add(key)
+                    
+                    # به‌روزرسانی extraction_result
+                    extraction_result['entities'] = existing_entities
+                    extraction_result['relationships'] = existing_relationships
+                    extraction_result['wikipedia_extracted'] = True
+                    extraction_result['wikipedia_stats'] = {
+                        'wiki_entities': len(wiki_entities),
+                        'wiki_relationships': len(wiki_relationships),
+                        'merged_entities': len(existing_entities),
+                        'merged_relationships': len(existing_relationships)
+                    }
+                    
+                    # ساخت مجدد گراف با داده‌های ادغام شده
+                    try:
+                        graph = text_to_graph_service.build_graph(extraction_result)
+                        result['graph'] = graph
+                        result['extraction_result'] = extraction_result
+                        logging.info(f"Merged Wikipedia data: {len(wiki_entities)} entities, {len(wiki_relationships)} relationships")
+                    except Exception as e:
+                        logging.warning(f"Failed to rebuild graph with Wikipedia data: {e}")
+                        # استفاده از گراف قبلی
+            
+            # Get filename from filepath
+            filename = os.path.basename(result['filepath']) if result.get('filepath') else None
+            
+            # Graph is saved and ready to be loaded via /api/load_graph endpoint
+            # The graph will appear in the list of available graphs
+            
+            # Extract graph data for preview from the newly created graph
+            graph = result.get('graph')
+            extraction_result = result.get('extraction_result', {})
+            graph_data = {
+                'nodes': [],
+                'edges': []
+            }
+            
+            if graph:
+                # Extract nodes from the graph with kind information
+                for node_id, node_data in graph.nodes(data=True):
+                    # Get kind from node data (prefer 'kind' over 'type')
+                    node_kind = node_data.get('kind') or node_data.get('type', 'Unknown')
+                    node_name = node_data.get('name', node_id)
+                    
+                    graph_data['nodes'].append({
+                        'id': node_id,
+                        'label': node_name,
+                        'type': node_data.get('type', 'Unknown'),
+                        'kind': node_kind,
+                        'title': f"نام: {node_name}\nنوع: {node_data.get('type', 'Unknown')}\nKind: {node_kind}"
+                    })
+                
+                # Extract edges from the graph with relationship information
+                for source, target, edge_data in graph.edges(data=True):
+                    # Get metaedge/relation from edge data
+                    metaedge = edge_data.get('metaedge', 'related_to')
+                    relation = edge_data.get('relation') or metaedge
+                    
+                    # Get relationship meaning/description
+                    relation_meaning = edge_data.get('relation_meaning') or edge_data.get('description') or relation
+                    
+                    graph_data['edges'].append({
+                        'from': source,
+                        'to': target,
+                        'label': relation,
+                        'metaedge': metaedge,
+                        'relation': relation,
+                        'relation_meaning': relation_meaning,
+                        'title': f"رابطه: {relation}\nمفهوم: {relation_meaning}"
+                    })
+            
+            # Also include extraction result data for reference
+            extraction_entities = extraction_result.get('entities', [])
+            extraction_relationships = extraction_result.get('relationships', [])
+            
+            return jsonify({
+                'success': True,
+                'message': 'گراف با موفقیت ساخته شد',
+                'filename': filename,
+                'filepath': result.get('filepath'),
+                'stats': result.get('stats', {}),
+                'extraction_method': method,
+                'resolution_summary': result.get('resolution_summary'),
+                'load_url': '/api/load_graph',  # Hint for frontend to optionally load the graph
+                'graph_data': graph_data,  # Graph data for preview (from newly created graph)
+                'extraction_data': {  # Original extraction data for reference
+                    'entities': extraction_entities,
+                    'relationships': extraction_relationships
+                }
+            })
+            
+        except ValueError as e:
+            # Handle validation errors - include more details
+            error_msg = str(e)
+            logging.error(f"Validation error in text to graph conversion: {error_msg}")
+            logging.error(f"Error type: {type(e).__name__}")
+            
+            # Try to extract more context from the error
+            import traceback
+            error_trace = traceback.format_exc()
+            logging.error(f"Error traceback: {error_trace}")
+            
+            return jsonify({
+                'success': False,
+                'error': error_msg,
+                'error_type': 'validation_error',
+                'method': method
+            }), 400
+        except Exception as e:
+            # Handle other errors - include full traceback
+            import traceback
+            error_msg = str(e)
+            error_trace = traceback.format_exc()
+            logging.error(f"Error in text to graph conversion: {error_msg}")
+            logging.error(f"Error type: {type(e).__name__}")
+            logging.error(f"Full traceback: {error_trace}")
+            
+            return jsonify({
+                'success': False,
+                'error': f'خطا در تبدیل متن به گراف: {error_msg}',
+                'error_type': 'server_error',
+                'method': method,
+                'details': error_trace[-500:] if len(error_trace) > 500 else error_trace  # Last 500 chars
+            }), 500
+    
+    except Exception as e:
+        logging.error(f"Unexpected error in text_to_graph endpoint: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'خطای غیرمنتظره: {str(e)}'
         }), 500
 
 @app.route('/api/list_graphs')
@@ -213,7 +752,8 @@ def load_graph():
         # بارگذاری گراف جدید
         global graphrag_service
         graphrag_service = GraphRAGService(graph_data_path=graph_path)
-        graphrag_service.set_openai_api_key(OPENAI_API_KEY)
+        if OPENAI_API_KEY:
+            graphrag_service.set_openai_api_key(OPENAI_API_KEY)
         
         return jsonify({
             'success': True,
@@ -247,6 +787,174 @@ def delete_graph():
             'message': f'گراف {os.path.basename(graph_path)} با موفقیت حذف شد'
         })
     
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/graph_view_data', methods=['POST'])
+def graph_view_data():
+    """دریافت داده‌های گراف برای نمایش ویژوال و آماری بدون تغییر گراف فعال سیستم"""
+    try:
+        data = request.get_json() or {}
+        graph_path = data.get('graph_path')
+
+        if not graph_path:
+            return jsonify({
+                'success': False,
+                'error': 'مسیر گراف مشخص نشده است'
+            }), 400
+
+        # Normalize path - handle both relative and absolute paths
+        graph_path = str(graph_path).strip()
+
+        # Decode URL-encoded path if needed
+        from urllib.parse import unquote
+        if '%' in graph_path:
+            graph_path = unquote(graph_path)
+
+        # تلاش برای رفع مشکلات مسیر (مثل تکرار نام پوشه یا کاراکترهای عجیب)
+        original_graph_path = graph_path
+
+        # اگر فایل مستقیماً وجود دارد، همان را استفاده کن
+        if not os.path.exists(graph_path):
+            # همیشه یک بار فقط بر اساس نام فایل هم امتحان می‌کنیم
+            filename_only = os.path.basename(graph_path)
+
+            candidate_paths = []
+
+            # 1) uploaded_graphs/filename
+            candidate_paths.append(os.path.join(UPLOAD_FOLDER, filename_only))
+
+            # 2) ./filename در دایرکتوری فعلی
+            candidate_paths.append(os.path.join('.', filename_only))
+
+            # 3) اگر در مسیر رشته‌ی uploaded_graphs آمده، بعد از آن را به عنوان نام فایل بگیر
+            lower_path = graph_path.lower()
+            marker = 'uploaded_graphs'
+            if marker in lower_path:
+                idx = lower_path.rfind(marker)
+                tail = graph_path[idx + len(marker):]
+                tail = tail.lstrip('\\/._\u0082')
+                if tail:
+                    candidate_paths.append(os.path.join(UPLOAD_FOLDER, tail))
+
+            # اولین مسیری که وجود دارد را انتخاب کن
+            resolved = None
+            for c in candidate_paths:
+                if os.path.exists(c):
+                    resolved = c
+                    break
+
+            if resolved is None:
+                # تلاش ویژه برای فایل‌های text_graph:
+                # اگر بخشی عددی مثل 60107_115532 در نام باشد، در بین فایل‌های uploaded_graphs جستجوی تطابق انجام می‌دهیم
+                import re as _re
+                numeric_match = _re.search(r'(\d{5}_\d{6})', filename_only)
+                if numeric_match:
+                    numeric_part = numeric_match.group(1)
+                    try:
+                        for f in os.listdir(UPLOAD_FOLDER):
+                            # به‌دنبال همان بخش عددی وسط نام فایل می‌گردیم
+                            if numeric_part in f and f.endswith('_text_graph.pkl'):
+                                candidate = os.path.join(UPLOAD_FOLDER, f)
+                                if os.path.exists(candidate):
+                                    resolved = candidate
+                                    candidate_paths.append(candidate)
+                                    break
+                    except Exception as e:
+                        logging.error(f"خطا در جستجوی فایل در uploaded_graphs: {str(e)}")
+
+                if resolved is None:
+                    logging.error(f"مسیر گراف یافت نشد. ورودی: {original_graph_path}, امتحان‌شده: {candidate_paths}")
+                    return jsonify({
+                        'success': False,
+                        'error': f'مسیر گراف نامعتبر است: {original_graph_path}'
+                    }), 400
+
+            graph_path = resolved
+
+        # بارگذاری موقت گراف فقط برای نمایش (بدون تغییر graphrag_service سراسری)
+        try:
+            temp_service = GraphRAGService(graph_data_path=graph_path)
+            G = getattr(temp_service, 'G', None)
+
+            if G is None:
+                return jsonify({
+                    'success': False,
+                    'error': 'گراف در فایل یافت نشد یا فایل خالی است'
+                }), 500
+        except Exception as e:
+            logging.error(f"خطا در بارگذاری گراف از مسیر {graph_path}: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': f'خطا در بارگذاری گراف: {str(e)}'
+            }), 500
+
+        # محاسبه آمار پایه گراف
+        num_nodes = G.number_of_nodes()
+        num_edges = G.number_of_edges()
+        avg_degree = (2 * num_edges / num_nodes) if num_nodes > 0 else 0
+        try:
+            import networkx as nx  # برای محاسبه چگالی اگر در دسترس باشد
+            density = nx.density(G)
+        except Exception:
+            density = None
+
+        # شمارش انواع نود بر اساس فیلد kind یا type
+        node_types = {}
+        for node_id, node_data in G.nodes(data=True):
+            kind = node_data.get('kind') or node_data.get('type', 'Unknown')
+            node_types[kind] = node_types.get(kind, 0) + 1
+
+        stats = {
+            'num_nodes': num_nodes,
+            'num_edges': num_edges,
+            'avg_degree': avg_degree,
+            'density': density
+        }
+
+        # آماده‌سازی داده‌های گراف برای ویژوال‌سازی
+        graph_data = {
+            'nodes': [],
+            'edges': []
+        }
+
+        for node_id, node_data in G.nodes(data=True):
+            node_kind = node_data.get('kind') or node_data.get('type', 'Unknown')
+            node_name = node_data.get('name', node_id)
+
+            graph_data['nodes'].append({
+                'id': node_id,
+                'label': node_name,
+                'type': node_data.get('type', 'Unknown'),
+                'kind': node_kind,
+                'title': f"نام: {node_name}\nنوع: {node_data.get('type', 'Unknown')}\nKind: {node_kind}"
+            })
+
+        for source, target, edge_data in G.edges(data=True):
+            metaedge = edge_data.get('metaedge', 'related_to')
+            relation = edge_data.get('relation') or metaedge
+            relation_meaning = edge_data.get('relation_meaning') or edge_data.get('description') or relation
+
+            graph_data['edges'].append({
+                'from': source,
+                'to': target,
+                'label': relation,
+                'metaedge': metaedge,
+                'relation': relation,
+                'relation_meaning': relation_meaning,
+                'title': f"رابطه: {relation}\nمفهوم: {relation_meaning}"
+            })
+
+        return jsonify({
+            'success': True,
+            'stats': stats,
+            'node_types': node_types,
+            'graph_data': graph_data
+        })
+
     except Exception as e:
         return jsonify({
             'success': False,
@@ -851,81 +1559,58 @@ def create_gpt_comparison_prompt(text1, text2, label1, label2, comparison_type):
     focus = comparison_focus.get(comparison_type, comparison_focus['comprehensive'])
     
     prompt = f"""
-لطفاً دو متن زیر را مقایسه کنید و تحلیل دقیقی ارائه دهید. توجه ویژه به عملی بودن و تخصصی بودن محتوا داشته باشید:
-
-**متن اول ({label1}):**
-{text1}
-
-**متن دوم ({label2}):**
-{text2}
-
-**نوع مقایسه:** {focus}
-
-**معیارهای ارزیابی مهم:**
-1. **عملی بودن**: متن باید اطلاعات کاربردی و قابل استفاده ارائه دهد
-2. **تخصصی بودن**: استفاده از اصطلاحات تخصصی و مفاهیم دقیق علمی
-3. **دقت علمی**: صحت اطلاعات و استناد به مفاهیم علمی
-4. **جامعیت**: پوشش کامل جنبه‌های مختلف موضوع
-5. **وضوح**: قابل فهم بودن برای مخاطب تخصصی
-
-لطفاً تحلیل خود را در قالب زیر ارائه دهید:
-
-**خلاصه مقایسه:**
-[یک خلاصه کوتاه از تفاوت‌های اصلی با تمرکز بر عملی بودن و تخصصی بودن]
-
-**امتیازدهی (از 0 تا 100):**
-{label1}: [امتیاز]/100
-{label2}: [امتیاز]/100
-
-**توضیح امتیازدهی:**
-[توضیح دلیل امتیازدهی با تأکید بر عملی بودن و تخصصی بودن محتوا]
-
-**نقاط قوت {label1}:**
-[لیست نقاط قوت با تمرکز بر جنبه‌های عملی و تخصصی]
-
-**نقاط قوت {label2}:**
-[لیست نقاط قوت با تمرکز بر جنبه‌های عملی و تخصصی]
-
-**نقاط ضعف {label1}:**
-[لیست نقاط ضعف از نظر عملی بودن و تخصصی بودن]
-
-**نقاط ضعف {label2}:**
-[لیست نقاط ضعف از نظر عملی بودن و تخصصی بودن]
-
-**توصیه نهایی:**
-[توصیه کدام روش بهتر است با تأکید بر عملی بودن و تخصصی بودن]
-
-**نکته مهم**: در ارزیابی، به متن‌هایی که اطلاعات عملی‌تر، تخصصی‌تر و کاربردی‌تری ارائه می‌دهند امتیاز بالاتری بدهید. متن‌های سطحی و عمومی امتیاز کمتری دریافت کنند.
-"""
+    لطفاً دو متن زیر را مقایسه کنید و تحلیل دقیقی ارائه دهید. توجه ویژه به عملی بودن و تخصصی بودن محتوا داشته باشید. از ارائه هرگونه امتیاز عددی خودداری کنید و فقط تحلیل متنی ارائه دهید.
+    
+    **متن اول ({label1}):**
+    {text1}
+    
+    **متن دوم ({label2}):**
+    {text2}
+    
+    **نوع مقایسه:** {focus}
+    
+    **معیارهای ارزیابی مهم:**
+    1. **عملی بودن**: متن باید اطلاعات کاربردی و قابل استفاده ارائه دهد
+    2. **تخصصی بودن**: استفاده از اصطلاحات تخصصی و مفاهیم دقیق علمی
+    3. **دقت علمی**: صحت اطلاعات و استناد به مفاهیم علمی
+    4. **جامعیت**: پوشش کامل جنبه‌های مختلف موضوع
+    5. **وضوح**: قابل فهم بودن برای مخاطب تخصصی
+    
+    لطفاً تحلیل خود را در قالب زیر ارائه دهید و از امتیاز عددی استفاده نکنید:
+    
+    **خلاصه مقایسه:**
+    [یک خلاصه کوتاه از تفاوت‌های اصلی با تمرکز بر عملی بودن و تخصصی بودن]
+    
+    **تحلیل کلی:**
+    [تحلیل متنی از نقاط قوت و ضعف کلی هر دو متن و دلیل برتری نسبی]
+    
+    **نقاط قوت {label1}:**
+    [لیست نقاط قوت با تمرکز بر جنبه‌های عملی و تخصصی]
+    
+    **نقاط قوت {label2}:**
+    [لیست نقاط قوت با تمرکز بر جنبه‌های عملی و تخصصی]
+    
+    **نقاط ضعف {label1}:**
+    [لیست نقاط ضعف از نظر عملی بودن و تخصصی بودن]
+    
+    **نقاط ضعف {label2}:**
+    [لیست نقاط ضعف از نظر عملی بودن و تخصصی بودن]
+    
+    **توصیه نهایی:**
+    [توصیه کدام روش بهتر است با تأکید بر عملی بودن و تخصصی بودن]
+    """
     
     return prompt
 
 def parse_gpt_comparison_response(response, label1, label2, comparison_type):
-    """تجزیه و تحلیل پاسخ GPT-4o"""
-    
-    # Extract scores using regex
+    """تجزیه و تحلیل پاسخ GPT-4o - فقط تحلیل متنی بدون امتیاز عددی"""
     import re
-    
-    # Find scores - use more flexible regex patterns
-    score1_match = re.search(rf'{re.escape(label1)}:\s*(\d+)/100', response, re.IGNORECASE)
-    score2_match = re.search(rf'{re.escape(label2)}:\s*(\d+)/100', response, re.IGNORECASE)
-    
-    # If not found, try alternative patterns
-    if not score1_match:
-        score1_match = re.search(rf'{re.escape(label1)}.*?(\d+)/100', response, re.IGNORECASE)
-    if not score2_match:
-        score2_match = re.search(rf'{re.escape(label2)}.*?(\d+)/100', response, re.IGNORECASE)
-    
-    score1 = int(score1_match.group(1)) if score1_match else 50
-    score2 = int(score2_match.group(1)) if score2_match else 50
-    
-
     
     # Split response into sections
     sections = response.split('\n\n')
     
     summary = ""
-    scoring_explanation = ""
+    analysis = ""
     strengths1 = ""
     strengths2 = ""
     weaknesses1 = ""
@@ -935,8 +1620,11 @@ def parse_gpt_comparison_response(response, label1, label2, comparison_type):
     for section in sections:
         if "خلاصه مقایسه" in section:
             summary = section.replace("**خلاصه مقایسه:**", "").strip()
-        elif "توضیح امتیازدهی" in section:
-            scoring_explanation = section.replace("**توضیح امتیازدهی:**", "").strip()
+        elif "تحلیل کلی" in section:
+            analysis = section.replace("**تحلیل کلی:**", "").strip()
+        elif "تحلیل" in section and not analysis:
+            # در صورت نبود عنوان دقیق «تحلیل کلی»، هر بخش حاوی واژه تحلیل را به عنوان تحلیل کلی در نظر می‌گیریم
+            analysis = re.sub(r"^\*\*[^:]+:\*\*", "", section).strip()
         elif f"نقاط قوت {label1}" in section:
             strengths1 = section.replace(f"**نقاط قوت {label1}:**", "").strip()
         elif f"نقاط قوت {label2}" in section:
@@ -951,12 +1639,13 @@ def parse_gpt_comparison_response(response, label1, label2, comparison_type):
     # If sections are empty, use the full response
     if not summary:
         summary = response[:200] + "..." if len(response) > 200 else response
+    if not analysis:
+        # تلاش برای استخراج یک تحلیل کلی از روی کل پاسخ در صورت نبود بخش مشخص
+        analysis = ""
     
     return {
         'summary': summary,
-        'score1': score1,
-        'score2': score2,
-        'scoring_explanation': scoring_explanation,
+        'analysis': analysis,
         'strengths1': strengths1,
         'strengths2': strengths2,
         'weaknesses1': weaknesses1,

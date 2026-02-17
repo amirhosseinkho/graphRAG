@@ -242,8 +242,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 const graphCard = this.closest('.graph-card');
                 const graphPath = graphCard.dataset.graphPath;
                 const graphName = graphCard.querySelector('.graph-name').textContent;
-                
-                showGraphDetails(graphPath, graphName);
+
+                // انتقال به صفحه نمایش گراف با ویژوال و جدول آماری
+                const url = `/view_graph?graph_path=${encodeURIComponent(graphPath)}&graph_name=${encodeURIComponent(graphName)}`;
+                window.location.href = url;
             });
         });
     }

@@ -339,6 +339,16 @@ body {
     padding: 15px;
     border-radius: 8px;
     border: 2px solid #e9ecef;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.edge-item .edge-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
 }
 
 .edge-relation {
@@ -350,6 +360,37 @@ body {
     font-weight: 600;
     display: inline-block;
     margin: 5px 0;
+}
+
+.edge-metaedge {
+    color: #6c757d;
+    font-size: 10px;
+    font-style: italic;
+    background: #e9ecef;
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+.edge-nodes {
+    color: #495057;
+    font-size: 0.9em;
+    font-weight: 500;
+    padding: 5px 0;
+}
+
+.edge-meaning {
+    color: #495057;
+    font-size: 0.85em;
+    padding: 8px 12px;
+    background-color: #e7f3ff;
+    border-radius: 6px;
+    border-right: 3px solid #007bff;
+    margin-top: 5px;
+}
+
+.edge-meaning i {
+    color: #007bff;
+    margin-left: 5px;
 }
 
 /* Paths List */
@@ -884,6 +925,321 @@ body {
 }
 
 /* Upload Section Styles */
+/* Upload Tabs */
+.upload-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    background: white;
+    padding: 10px;
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 15px 25px;
+    border: none;
+    background: transparent;
+    color: #666;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.tab-btn:hover {
+    background: rgba(102, 126, 234, 0.1);
+    color: #667eea;
+}
+
+.tab-btn.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.tab-btn i {
+    font-size: 1.1rem;
+}
+
+/* Text Input Section */
+.text-input-section {
+    margin: 20px 0;
+}
+
+.text-input-section label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: 600;
+    color: #333;
+    font-size: 1rem;
+}
+
+.text-input {
+    width: 100%;
+    padding: 15px;
+    border: 2px solid #e1e5e9;
+    border-radius: 10px;
+    font-size: 14px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    resize: vertical;
+    min-height: 200px;
+    transition: border-color 0.3s ease;
+    direction: ltr;
+    text-align: left;
+}
+
+.text-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.text-stats {
+    margin-top: 5px;
+    font-size: 0.85rem;
+    color: #666;
+    text-align: left;
+}
+
+/* Extraction Settings */
+.extraction-settings {
+    margin: 25px 0;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    border: 1px solid #e1e5e9;
+}
+
+.extraction-settings h3 {
+    margin-bottom: 20px;
+    color: #333;
+    font-size: 1.2rem;
+}
+
+.extraction-settings .form-group {
+    margin-bottom: 15px;
+}
+
+.extraction-settings label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #555;
+    font-size: 0.95rem;
+}
+
+.extraction-settings .form-control {
+    width: 100%;
+    padding: 10px 15px;
+    border: 2px solid #e1e5e9;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: border-color 0.3s ease;
+}
+
+.extraction-settings .form-control:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+/* Text Upload Actions */
+.text-upload-actions {
+    display: flex;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.text-upload-actions .btn {
+    flex: 1;
+}
+
+/* Graph Stats */
+.graph-stats {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin: 15px 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+}
+
+.graph-stats .stat-item {
+    text-align: center;
+    padding: 10px;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #e1e5e9;
+}
+
+.graph-stats .stat-item .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #667eea;
+    display: block;
+}
+
+.graph-stats .stat-item .stat-label {
+    font-size: 0.85rem;
+    color: #666;
+    margin-top: 5px;
+}
+
+/* Graph Preview Section */
+.graph-preview-section {
+    margin: 25px 0;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    border: 1px solid #e1e5e9;
+}
+
+.graph-preview-section h4 {
+    margin-bottom: 15px;
+    color: #333;
+    font-size: 1.1rem;
+}
+
+.graph-preview-container {
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #e1e5e9;
+    overflow: hidden;
+    margin-bottom: 15px;
+}
+
+.graph-visualization {
+    width: 100%;
+    height: 500px;
+    min-height: 400px;
+    background: white;
+}
+
+.graph-legend {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 15px;
+    padding: 10px;
+    background: white;
+    border-radius: 8px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    color: #555;
+}
+
+.legend-color {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.legend-line {
+    width: 30px;
+    height: 2px;
+    background: #667eea;
+    display: inline-block;
+}
+
+.graph-details-toggle {
+    margin: 15px 0;
+    text-align: center;
+}
+
+.graph-details {
+    margin-top: 20px;
+    padding: 15px;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #e1e5e9;
+}
+
+.details-section {
+    margin-bottom: 20px;
+}
+
+.details-section:last-child {
+    margin-bottom: 0;
+}
+
+.details-section h5 {
+    margin-bottom: 10px;
+    color: #333;
+    font-size: 1rem;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #667eea;
+}
+
+.nodes-list, .edges-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.node-item, .edge-item {
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border-left: 3px solid #667eea;
+    font-size: 0.85rem;
+}
+
+.node-item .node-name {
+    font-weight: 600;
+    color: #333;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.node-item .node-type {
+    font-size: 0.75rem;
+    color: #666;
+}
+
+.edge-item {
+    border-left-color: #28a745;
+}
+
+.edge-item .edge-relation {
+    font-weight: 600;
+    color: #28a745;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.edge-item .edge-nodes {
+    font-size: 0.75rem;
+    color: #666;
+}
+
+@media (max-width: 768px) {
+    .graph-visualization {
+        height: 400px;
+        min-height: 300px;
+    }
+    
+    .nodes-list, .edges-list {
+        grid-template-columns: 1fr;
+    }
+}
+
 .upload-section {
     background: white;
     border-radius: 15px;

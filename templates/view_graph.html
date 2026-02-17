@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نمایش گراف - GraphRAG</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1><i class="fas fa-project-diagram"></i> نمایش گراف</h1>
+            <p>مشاهده بصری و آماری گراف انتخاب شده{{ ' - ' + graph_name if graph_name else '' }}</p>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="nav-menu">
+            <a href="/" class="nav-link">
+                <i class="fas fa-home"></i> صفحه اصلی
+            </a>
+            <a href="/upload_graph" class="nav-link">
+                <i class="fas fa-upload"></i> آپلود گراف
+            </a>
+            <a href="/manage_graphs" class="nav-link">
+                <i class="fas fa-list"></i> مدیریت گراف‌ها
+            </a>
+            <a href="/evaluation" class="nav-link">
+                <i class="fas fa-chart-bar"></i> ارزیابی
+            </a>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Graph Info & Stats -->
+            <section class="current-graph-section">
+                <h2><i class="fas fa-chart-pie"></i> آمار گراف</h2>
+                <div id="graph-stats" class="graph-stats">
+                    <div class="loading-spinner">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>در حال بارگذاری اطلاعات گراف...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Graph Visualization -->
+            <section class="graphs-section">
+                <h2><i class="fas fa-project-diagram"></i> نمایش بصری گراف</h2>
+                <div id="graph-preview-container" class="graph-preview-container">
+                    <div id="graph-visualization" class="graph-visualization"></div>
+                </div>
+                <div class="graph-legend">
+                    <div class="legend-item">
+                        <span class="legend-color" style="background: #667eea;"></span>
+                        <span>نود (موجودیت)</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-line"></span>
+                        <span>یال (رابطه)</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Graph Details (Nodes & Edges Tables) -->
+            <section class="graphs-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-table"></i> جزئیات گراف</h2>
+                    <button class="btn btn-secondary" onclick="toggleGraphDetails()">
+                        <i class="fas fa-list"></i> نمایش/مخفی کردن جزئیات
+                    </button>
+                </div>
+                <div id="graph-details" class="graph-details" style="display: none;">
+                    <div class="details-section">
+                        <h5><i class="fas fa-circle"></i> نودها</h5>
+                        <div id="nodes-list" class="nodes-list"></div>
+                    </div>
+                    <div class="details-section">
+                        <h5><i class="fas fa-link"></i> روابط</h5>
+                        <div id="edges-list" class="edges-list"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="actions-section">
+                <div class="action-buttons">
+                    <a href="/manage_graphs" class="btn btn-secondary">
+                        <i class="fas fa-arrow-right"></i> بازگشت به مدیریت گراف‌ها
+                    </a>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- vis-network for graph visualization -->
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <script>
+        // مقادیر را از سرور به جاوااسکریپت منتقل می‌کنیم
+        window.VIEW_GRAPH_CONFIG = {
+            graphPath: "{{ graph_path | e }}",
+            graphName: "{{ graph_name | e }}"
+        };
+    </script>
+    <script src="{{ url_for('static', filename='js/view_graph.js') }}"></script>
+</body>
+</html>
+
+

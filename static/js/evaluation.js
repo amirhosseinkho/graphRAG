@@ -453,12 +453,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 
                 <div class="gpt-analysis">
-                    <h5><i class="fas fa-star"></i> امتیازدهی</h5>
-                    <div style="margin: 10px 0;">
-                        <span class="gpt-score">${data.label1}: ${data.score1}/100</span>
-                        <span class="gpt-score">${data.label2}: ${data.score2}/100</span>
-                    </div>
-                    <p>${data.scoring_explanation}</p>
+                    <h5><i class="fas fa-search"></i> تحلیل کلی</h5>
+                    <p>${data.analysis || '—'}</p>
                 </div>
                 
                 <div class="gpt-analysis">

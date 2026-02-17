@@ -3,54 +3,71 @@
 Graph Prompts - پرامپت‌های استخراج گراف
 """
 
+# Prompts inspired by ragflow and knowledgegraph for high recall extraction
+CONTINUE_PROMPT = "MANY entities were missed in the last extraction. Add them below using the same format:\n"
+LOOP_PROMPT = "It appears some entities may have still been missed. Answer Y if there are still entities that need to be added, or N if there are none. Please answer with a single letter Y or N.\n"
+
 GRAPH_PROMPTS = {
     "extract_entities": """---Role---
-You are an expert at extracting entities and relationships from text to build a knowledge graph.
+You are an information extraction system that generates a DETAILED knowledge graph from text.
+Primary goal: MAXIMIZE RECALL. Do not summarize or select only main facts.
 
 ---Goal---
-Extract entities and their relationships from the given text to create a structured knowledge graph.
+Extract entities and their relationships as STRICT JSON aligned to Hetionet MetaNodes/MetaEdges.
+
+---Hetionet MetaNodes---
+Gene (G), Disease (D), Compound (C), Pathway (PW), Biological Process (BP), Molecular Function (MF), Anatomy (A), Symptom (S), Pharmacologic Class (PC), Cellular Component (CC)
+
+---Hetionet MetaEdges (subset)---
+- CtD (Compound–treats–Disease), CpD (Compound–palliates–Disease)
+- CbG (Compound–binds–Gene), CuG/CdG (Compound–up/down–regulates–Gene)
+- DaG/DuG/DdG (Disease–associates/up/down–regulates–Gene)
+- GpPW/GpBP/GpMF/GpCC (Gene–participates–Pathway/Process/Function/Component)
+- GiG (Gene–interacts–Gene), Gr>G (Gene>regulates>Gene), GcG (Gene–covaries–Gene)
+- DlA (Disease–localizes–Anatomy), DpS (Disease–presents–Symptom)
+- PCiC (Class–includes–Compound)
 
 ---Instructions---
-- Identify entities (nodes) and their types
-- Identify relationships (edges) between entities
-- Use standard entity types: Gene, Disease, Drug, Protein, Pathway, Cell, Tissue, Organ, Process, Function
-- Use standard relationship types: regulates, interacts_with, causes, treats, expressed_in, part_of, participates_in
-- Return results in JSON format
+- Extract ALL entities explicitly mentioned, including organizations, people, locations, events, technologies, projects, concepts, risks, regulations, metrics, and domains.
+- Also extract meaningful noun phrases as CONCEPT entities (e.g., autonomous delivery drones, machine learning models, distributed cloud platform, ethical concerns).
+- Normalize entity names consistently (same entity = same string).
+- Extract EVERY explicit relation in the text, not only important ones.
+- Create separate relations for actions, attributes, locations, time, quantities, impacts, and stakeholders.
+- Relations must be directional and specific, using concise snake_case verb phrases.
+- Do NOT collapse multiple facts into one relation.
+- Avoid weak relations like 'is' or 'has' unless they express a real property.
+- Include years and quantities as separate relations or edge attributes when mentioned.
+- Use only facts stated in the text. Do NOT infer or guess.
+- Output MUST be VALID JSON ONLY. No prose.
+- Entities must use only the MetaNodes above. Prefer canonical surface forms (e.g., "BRCA1", "breast cancer", "trastuzumab").
+- Each relationship MUST include a Hetionet metaedge code in field "metaedge".
+- If unsure about a relationship, omit it rather than guessing.
 
 ---Output Format---
 {
   "entities": [
-    {
-      "id": "unique_id",
-      "name": "entity_name",
-      "type": "entity_type",
-      "attributes": {}
-    }
+    {"id": "unique_id", "name": "entity_name", "type": "Gene|Disease|Compound|PW|BP|MF|A|S|PC|CC", "attributes": {}}
   ],
   "relationships": [
-    {
-      "source": "source_entity_id",
-      "target": "target_entity_id", 
-      "type": "relationship_type",
-      "attributes": {}
-    }
+    {"source": "source_entity_id", "target": "target_entity_id", "metaedge": "GcG|GiG|Gr>G|CtD|...", "relation": "actual_relation_name_from_text", "attributes": {}}
   ]
 }
 
 ---Example---
-Text: "TP53 is a tumor suppressor gene that regulates cell cycle and apoptosis. Mutations in TP53 can cause cancer."
+Text: "TP53 participates in apoptosis and interacts with BRCA1. Trastuzumab treats breast cancer."
 
 Response: {
   "entities": [
-    {"id": "TP53", "name": "TP53", "type": "Gene", "attributes": {"function": "tumor suppressor"}},
-    {"id": "cancer", "name": "cancer", "type": "Disease", "attributes": {}},
-    {"id": "cell_cycle", "name": "cell cycle", "type": "Process", "attributes": {}},
-    {"id": "apoptosis", "name": "apoptosis", "type": "Process", "attributes": {}}
+    {"id": "TP53", "name": "TP53", "type": "Gene", "attributes": {}},
+    {"id": "BRCA1", "name": "BRCA1", "type": "Gene", "attributes": {}},
+    {"id": "apoptosis", "name": "apoptosis", "type": "BP", "attributes": {}},
+    {"id": "trastuzumab", "name": "trastuzumab", "type": "Compound", "attributes": {}},
+    {"id": "breast cancer", "name": "breast cancer", "type": "Disease", "attributes": {}}
   ],
   "relationships": [
-    {"source": "TP53", "target": "cell_cycle", "type": "regulates", "attributes": {}},
-    {"source": "TP53", "target": "apoptosis", "type": "regulates", "attributes": {}},
-    {"source": "TP53", "target": "cancer", "type": "causes", "attributes": {"condition": "mutation"}}
+    {"source": "TP53", "target": "apoptosis", "metaedge": "GpBP", "relation": "participates in", "attributes": {}},
+    {"source": "TP53", "target": "BRCA1", "metaedge": "GiG", "relation": "interacts with", "attributes": {}},
+    {"source": "trastuzumab", "target": "breast cancer", "metaedge": "CtD", "relation": "treats", "attributes": {}}
   ]
 }
 
@@ -58,28 +75,123 @@ Now extract from this text:
 {text}
 Response:""",
 
+    "extract_entities_generic": """---Role---
+You are a precise information extraction system that builds a KNOWLEDGE GRAPH from a SINGLE input text.
+
+---Primary Principles---
+- ONLY extract entities and relations that are EXPLICITLY mentioned in the text.
+- DO NOT use outside knowledge, assumptions, or guesses.
+- For every entity and relation you output, there must be clear words or phrases in the text that justify it.
+- If you are not sure something is explicitly present in the text, DO NOT include it.
+
+---Entity Types (generic, language-agnostic)---
+- PERSON: individual people, characters, named persons.
+- LOCATION: cities, countries, physical places, schools, buildings, regions.
+- ORGANIZATION: companies, institutions, groups, teams.
+- EVENT: concrete events or actions treated as things (meetings, wars, celebrations, accidents).
+- OBJECT: physical things (devices, tools, vehicles, products, artifacts).
+- CONCEPT: abstract or general concepts, topics, ideas, fields.
+- TIME: dates, times, periods, temporal expressions.
+- NUMBER: numeric quantities, counts, percentages, measures.
+- OTHER: entities that clearly appear in the text but do not fit above types.
+
+---Instructions---
+- Work directly in the language of the input text (Persian/Farsi, English, or mixed).
+- Normalize entity names consistently; the same real-world entity must have the same \"name\" string.
+- Each entity MUST correspond to some span of text (word or phrase) that appears in the input.
+- Extract ALL relations that are explicitly stated between entities (subject-verb-object, possession, location, membership, etc.).
+- Relation \"relation\" field MUST be a short natural-language phrase from the text (or a very close paraphrase using the same key verb).
+- Do NOT invent new entities or relations, even if they are plausible in the real world.
+- If the text is very short and mentions only 1–2 things, return only those; never add extra fictional people/objects.
+
+---Output Format (STRICT JSON)---
+{
+  "entities": [
+    {"id": "unique_id", "name": "entity_surface_form_from_text", "type": "PERSON|LOCATION|ORGANIZATION|EVENT|OBJECT|CONCEPT|TIME|NUMBER|OTHER", "attributes": {}}
+  ],
+  "relationships": [
+    {
+      "source": "source_entity_id",
+      "target": "target_entity_id",
+      "relation": "short_phrase_from_text_describing_relation",
+      "attributes": {
+        "evidence": "exact sentence or phrase from the text that supports this relation",
+        "confidence": 0.0-1.0
+      }
+    }
+  ]
+}
+
+---Examples---
+Text: "Ali went to school."
+Possible output:
+{
+  "entities": [
+    {"id": "ali", "name": "Ali", "type": "PERSON", "attributes": {}},
+    {"id": "school", "name": "school", "type": "LOCATION", "attributes": {}}
+  ],
+  "relationships": [
+    {
+      "source": "ali",
+      "target": "school",
+      "relation": "went to",
+      "attributes": {
+        "evidence": "Ali went to school.",
+        "confidence": 0.95
+      }
+    }
+  ]
+}
+
+---Task---
+Now extract entities and relationships from this text as STRICT JSON:
+{text}
+Response:""",
+
+    "extract_entities_high_recall": """-Goal-
+Given a text document that is potentially relevant to this activity and a list of entity types, identify all entities of those types from the text and all relationships among the identified entities.
+
+-Steps-
+1. Identify all entities. For each identified entity, extract the following information:
+- entity_name: Name of the entity, capitalized, in language of 'Text'
+- entity_type: One of the following types: [{entity_types}]
+- entity_description: Comprehensive description of the entity's attributes and activities in language of 'Text'
+Format each entity as ("entity"{tuple_delimiter}<entity_name>{tuple_delimiter}<entity_type>{tuple_delimiter}<entity_description>
+
+2. From the entities identified in step 1, identify all pairs of (source_entity, target_entity) that are *clearly related* to each other.
+For each pair of related entities, extract the following information:
+- source_entity: name of the source entity, as identified in step 1
+- target_entity: name of the target entity, as identified in step 1
+- relationship_description: explanation as to why you think the source entity and the target entity are related to each other in language of 'Text'
+- relationship_strength: a numeric score indicating strength of the relationship between the source entity and target entity
+ Format each relationship as ("relationship"{tuple_delimiter}<source_entity>{tuple_delimiter}<target_entity>{tuple_delimiter}<relationship_description>{tuple_delimiter}<relationship_strength>)
+
+3. Return output as a single list of all the entities and relationships identified in steps 1 and 2. Use **{record_delimiter}** as the list delimiter.
+
+4. When finished, output {completion_delimiter}
+
+######################
+-Real Data-
+######################
+Entity_types: {entity_types}
+Text: {input_text}
+######################
+Output:""",
+
     "extract_relationships": """---Role---
-You are an expert at identifying relationships between entities in biomedical text.
+You identify Hetionet metaedges between given entities using context.
 
 ---Goal---
 Given a list of entities, identify the relationships between them based on the context.
 
----Instructions---
-- Analyze the relationships between the given entities
-- Use standard relationship types: regulates, interacts_with, causes, treats, expressed_in, part_of, participates_in
-- Consider the context and domain knowledge
-- Return relationships in JSON format
+-- Output MUST be VALID JSON ONLY.
+-- Choose metaedges from: GcG, GiG, Gr>G, CtD, CpD, CbG, CuG, CdG, DaG, DuG, DdG, GpPW, GpBP, GpMF, GpCC, DlA, DpS, PCiC.
+-- If relationship is not supported by Hetionet, omit it.
 
 ---Output Format---
 {
   "relationships": [
-    {
-      "source": "source_entity",
-      "target": "target_entity",
-      "type": "relationship_type", 
-      "confidence": 0.0-1.0,
-      "evidence": "supporting text"
-    }
+    {"source": "source_entity", "target": "target_entity", "metaedge": "GiG|GpBP|CtD|...", "confidence": 0.0-1.0, "evidence": "supporting text"}
   ]
 }
 
@@ -89,20 +201,7 @@ Context: "TP53 is a tumor suppressor that regulates cell cycle and prevents canc
 
 Response: {
   "relationships": [
-    {
-      "source": "TP53",
-      "target": "cell cycle", 
-      "type": "regulates",
-      "confidence": 0.9,
-      "evidence": "TP53 regulates cell cycle"
-    },
-    {
-      "source": "TP53",
-      "target": "cancer",
-      "type": "prevents", 
-      "confidence": 0.8,
-      "evidence": "prevents cancer development"
-    }
+    {"source": "TP53", "target": "cell cycle", "metaedge": "GpBP", "confidence": 0.9, "evidence": "TP53 participates in cell cycle regulation"}
   ]
 }
 
@@ -112,7 +211,7 @@ Context: {context}
 Response:""",
 
     "validate_entity": """---Role---
-You are an expert at validating and categorizing biomedical entities.
+Validate and categorize biomedical entities to Hetionet MetaNodes.
 
 ---Goal---
 Validate if the given entity is a legitimate biomedical entity and assign the correct type.
@@ -123,22 +222,12 @@ Validate if the given entity is a legitimate biomedical entity and assign the co
 - Consider synonyms and alternative names
 - Return validation results in JSON format
 
----Entity Types---
-- Gene: DNA sequences that code for proteins
-- Disease: medical conditions or disorders  
-- Drug: pharmaceutical compounds
-- Protein: biological molecules
-- Pathway: biological processes
-- Cell: cellular components
-- Tissue: biological tissues
-- Organ: body organs
-- Process: biological processes
-- Function: biological functions
+Use only: Gene, Disease, Compound, Pathway (PW), Biological Process (BP), Molecular Function (MF), Cellular Component (CC), Pharmacologic Class (PC), Anatomy (A), Symptom (S)
 
 ---Output Format---
 {
   "is_valid": true/false,
-  "entity_type": "type",
+  "entity_type": "Gene|Disease|Compound|PW|BP|MF|CC|PC|A|S",
   "confidence": 0.0-1.0,
   "suggested_name": "standardized_name",
   "reasoning": "explanation"
@@ -156,7 +245,7 @@ Entity: {entity}
 Response:""",
 
     "enrich_entity": """---Role---
-You are an expert at enriching entity information with additional attributes and context.
+Enrich entity information with Hetionet-aligned attributes.
 
 ---Goal---
 Given an entity, provide additional information and attributes to enrich the knowledge graph.
@@ -172,7 +261,7 @@ Given an entity, provide additional information and attributes to enrich the kno
 {
   "entity_id": "id",
   "name": "name",
-  "type": "type",
+  "type": "Gene|Disease|Compound|PW|BP|MF|CC|PC|A|S",
   "attributes": {
     "synonyms": ["alt_name1", "alt_name2"],
     "description": "functional description",
@@ -207,17 +296,14 @@ Type: {entity_type}
 Response:""",
 
     "merge_entities": """---Role---
-You are an expert at merging similar entities in a knowledge graph.
+Decide if two entities should be merged (equivalence) with strict Hetionet semantics.
 
 ---Goal---
 Given two entities, determine if they should be merged and provide the canonical representation.
 
----Instructions---
-- Compare entities for similarity
-- Consider synonyms, abbreviations, and alternative names
-- Determine the canonical (preferred) name
-- Merge attributes appropriately
-- Return merge decision in JSON format
+-- Output MUST be VALID JSON ONLY.
+-- Do NOT merge related-but-distinct (class vs instance, family vs member).
+-- Prefer registry-backed canonical names (HGNC/DOID/DrugBank/UniProt).
 
 ---Output Format---
 {
