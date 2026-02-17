@@ -111,9 +111,9 @@ if not OPENAI_API_KEY:
     except Exception as _e:
         pass
 
-# اگر هنوز API key تنظیم نشده، از API key پیش‌فرض استفاده کن (برای تست)
+# اگر هنوز API key تنظیم نشده، از API key پیش‌فرض استفاده نکن - فقط هشدار بده
 if not OPENAI_API_KEY:
-    OPENAI_API_KEY = """  # API key باید از متغیرهای محیطی یا secrets تنظیم شود"
+    print("⚠️ OPENAI_API_KEY تنظیم نشده است؛ تولید پاسخ با OpenAI غیرفعال خواهد بود")
 
 if OPENAI_API_KEY:
     graphrag_service.set_openai_api_key(OPENAI_API_KEY)
