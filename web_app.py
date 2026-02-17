@@ -113,7 +113,7 @@ if not OPENAI_API_KEY:
 
 # اگر هنوز API key تنظیم نشده، از API key پیش‌فرض استفاده کن (برای تست)
 if not OPENAI_API_KEY:
-    OPENAI_API_KEY = """  # API key باید از متغیرهای محیطی یا secrets تنظیم شود"
+    OPENAI_API_KEY = ""  # API key باید از متغیرهای محیطی یا secrets تنظیم شود
 
 if OPENAI_API_KEY:
     graphrag_service.set_openai_api_key(OPENAI_API_KEY)
