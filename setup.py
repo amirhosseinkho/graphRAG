@@ -9,12 +9,12 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 setup(
     name="graphrag",
     version="1.0.0",
-    author="GraphRAG Team",
-    author_email="your.email@example.com",
+    author="Amirhossein Khoshbakht",
+    author_email="amirhossein.khoshbakhtce@gmail.com",
     description="سیستم بازیابی و تولید پاسخ مبتنی بر گراف دانش زیستی",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/graphrag",
+    url="https://github.com/amirhosseinkho/graphRAG",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -57,8 +57,8 @@ setup(
     },
     keywords="graph, rag, knowledge-graph, biomedical, ai, nlp",
     project_urls={
-        "Bug Reports": "https://github.com/yourusername/graphrag/issues",
-        "Source": "https://github.com/yourusername/graphrag",
-        "Documentation": "https://github.com/yourusername/graphrag#readme",
+        "Bug Reports": "https://github.com/amirhosseinkho/graphRAG/issues",
+        "Source": "https://github.com/amirhosseinkho/graphRAG",
+        "Documentation": "https://github.com/amirhosseinkho/graphRAG#readme",
     },
 ) 

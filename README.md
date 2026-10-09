@@ -1,3 +1,17 @@
+# GraphRAG: Knowledge-Graph Retrieval-Augmented Generation
+
+**English summary.** GraphRAG answers biomedical questions by retrieving evidence from the [Hetionet](https://het.io) knowledge graph and passing it to a language model as context.
+
+- **Question analysis**: entity extraction (spaCy, fuzzy matching), question-type and intent detection; Persian questions are normalized and mapped to English entities.
+- **Graph retrieval**: BFS, DFS, Dijkstra shortest paths, N-hop path search, PageRank ranking, and community detection (Louvain, label propagation, Girvan–Newman, spectral), plus biomedical searches such as gene–disease networks (NetworkX).
+- **Context and answer generation**: several context styles (scientific, narrative, data-driven, pathway-focused) fed to local template models or to OpenAI, Anthropic, and Google LLM APIs.
+- **Text-to-graph**: building new knowledge graphs from uploaded text or URLs.
+- **Interface**: Flask web application (`python web_app.py`, then open `http://localhost:5000`).
+
+The detailed documentation below is in Persian.
+
+---
+
 # GraphRAG - سیستم بازیابی و تولید پاسخ مبتنی بر گراف دانش
 
 ## 📋 خلاصه پروژه
