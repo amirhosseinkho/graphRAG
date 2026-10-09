@@ -10,6 +10,8 @@ answers in evaluation/questions.jsonl:
   - node_recall:    (GraphRAG only) share of gold entities among the retrieved
                     graph nodes and edge endpoints, before the context is built
   - context_chars, latency_s
+A GraphRAG question that takes longer than QUESTION_TIMEOUT seconds is stopped
+and scored as an empty retrieval (recorded in the 'error' column).
 
 Answer metrics are computed only when --llm-model is given and OPENAI_API_KEY
 is set: entity-level precision/recall/F1 of the gold names mentioned in the
@@ -24,6 +26,7 @@ import contextlib
 import csv
 import io
 import json
+import multiprocessing
 import os
 import re
 import subprocess
@@ -35,6 +38,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EVAL_DIR = os.path.join(ROOT, "evaluation")
 RAW_DIR = os.path.join(EVAL_DIR, "results", "raw")
 CONTEXT_BUDGET = 2000  # characters; equals GraphRAGService.config['max_context_length']
+QUESTION_TIMEOUT = 600  # seconds per question; a timeout counts as an empty retrieval
 
 GRAPHRAG_SYSTEMS = {
     "graphrag_intelligent": "INTELLIGENT",
@@ -90,6 +94,57 @@ def score_answer(answer, q):
     return precision, recall, f1
 
 
+def _graphrag_worker(conn, method_name):
+    """Child process: load the graph once, then answer retrieval requests."""
+    os.chdir(ROOT)  # the service loads its data files relative to the repo root
+    sys.path.insert(0, ROOT)
+    with contextlib.redirect_stdout(io.StringIO()):
+        from graphrag_service import GraphRAGService, RetrievalMethod
+        service = GraphRAGService()
+    method = RetrievalMethod[method_name]
+    conn.send("ready")
+    while True:
+        question = conn.recv()
+        if question is None:
+            return
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                r = service.retrieve_information(question, method)
+            ids = {n.id for n in r.nodes} | {e.source for e in r.edges} | {e.target for e in r.edges}
+            conn.send(("ok", r.context_text, ids, {"nodes": len(r.nodes), "edges": len(r.edges)}))
+        except Exception as e:
+            conn.send(("error", repr(e)[:300]))
+
+
+class GraphRAGWorker:
+    """Runs GraphRAG retrieval in a child process so a slow question can be stopped
+    after QUESTION_TIMEOUT seconds; the worker is then restarted for the next question."""
+
+    def __init__(self, method_name):
+        self.method_name = method_name
+        self._start()
+
+    def _start(self):
+        ctx = multiprocessing.get_context("spawn")
+        self.conn, child = ctx.Pipe()
+        self.proc = ctx.Process(target=_graphrag_worker, args=(child, self.method_name), daemon=True)
+        self.proc.start()
+        if self.conn.recv() != "ready":
+            raise RuntimeError("GraphRAG worker failed to start")
+
+    def retrieve(self, question):
+        self.conn.send(question)
+        if not self.conn.poll(QUESTION_TIMEOUT):
+            self.proc.terminate()
+            self.proc.join()
+            self._start()
+            raise TimeoutError(f"retrieval exceeded {QUESTION_TIMEOUT} s")
+        msg = self.conn.recv()
+        if msg[0] == "error":
+            raise RuntimeError(msg[1])
+        return msg[1], msg[2], msg[3]
+
+
 def run_system(system, questions, llm_model, out_path):
     done = set()
     if os.path.exists(out_path):
@@ -111,19 +166,8 @@ def run_system(system, questions, llm_model, out_path):
             context, n_chunks = rag.retrieve(question, max_chars=CONTEXT_BUDGET)
             return context, None, {"chunks": n_chunks}
     else:
-        cwd = os.getcwd()
-        os.chdir(ROOT)  # the service loads its data files relative to the repo root
-        with contextlib.redirect_stdout(io.StringIO()):
-            from graphrag_service import GraphRAGService, RetrievalMethod
-            service = GraphRAGService()
-        os.chdir(cwd)
-        method = RetrievalMethod[GRAPHRAG_SYSTEMS[system]]
-
-        def retrieve(question):
-            with contextlib.redirect_stdout(io.StringIO()):
-                r = service.retrieve_information(question, method)
-            ids = {n.id for n in r.nodes} | {e.source for e in r.edges} | {e.target for e in r.edges}
-            return r.context_text, ids, {"nodes": len(r.nodes), "edges": len(r.edges)}
+        worker = GraphRAGWorker(GRAPHRAG_SYSTEMS[system])
+        retrieve = worker.retrieve
 
     with open(out_path, "a", encoding="utf-8") as out:
         for i, q in enumerate(todo, 1):
@@ -131,7 +175,7 @@ def run_system(system, questions, llm_model, out_path):
             try:
                 context, ids, extra = retrieve(q["question"])
                 error = ""
-            except Exception as e:  # keep going; failures count as empty retrieval
+            except Exception as e:  # keep going; failures and timeouts count as empty retrieval
                 context, ids, extra, error = "", set(), {}, repr(e)[:300]
             latency = time.time() - t0
             hits = [mentioned(context, n, gid) for n, gid in zip(q["gold_names"], q["gold_ids"])]
