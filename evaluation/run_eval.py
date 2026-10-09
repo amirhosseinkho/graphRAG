@@ -266,7 +266,7 @@ def summarize(questions, systems, args):
     def fmt(v, pct=True):
         if v is None:
             return "n/a"
-        return f"{100 * v:.1f}%" if pct else f"{v:.0f}" if v >= 10 else f"{v:.1f}"
+        return f"{100 * v:.1f}%" if pct else f"{v:.0f}" if v >= 10 else f"{v:.1f}" if v >= 1 else f"{v:.2f}"
 
     lines = [f"| System | n | Recall in first {CONTEXT_BUDGET} chars | Recall in full context | Hit rate (full context) "
              "| Node recall | Mean context (chars) | Mean latency (s) |",

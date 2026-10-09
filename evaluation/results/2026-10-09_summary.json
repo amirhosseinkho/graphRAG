@@ -1,0 +1,247 @@
+{
+  "run_date": "2026-10-09",
+  "commit": "e5b5815",
+  "n_questions": 56,
+  "question_seed": 42,
+  "context_budget_chars": 2000,
+  "dense_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "llm_model": null,
+  "systems": {
+    "graphrag_intelligent": {
+      "overall": {
+        "context_recall_at_budget": 0.31300724045763995,
+        "context_recall": 0.3194556531560527,
+        "context_hit": 0.5714285714285714,
+        "node_recall": 0.3137347536851532,
+        "context_chars": 55875.82142857143,
+        "latency_s": 57.300000000000004,
+        "answer_precision": null,
+        "answer_recall": null,
+        "answer_f1": null,
+        "n": 56,
+        "errors": 0
+      },
+      "by_template": {
+        "compound_genes": {
+          "n": 8,
+          "context_recall": 0.0,
+          "context_recall_at_budget": 0.0,
+          "context_hit": 0.0
+        },
+        "compound_side_effects": {
+          "n": 8,
+          "context_recall": 0.5622427817280758,
+          "context_recall_at_budget": 0.5622427817280758,
+          "context_hit": 0.875
+        },
+        "disease_anatomy": {
+          "n": 8,
+          "context_recall": 0.12789351851851852,
+          "context_recall_at_budget": 0.08275462962962962,
+          "context_hit": 0.375
+        },
+        "disease_compound_genes": {
+          "n": 8,
+          "context_recall": 0.1928956682246156,
+          "context_recall_at_budget": 0.1928956682246156,
+          "context_hit": 0.625
+        },
+        "disease_compounds": {
+          "n": 8,
+          "context_recall": 0.7114583333333333,
+          "context_recall_at_budget": 0.7114583333333333,
+          "context_hit": 0.875
+        },
+        "disease_genes": {
+          "n": 8,
+          "context_recall": 0.3534873188405797,
+          "context_recall_at_budget": 0.3534873188405797,
+          "context_hit": 0.625
+        },
+        "disease_symptoms": {
+          "n": 8,
+          "context_recall": 0.28821195144724554,
+          "context_recall_at_budget": 0.28821195144724554,
+          "context_hit": 0.625
+        }
+      }
+    },
+    "graphrag_bfs": {
+      "overall": {
+        "context_recall_at_budget": 0.13128425921948653,
+        "context_recall": 0.13128425921948653,
+        "context_hit": 0.35714285714285715,
+        "node_recall": 0.12905211636234365,
+        "context_chars": 4741.392857142857,
+        "latency_s": 6.519285714285714,
+        "answer_precision": null,
+        "answer_recall": null,
+        "answer_f1": null,
+        "n": 56,
+        "errors": 0
+      },
+      "by_template": {
+        "compound_genes": {
+          "n": 8,
+          "context_recall": 0.3710858585858586,
+          "context_recall_at_budget": 0.3710858585858586,
+          "context_hit": 0.75
+        },
+        "compound_side_effects": {
+          "n": 8,
+          "context_recall": 0.18167892156862744,
+          "context_recall_at_budget": 0.18167892156862744,
+          "context_hit": 0.375
+        },
+        "disease_anatomy": {
+          "n": 8,
+          "context_recall": 0.0349605119825708,
+          "context_recall_at_budget": 0.0349605119825708,
+          "context_hit": 0.375
+        },
+        "disease_compound_genes": {
+          "n": 8,
+          "context_recall": 0.003289473684210526,
+          "context_recall_at_budget": 0.003289473684210526,
+          "context_hit": 0.125
+        },
+        "disease_compounds": {
+          "n": 8,
+          "context_recall": 0.175,
+          "context_recall_at_budget": 0.175,
+          "context_hit": 0.25
+        },
+        "disease_genes": {
+          "n": 8,
+          "context_recall": 0.010643115942028984,
+          "context_recall_at_budget": 0.010643115942028984,
+          "context_hit": 0.25
+        },
+        "disease_symptoms": {
+          "n": 8,
+          "context_recall": 0.14233193277310924,
+          "context_recall_at_budget": 0.14233193277310924,
+          "context_hit": 0.375
+        }
+      }
+    },
+    "graphrag_adaptive": {
+      "overall": {
+        "context_recall_at_budget": 0.05361922546796496,
+        "context_recall": 0.05361922546796496,
+        "context_hit": 0.23214285714285715,
+        "node_recall": 0.04940295562669512,
+        "context_chars": 1733.8392857142858,
+        "latency_s": 9.189285714285715,
+        "answer_precision": null,
+        "answer_recall": null,
+        "answer_f1": null,
+        "n": 56,
+        "errors": 0
+      },
+      "by_template": {
+        "compound_genes": {
+          "n": 8,
+          "context_recall": 0.0,
+          "context_recall_at_budget": 0.0,
+          "context_hit": 0.0
+        },
+        "compound_side_effects": {
+          "n": 8,
+          "context_recall": 0.033394607843137254,
+          "context_recall_at_budget": 0.033394607843137254,
+          "context_hit": 0.375
+        },
+        "disease_anatomy": {
+          "n": 8,
+          "context_recall": 0.08678124027388734,
+          "context_recall_at_budget": 0.08678124027388734,
+          "context_hit": 0.625
+        },
+        "disease_compound_genes": {
+          "n": 8,
+          "context_recall": 0.0,
+          "context_recall_at_budget": 0.0,
+          "context_hit": 0.0
+        },
+        "disease_compounds": {
+          "n": 8,
+          "context_recall": 0.1361111111111111,
+          "context_recall_at_budget": 0.1361111111111111,
+          "context_hit": 0.25
+        },
+        "disease_genes": {
+          "n": 8,
+          "context_recall": 0.041666666666666664,
+          "context_recall_at_budget": 0.041666666666666664,
+          "context_hit": 0.125
+        },
+        "disease_symptoms": {
+          "n": 8,
+          "context_recall": 0.07738095238095238,
+          "context_recall_at_budget": 0.07738095238095238,
+          "context_hit": 0.25
+        }
+      }
+    },
+    "dense_rag": {
+      "overall": {
+        "context_recall_at_budget": 0.8805772071749516,
+        "context_recall": 0.8805772071749516,
+        "context_hit": 0.9642857142857143,
+        "node_recall": null,
+        "context_chars": 1849.9464285714287,
+        "latency_s": 0.04428571428571428,
+        "answer_precision": null,
+        "answer_recall": null,
+        "answer_f1": null,
+        "n": 56,
+        "errors": 0
+      },
+      "by_template": {
+        "compound_genes": {
+          "n": 8,
+          "context_recall": 1.0,
+          "context_recall_at_budget": 1.0,
+          "context_hit": 1.0
+        },
+        "compound_side_effects": {
+          "n": 8,
+          "context_recall": 1.0,
+          "context_recall_at_budget": 1.0,
+          "context_hit": 1.0
+        },
+        "disease_anatomy": {
+          "n": 8,
+          "context_recall": 1.0,
+          "context_recall_at_budget": 1.0,
+          "context_hit": 1.0
+        },
+        "disease_compound_genes": {
+          "n": 8,
+          "context_recall": 0.16404045022466074,
+          "context_recall_at_budget": 0.16404045022466074,
+          "context_hit": 0.75
+        },
+        "disease_compounds": {
+          "n": 8,
+          "context_recall": 1.0,
+          "context_recall_at_budget": 1.0,
+          "context_hit": 1.0
+        },
+        "disease_genes": {
+          "n": 8,
+          "context_recall": 1.0,
+          "context_recall_at_budget": 1.0,
+          "context_hit": 1.0
+        },
+        "disease_symptoms": {
+          "n": 8,
+          "context_recall": 1.0,
+          "context_recall_at_budget": 1.0,
+          "context_hit": 1.0
+        }
+      }
+    }
+  }
+}
