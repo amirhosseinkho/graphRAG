@@ -5,10 +5,12 @@
 با استفاده از NodeLookupSystem برای تبدیل شناسه‌ها به نام‌های معنادار
 """
 
+from __future__ import annotations
+
 import sys
 import os
 import re
-from typing import Dict, List, Tuple, Optional, Any
+from typing import TYPE_CHECKING, Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass
 import json
 
@@ -16,7 +18,9 @@ import json
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from node_lookup_system import NodeLookupSystem
-from graphrag_service import GraphNode, GraphEdge, RetrievalResult
+
+if TYPE_CHECKING:  # imported only for type hints; a runtime import would be circular
+    from graphrag_service import RetrievalResult
 
 def remove_emojis(text: str) -> str:
     """حذف ایموجی‌ها از متن"""
@@ -551,6 +555,8 @@ class EnhancedContextGenerator:
 
 def test_enhanced_context_generator():
     """تست ماژول تولید متن زمینه بهبود یافته"""
+    from graphrag_service import GraphNode, GraphEdge, RetrievalResult
+
     print("تست ماژول تولید متن زمینه بهبود یافته")
     print("=" * 60)
     

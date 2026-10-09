@@ -25,11 +25,12 @@ try:
     from graphrag_new.entity_resolution import EntityResolution
     from rag_new.llm.chat_model import GptTurbo, MoonshotChat, AzureChat, QWenChat, ZhipuChat, OllamaChat, GeminiChat, AnthropicChat
     from rag_new.utils import REDIS_CONN
-    from enhanced_context_generator import EnhancedContextGenerator
     NEW_MODULES_AVAILABLE = True
 except ImportError:
     NEW_MODULES_AVAILABLE = False
     print("Warning: New GraphRAG modules not available. Using classic methods only.")
+
+from enhanced_context_generator import EnhancedContextGenerator
 
 def remove_emojis(text: str) -> str:
     """حذف ایموجی‌ها از متن"""
