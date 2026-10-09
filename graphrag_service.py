@@ -9,6 +9,7 @@ import networkx as nx
 import spacy
 from spacy.lang.en.stop_words import STOP_WORDS
 from collections import deque
+from itertools import islice
 import pickle
 import os
 import json
@@ -1952,8 +1953,9 @@ class GraphRAGService:
     def get_shortest_paths(self, source: str, target: str, max_paths: int = 3) -> List[List[str]]:
         """یافتن کوتاه‌ترین مسیرها"""
         try:
-            paths = list(nx.all_shortest_paths(self.G, source=source, target=target))
-            return paths[:max_paths]
+            # Take only the first max_paths paths: enumerating all shortest paths first
+            # is combinatorial between high-degree nodes and could take up to an hour.
+            return list(islice(nx.all_shortest_paths(self.G, source=source, target=target), max_paths))
         except nx.NetworkXNoPath:
             return []
     
