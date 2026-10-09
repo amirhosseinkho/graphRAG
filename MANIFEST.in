@@ -1,9 +1,7 @@
-ضinclude README.md
+include README.md
 include LICENSE
-include CONTRIBUTING.md
+include NOTICE
 include requirements.txt
-include API_SETUP.md
-include RUN_WEB_APP.md
 
 recursive-include templates *
 recursive-include static *
