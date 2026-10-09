@@ -75,3 +75,17 @@ Thumbs.db
 config.ini
 secrets.json
 *.key 
+
+# Hetionet data and generated graphs (run scripts/download_data.py)
+*.pickle
+*.sif.gz
+hetionet-v1.0-*
+hetionet_graph*.pkl
+uploaded_graphs/*
+!uploaded_graphs/.gitkeep
+
+# Evaluation: keep committed results, ignore caches and raw per-question logs
+evaluation/cache/
+evaluation/results/raw/
+!evaluation/results/*.csv
+!evaluation/results/*.json
