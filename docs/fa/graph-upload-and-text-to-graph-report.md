@@ -74,8 +74,8 @@ BRCA1    interacts_with    TP53
 {
   "success": true,
   "message": "فایل {filename} با موفقیت آپلود شد",
-  "filename": "20240217_143022_example.pkl",
-  "filepath": "uploaded_graphs/20240217_143022_example.pkl"
+  "filename": "20250804_224557_example.pkl",
+  "filepath": "uploaded_graphs/20250804_224557_example.pkl"
 }
 ```
 
@@ -144,8 +144,8 @@ BRCA1    interacts_with    TP53
 {
   "success": true,
   "message": "گراف با موفقیت ساخته شد",
-  "filename": "20240217_143022_text_graph.pkl",
-  "filepath": "uploaded_graphs/20240217_143022_text_graph.pkl",
+  "filename": "20250804_224557_text_graph.pkl",
+  "filepath": "uploaded_graphs/20250804_224557_text_graph.pkl",
   "stats": {
     "num_nodes": 45,
     "num_edges": 78,
@@ -465,7 +465,7 @@ def process_url_to_graph(url, method, use_wikipedia_extraction=True, ...):
 ### 5.1. ساختار فایل‌ها
 
 ```
-tir/
+graphRAG/
 ├── web_app.py                    # اپلیکیشن Flask اصلی
 ├── text_to_graph_service.py      # سرویس تبدیل متن به گراف
 ├── url_extractor.py              # استخراج از URL عادی

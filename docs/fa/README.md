@@ -1,17 +1,3 @@
-# GraphRAG: Knowledge-Graph Retrieval-Augmented Generation
-
-**English summary.** GraphRAG answers biomedical questions by retrieving evidence from the [Hetionet](https://het.io) knowledge graph and passing it to a language model as context.
-
-- **Question analysis**: entity extraction (spaCy, fuzzy matching), question-type and intent detection; Persian questions are normalized and mapped to English entities.
-- **Graph retrieval**: BFS, DFS, Dijkstra shortest paths, N-hop path search, PageRank ranking, and community detection (Louvain, label propagation, Girvan–Newman, spectral), plus biomedical searches such as gene–disease networks (NetworkX).
-- **Context and answer generation**: several context styles (scientific, narrative, data-driven, pathway-focused) fed to local template models or to OpenAI, Anthropic, and Google LLM APIs.
-- **Text-to-graph**: building new knowledge graphs from uploaded text or URLs.
-- **Interface**: Flask web application (`python web_app.py`, then open `http://localhost:5000`).
-
-The detailed documentation below is in Persian.
-
----
-
 # GraphRAG - سیستم بازیابی و تولید پاسخ مبتنی بر گراف دانش
 
 ## 📋 خلاصه پروژه
@@ -238,20 +224,23 @@ final_answer = generate_answer(context_text, query, generation_model)
 ## 📁 ساختار پروژه
 
 ```
-tir/
-├── docs/                          # مستندات
+graphRAG/
+├── docs/fa/                       # مستندات فارسی
+├── evaluation/                    # اسکریپت‌ها و نتایج ارزیابی
 ├── graphrag_new/                  # ماژول‌های جدید GraphRAG
 ├── rag_new/                       # ماژول‌های RAG
+├── scripts/download_data.py       # دانلود Hetionet و ساخت گراف
 ├── static/                        # فایل‌های استاتیک
 ├── templates/                     # قالب‌های HTML
 ├── tests/                         # تست‌ها
 ├── uploaded_graphs/               # گراف‌های آپلود شده
 ├── enhanced_graphrag_service.py   # سرویس پیشرفته
 ├── enhanced_context_generator.py  # تولیدکننده متن زمینه
-├── graphrag_service.py           # سرویس اصلی
-├── node_lookup_system.py         # سیستم جستجوی نود
-├── web_app.py                    # رابط وب
-└── requirements.txt              # وابستگی‌ها
+├── graphrag_service.py            # سرویس اصلی
+├── node_lookup_system.py          # سیستم جستجوی نود
+├── rebuild_graph.py               # ساخت گراف از فایل‌های Hetionet
+├── web_app.py                     # رابط وب
+└── requirements.txt               # وابستگی‌ها
 ```
 
 ## 🔧 تنظیمات پیشرفته
@@ -293,10 +282,7 @@ python -m pytest tests/test_comprehensive_system.py
 ```
 
 ### ارزیابی عملکرد
-- **دقت بازیابی**: 85-95%
-- **سرعت پاسخ**: 2-5 ثانیه
-- **کیفیت متن زمینه**: 90-95%
-- **رضایت کاربر**: 85-90%
+نتایج ارزیابی قابل بازتولید و روش اجرای آن در بخش Evaluation فایل [README انگلیسی](../../README.md#evaluation) آمده است.
 
 ## 📈 کاربردها
 
@@ -331,17 +317,16 @@ python -m pytest tests/test_comprehensive_system.py
 
 ## 📄 مجوز
 
-این پروژه تحت مجوز MIT منتشر شده است.
+این پروژه تحت مجوز MIT منتشر شده است (فایل [LICENSE](../../LICENSE)). کدهای شخص ثالث در فایل [NOTICE](../../NOTICE) فهرست شده‌اند.
 
 ## 📞 پشتیبانی
 
 برای سوالات و مشکلات:
 - ایجاد Issue در GitHub
 - ارسال ایمیل به تیم توسعه
-- مراجعه به مستندات کامل در پوشه `docs/`
+- مراجعه به مستندات فارسی در پوشه `docs/fa/`
 
 ---
 
-**توسعه‌دهندگان**: تیم GraphRAG
-**آخرین به‌روزرسانی**: 2024
+**توسعه‌دهنده**: امیرحسین خوشبخت (پروژهٔ کارشناسی، ۱۴۰۴)
 **نسخه**: 2.0.0 
