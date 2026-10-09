@@ -1927,25 +1927,32 @@ class GraphRAGService:
         """جستجوی عمیق اول با امکان فیلتر بر اساس نوع رابطه"""
         visited = set()
         result = []
+        relation_filter = relation_filter.lower() if relation_filter else None
+        adjacency = self.G.adj
         
         def dfs(node, depth):
             if depth > max_depth or node in visited:
                 return
             visited.add(node)
             result.append((node, depth))
+            # Neighbours would sit at max_depth + 1 and are never added, so scanning
+            # them is wasted work (this layer is the largest one in Hetionet).
+            if depth == max_depth:
+                return
             
-            for neighbor in self.G.neighbors(node):
-                if neighbor not in visited:
-                    # اگر فیلتر رابطه مشخص شده، فقط یال‌های مرتبط را بررسی کن
-                    edge_data = self.G.get_edge_data(node, neighbor) or {}
-                    if relation_filter:
-                        rel = (edge_data.get('relation') or edge_data.get('metaedge') or '').lower()
-                        if relation_filter.lower() not in rel:
-                            continue
-                    # حذف یال‌های بدون متاداده
-                    if not edge_data.get('relation') and not edge_data.get('metaedge'):
-                        continue
-                    dfs(neighbor, depth + 1)
+            # Edge data is read directly from the adjacency view (same order and
+            # data as G.neighbors() + G.get_edge_data(), without a lookup per edge).
+            for neighbor, edge_data in adjacency[node].items():
+                if neighbor in visited:
+                    continue
+                rel = edge_data.get('relation') or edge_data.get('metaedge')
+                # حذف یال‌های بدون متاداده
+                if not rel:
+                    continue
+                # اگر فیلتر رابطه مشخص شده، فقط یال‌های مرتبط را بررسی کن
+                if relation_filter and relation_filter not in rel.lower():
+                    continue
+                dfs(neighbor, depth + 1)
         
         dfs(start_node, 0)
         return result
