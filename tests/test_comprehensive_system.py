@@ -69,10 +69,14 @@ def test_question_type_detection():
         else:
             print("  ❌ اشتباه تشخیص داده شد")
     
-    accuracy = (correct_detections / total_questions) * 100
-    print(f"\n📊 دقت تشخیص نوع سوال: {accuracy:.1f}% ({correct_detections}/{total_questions})")
-    
-    return accuracy > 80  # موفقیت اگر دقت بالای 80% باشد
+    # Sanity check of question-type detection on the 16 hand-written questions
+    # above only. This is not a retrieval or answer-accuracy benchmark; see
+    # evaluation/run_eval.py for the reproducible evaluation.
+    detection_rate = (correct_detections / total_questions) * 100
+    print(f"\n📊 Question-type detection on {total_questions} hand-written examples: "
+          f"{correct_detections}/{total_questions} ({detection_rate:.1f}%)")
+
+    return correct_detections >= 13  # pass if at least 13 of the 16 examples are detected correctly
 
 def test_metaedge_aware_search():
     """تست جستجوی آگاه از metaedge"""
