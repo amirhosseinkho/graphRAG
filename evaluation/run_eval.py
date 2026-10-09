@@ -3,7 +3,9 @@
 Retrieval metrics (no LLM needed), computed per question against the gold
 answers in evaluation/questions.jsonl:
   - context_recall: share of gold entities whose name or Hetionet id appears in
-    the context text that would be passed to the LLM
+    the full context text that would be passed to the LLM
+  - context_recall_at_budget: the same, but only within the first CONTEXT_BUDGET
+    characters of the context, so systems are compared at equal context size
   - context_hit:    1 if at least one gold entity appears in the context
   - node_recall:    (GraphRAG only) share of gold entities among the retrieved
                     graph nodes and edge endpoints, before the context is built
@@ -133,6 +135,8 @@ def run_system(system, questions, llm_model, out_path):
                 context, ids, extra, error = "", set(), {}, repr(e)[:300]
             latency = time.time() - t0
             hits = [mentioned(context, n, gid) for n, gid in zip(q["gold_names"], q["gold_ids"])]
+            head = context[:CONTEXT_BUDGET]
+            hits_budget = [mentioned(head, n, gid) for n, gid in zip(q["gold_names"], q["gold_ids"])]
             row = {
                 "question_id": q["id"],
                 "template": q["template"],
@@ -141,6 +145,7 @@ def run_system(system, questions, llm_model, out_path):
                 "n_gold": len(q["gold_ids"]),
                 "context_recall": sum(hits) / len(hits),
                 "context_hit": int(any(hits)),
+                "context_recall_at_budget": sum(hits_budget) / len(hits_budget),
                 "node_recall": (len(ids & set(q["gold_ids"])) / len(q["gold_ids"])) if ids is not None else None,
                 "context_chars": len(context),
                 "latency_s": round(latency, 2),
@@ -170,6 +175,9 @@ def summarize(questions, systems, args):
                 rows += [json.loads(line) for line in f if line.strip()]
     qids = {q["id"] for q in questions}
     rows = [r for r in rows if r["question_id"] in qids]
+    for r in rows:  # rows written before this metric existed: exact when the context fits the budget
+        if "context_recall_at_budget" not in r and r["context_chars"] <= CONTEXT_BUDGET:
+            r["context_recall_at_budget"] = r["context_recall"]
     if not rows:
         print("No results to summarize.")
         return
@@ -182,7 +190,7 @@ def summarize(questions, systems, args):
         writer.writeheader()
         writer.writerows(rows)
 
-    metrics = ["context_recall", "context_hit", "node_recall", "context_chars", "latency_s",
+    metrics = ["context_recall_at_budget", "context_recall", "context_hit", "node_recall", "context_chars", "latency_s",
                "answer_precision", "answer_recall", "answer_f1"]
     summary = {
         "run_date": today,
@@ -205,6 +213,7 @@ def summarize(questions, systems, args):
         for t in sorted({r["template"] for r in srows}):
             trows = [r for r in srows if r["template"] == t]
             by_template[t] = {"n": len(trows), "context_recall": mean([r["context_recall"] for r in trows]),
+                              "context_recall_at_budget": mean([r["context_recall_at_budget"] for r in trows]),
                               "context_hit": mean([r["context_hit"] for r in trows])}
         summary["systems"][system] = {"overall": overall, "by_template": by_template}
     with open(os.path.join(results_dir, f"{today}_summary.json"), "w", encoding="utf-8") as f:
@@ -215,18 +224,19 @@ def summarize(questions, systems, args):
             return "n/a"
         return f"{100 * v:.1f}%" if pct else f"{v:.0f}" if v >= 10 else f"{v:.1f}"
 
-    lines = ["| System | n | Context recall | Context hit rate | Node recall | Mean context (chars) | Mean latency (s) |",
-             "|---|---|---|---|---|---|---|"]
+    lines = [f"| System | n | Recall in first {CONTEXT_BUDGET} chars | Recall in full context | Hit rate (full context) "
+             "| Node recall | Mean context (chars) | Mean latency (s) |",
+             "|---|---|---|---|---|---|---|---|"]
     for system, s in summary["systems"].items():
         o = s["overall"]
-        lines.append(f"| {system} | {o['n']} | {fmt(o['context_recall'])} | {fmt(o['context_hit'])} | "
+        lines.append(f"| {system} | {o['n']} | {fmt(o['context_recall_at_budget'])} | {fmt(o['context_recall'])} | {fmt(o['context_hit'])} | "
                      f"{fmt(o['node_recall'])} | {fmt(o['context_chars'], False)} | {fmt(o['latency_s'], False)} |")
     templates = sorted({t for s in summary["systems"].values() for t in s["by_template"]})
-    lines += ["", "Context recall by question template:", "",
+    lines += ["", f"Recall in the first {CONTEXT_BUDGET} characters, by question template:", "",
               "| Template | " + " | ".join(summary["systems"]) + " |",
               "|---|" + "---|" * len(summary["systems"])]
     for t in templates:
-        cells = [fmt(s["by_template"].get(t, {}).get("context_recall")) for s in summary["systems"].values()]
+        cells = [fmt(s["by_template"].get(t, {}).get("context_recall_at_budget")) for s in summary["systems"].values()]
         lines.append(f"| {t} | " + " | ".join(cells) + " |")
     table = "\n".join(lines)
     with open(os.path.join(results_dir, f"{today}_summary.md"), "w", encoding="utf-8") as f:
