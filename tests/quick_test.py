@@ -24,7 +24,7 @@ def quick_test():
     service.initialize()
     
     # تنظیم API Key برای OpenAI
-    service.set_openai_api_key("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")
+    service.set_openai_api_key(os.environ.get("OPENAI_API_KEY", ""))
     
     # تست سوال داروهای دیابت
     test_question = "What drugs treat diabetes?"
