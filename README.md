@@ -8,6 +8,17 @@
 - **Text-to-graph**: building new knowledge graphs from uploaded text or URLs.
 - **Interface**: Flask web application (`python web_app.py`, then open `http://localhost:5000`).
 
+## Authors
+
+- **Amirhossein Khoshbakht**
+- **Ali Rahimi**
+
+Developed as a B.Sc. thesis project at Sharif University of Technology, supervised by Dr. Hamid Beigy. To cite this repository, use [`CITATION.cff`](CITATION.cff) (GitHub shows a "Cite this repository" button).
+
+## License
+
+MIT. See [`LICENSE`](LICENSE). `graphrag_new/search.py` and `rag_new/nlp/search.py` keep their original Apache-2.0 headers (Copyright 2024 The InfiniFlow Authors).
+
 The detailed documentation below is in Persian.
 
 ---
@@ -238,20 +249,21 @@ final_answer = generate_answer(context_text, query, generation_model)
 ## 📁 ساختار پروژه
 
 ```
-tir/
-├── docs/                          # مستندات
+graphRAG/
 ├── graphrag_new/                  # ماژول‌های جدید GraphRAG
 ├── rag_new/                       # ماژول‌های RAG
-├── static/                        # فایل‌های استاتیک
+├── static/                        # فایل‌های استاتیک (CSS/JS)
 ├── templates/                     # قالب‌های HTML
 ├── tests/                         # تست‌ها
 ├── uploaded_graphs/               # گراف‌های آپلود شده
+├── graphrag_service.py            # سرویس اصلی
 ├── enhanced_graphrag_service.py   # سرویس پیشرفته
 ├── enhanced_context_generator.py  # تولیدکننده متن زمینه
-├── graphrag_service.py           # سرویس اصلی
-├── node_lookup_system.py         # سیستم جستجوی نود
-├── web_app.py                    # رابط وب
-└── requirements.txt              # وابستگی‌ها
+├── text_to_graph_service.py       # ساخت گراف از متن
+├── node_lookup_system.py          # سیستم جستجوی نود
+├── rebuild_graph.py               # ساخت گراف از فایل‌های Hetionet
+├── web_app.py                     # رابط وب (Flask)
+└── requirements.txt               # وابستگی‌ها
 ```
 
 ## 🔧 تنظیمات پیشرفته
@@ -331,17 +343,13 @@ python -m pytest tests/test_comprehensive_system.py
 
 ## 📄 مجوز
 
-این پروژه تحت مجوز MIT منتشر شده است.
+این پروژه تحت مجوز MIT منتشر شده است. فایل [`LICENSE`](LICENSE) را ببینید.
 
 ## 📞 پشتیبانی
 
-برای سوالات و مشکلات:
-- ایجاد Issue در GitHub
-- ارسال ایمیل به تیم توسعه
-- مراجعه به مستندات کامل در پوشه `docs/`
+برای سوالات و گزارش مشکلات، یک [Issue در GitHub](https://github.com/amirhosseinkho/graphRAG/issues) ایجاد کنید.
 
 ---
 
-**توسعه‌دهندگان**: تیم GraphRAG
-**آخرین به‌روزرسانی**: 2024
+**توسعه‌دهندگان**: امیرحسین خوشبخت و علی رحیمی (Amirhossein Khoshbakht and Ali Rahimi)
 **نسخه**: 2.0.0 

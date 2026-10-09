@@ -9,7 +9,7 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 setup(
     name="graphrag",
     version="1.0.0",
-    author="Amirhossein Khoshbakht",
+    author="Amirhossein Khoshbakht, Ali Rahimi",
     author_email="amirhossein.khoshbakhtce@gmail.com",
     description="سیستم بازیابی و تولید پاسخ مبتنی بر گراف دانش زیستی",
     long_description=long_description,

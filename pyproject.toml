@@ -9,7 +9,8 @@ description = "سیستم بازیابی و تولید پاسخ مبتنی بر 
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "Amirhossein Khoshbakht", email = "amirhossein.khoshbakhtce@gmail.com"}
+    {name = "Amirhossein Khoshbakht", email = "amirhossein.khoshbakhtce@gmail.com"},
+    {name = "Ali Rahimi"}
 ]
 maintainers = [
     {name = "Amirhossein Khoshbakht", email = "amirhossein.khoshbakhtce@gmail.com"}
