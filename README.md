@@ -1,55 +1,81 @@
-# GraphRAG over Hetionet
+# GraphRAG: Knowledge-Graph Retrieval-Augmented Generation over Hetionet
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## Overview
+GraphRAG answers biomedical questions by retrieving evidence from a knowledge graph instead of from text chunks. A question is mapped to graph entities, a graph algorithm collects the relevant nodes, edges, and paths, and the result is turned into a context that a language model (or a local template) uses to write the answer. The default graph is [Hetionet v1.0](https://het.io), and new graphs can be built from free text or web pages and queried the same way.
 
-This repository contains my B.Sc. project: a retrieval-augmented generation (RAG) system that answers biomedical questions by retrieving evidence from a knowledge graph instead of from text passages.
+This is the B.Sc. thesis project of **Amirhossein Khoshbakht** and **Ali Rahimi** at Sharif University of Technology, supervised by Dr. Hamid Beigy.
 
-The knowledge graph is [Hetionet v1.0](https://het.io), which integrates 29 public biomedical resources into 47,031 nodes of 11 types (genes, compounds, diseases, anatomies, symptoms, side effects, pathways, biological processes, and others) and 2,250,197 edges of 24 relation types (for example *Compound–treats–Disease*, *Disease–associates–Gene*, *Compound–binds–Gene*). The system loads Hetionet as an undirected NetworkX graph. For a question it:
+![Knowledge graph built from a paragraph of text](docs/images/text-to-graph-preview.png)
 
-1. finds the entities the question mentions and the relation types it asks about,
-2. retrieves a subgraph around those entities with one of several graph-search strategies,
-3. turns the subgraph into a textual context, and
-4. passes that context to a template-based generator or to an LLM API to produce the answer.
+## Features
 
-The repository also includes a Flask web interface, a module that builds new knowledge graphs from free text, URLs, or Wikipedia pages, partial support for Persian questions, and a reproducible evaluation against a standard dense-retrieval RAG baseline (see [Evaluation](#evaluation)). In that evaluation the baseline retrieves far more of the correct answers on single-relation questions, while the best GraphRAG method is slightly ahead on two-hop questions.
+**Question answering over a knowledge graph**
+- Entity linking: keywords are extracted with spaCy (or an LLM) and matched to graph nodes by exact, alias, and fuzzy name lookup. Persian questions are normalized and mapped to English entity names.
+- Graph retrieval with a choice of algorithms: BFS, DFS, shortest paths, direct neighbors, hybrid and multi-method search, N-hop path retrieval, PageRank-based ranking, and community-based retrieval (Louvain, label propagation, Girvan–Newman, spectral clustering).
+- Context generation in several styles (scientific, narrative, data-driven, step-by-step, biological pathway, clinical relevance, and others), with configurable limits on nodes, edges, depth, and context length.
+- Answer generation with a local template model (no API key needed) or with OpenAI, Anthropic, Google Gemini, or Hugging Face models.
+
+**Building graphs from text**
+- Input as raw text or a URL; Wikipedia pages get a dedicated extractor (infobox, categories, links).
+- Fourteen extraction methods, from rule-based (`simple`, `spacy`, `spacy_svo_enhanced`) to LLM-based (`llm`, `llm_multipass`, `autoregressive`, `edc`), joint and span-based models (`joint_er`, `span_based` with BioBERT), coreference resolution, Persian-language extraction, and chunked extraction for long documents (`long_text`, `incremental`).
+- Entity resolution, relation weighting, and optional removal of isolated nodes before the graph is saved as a NetworkX graph that the QA pipeline can load.
+- Built-in graph-quality checks: automatic metrics (entity grounding, edge support in the source text, type compatibility, structural statistics, redundancy) and an optional LLM-as-a-judge review.
+
+**Web interface** (Flask) for asking questions, uploading graphs, converting text to graphs, browsing and managing saved graphs, and comparing answers.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    Q["Question"] --> KW["Keyword extraction<br/>spaCy + gene-symbol rules<br/>Persian-to-English term map"]
-    Q --> QT["Question-type detection<br/>pattern rules mapped to Hetionet relation types"]
-    KW --> M["Entity matching<br/>exact name, type keyword,<br/>substring match over 47k nodes"]
-    QT --> R
-    M --> R["Graph retrieval<br/>Intelligent relation-guided search,<br/>BFS, DFS, shortest paths, neighbours,<br/>PageRank, hybrid / ensemble / adaptive"]
-    G[("Hetionet graph<br/>NetworkX")] --> R
-    R --> C["Context construction<br/>nodes, relations and paths<br/>rendered in one of several styles"]
-    C --> A["Answer generation<br/>templates or OpenAI / Anthropic /<br/>Google / Hugging Face models"]
-    A --> O["Answer + retrieved subgraph"]
+    Q[Question] --> KW[Keyword extraction<br/>spaCy or LLM]
+    KW --> EL[Entity linking<br/>name, alias, fuzzy match]
+    EL --> R{Retrieval algorithm}
+    R --> R1[BFS / DFS / neighbors]
+    R --> R2[Shortest and N-hop paths]
+    R --> R3[PageRank ranking]
+    R --> R4[Community detection]
+    R1 & R2 & R3 & R4 --> C[Context generation<br/>styles and limits]
+    C --> G[Answer generation<br/>template or LLM API]
+    G --> A[Answer]
+
+    T[Text or URL] --> X[Entity and relation extraction<br/>14 methods]
+    X --> B[Graph building<br/>resolution, weighting]
+    B --> KG[(Knowledge graph<br/>Hetionet or uploaded)]
+    KG --> EL
 ```
 
-Main modules:
+| Component | File |
+|---|---|
+| QA pipeline: entity linking, retrieval, context, generation | `graphrag_service.py` |
+| Context styles | `enhanced_context_generator.py` |
+| Retrieval add-ons (KG search, N-hop, PageRank, community detection, entity resolution) | `graphrag_new/` |
+| Text-to-graph extraction and graph building | `text_to_graph_service.py`, `span_based_extractor.py`, `bert_relation_extractor.py`, `coreference_resolver.py`, `smart_chunker.py`, `hierarchical_merger.py`, `modular_pipeline.py` |
+| URL and Wikipedia text extraction | `url_extractor.py`, `wikipedia_extractor.py` |
+| Persian support | `persian_normalizer.py`, `persian_models.py` |
+| Web app and REST API | `web_app.py`, `templates/`, `static/` |
+| Building the Hetionet graph from the raw files | `rebuild_graph.py`, `main_grpahrag.py` |
 
-- `graphrag_service.py`: the core pipeline. It covers keyword extraction, question-type detection (`analyze_question_intent`), entity matching (`match_tokens_to_nodes`), the retrieval methods (`RetrievalMethod`, `retrieve_information`), context construction (`create_context_text`), and answer generation (`GenerationModel`, `generate_answer`).
-- `enhanced_graphrag_service.py` and `enhanced_context_generator.py`: an extended service with configurable retrieval and community detection, plus richer context templates.
-- `node_lookup_system.py`: maps Hetionet node ids to names, types, and short descriptions for display.
-- `text_to_graph_service.py`, `url_extractor.py`, `wikipedia_extractor.py`: build a graph from text using rule-based, spaCy, or LLM-based entity and relation extraction.
-- `persian_normalizer.py`, `persian_models.py`: Persian text normalization and term mapping.
-- `web_app.py` with `templates/` and `static/`: the Flask interface and JSON API.
-- `rebuild_graph.py`: builds the NetworkX graph from the Hetionet files.
-- `evaluation/`: the question generator, the dense-RAG baseline, and the evaluation runner.
+## Data
+
+Hetionet v1.0 integrates 29 public biomedical resources. The files in this repository contain **47,031 nodes** of 11 types (20,945 genes, 11,381 biological processes, 5,734 side effects, 2,884 molecular functions, 1,822 pathways, 1,552 compounds, 1,391 cellular components, 438 symptoms, 402 anatomies, 345 pharmacologic classes, 137 diseases) and **2,250,197 edges** of 24 relation types (for example `DaG` disease–associates–gene, `CtD` compound–treats–disease, `CbG` compound–binds–gene). The prebuilt `hetionet_graph.pkl` is an undirected NetworkX graph in which parallel edges between the same pair of nodes are merged, leaving 2,107,709 edges.
+
+| File | Content |
+|---|---|
+| `hetionet-v1.0-nodes.tsv` | node id, name, kind |
+| `edges.sif` | source, metaedge, target |
+| `hetionet_graph.pkl` | NetworkX graph built from the two files above, loaded by default |
+
+These files are not stored in git. `python scripts/download_data.py` downloads the raw files from [hetio/hetionet](https://github.com/hetio/hetionet) and runs `rebuild_graph.py` to build the pickle (see [Installation](#installation)).
 
 ## Installation
 
-Requires Python 3.10 or newer (developed and tested with Python 3.13 on Windows).
+Requires Python 3.10 or newer (developed on 3.13).
 
 ```bash
 git clone https://github.com/amirhosseinkho/graphRAG.git
 cd graphRAG
-python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 python -m spacy download en_core_web_sm
 
@@ -57,49 +83,75 @@ python -m spacy download en_core_web_sm
 python scripts/download_data.py
 ```
 
-`scripts/download_data.py` downloads `hetionet-v1.0-nodes.tsv` and `hetionet-v1.0-edges.sif.gz` from the official [hetio/hetionet](https://github.com/hetio/hetionet) repository. It then decompresses the edges to `edges.sif` and runs `rebuild_graph.py`, which writes `hetionet_graph.pkl` to the repository root. None of these files are tracked by git. Without the graph file, the service falls back to a small built-in sample graph.
+API keys are optional and are read from the environment or from a `.env` file:
 
-LLM-based generation is optional. The template generators work offline. To use an API model, set the matching key before starting the app:
+| Variable | Used for |
+|---|---|
+| `OPENAI_API_KEY` | OpenAI answer generation, LLM keyword extraction, and the judge |
+| `HF_TOKEN` | Hugging Face models for LLM-based text-to-graph extraction and the judge |
 
-```bash
-export OPENAI_API_KEY=...          # Windows PowerShell: $env:OPENAI_API_KEY="..."
-```
+Without any key, the template generator and the rule-based extractors still work.
 
 ## Usage
 
-**Web interface**
+### Web app
 
 ```bash
 python web_app.py
 ```
 
-Then open http://localhost:5000. From the interface you can choose the retrieval method, the context style, and the generation model, and inspect the retrieved subgraph. Other pages let you upload a graph, build a graph from text or a URL, and switch the active graph.
+Open `http://localhost:5000`. The pages are `/` (question answering), `/upload_graph` (text or URL to graph), `/manage_graphs`, `/view_graph`, and `/evaluation`.
 
-**Python**
+### Python
+
+The output below is from a real run on the Hetionet graph built by `scripts/download_data.py`, with the template generator (no API key):
 
 ```python
 from graphrag_service import GraphRAGService, RetrievalMethod, GenerationModel
 
-service = GraphRAGService()  # loads hetionet_graph.pkl from the working directory
+service = GraphRAGService("hetionet_graph.pkl")
 result = service.process_query(
-    "Which compounds treat hypertension?",
-    RetrievalMethod.INTELLIGENT,  # or BFS, DFS, SHORTEST_PATH, NEIGHBORS, ADAPTIVE, ...
-    GenerationModel.SIMPLE,       # template-based; e.g. OPENAI_GPT_4O_MINI needs an API key
+    "What is the relationship between TP53 and breast cancer?",
+    RetrievalMethod.SHORTEST_PATH,
+    GenerationModel.SIMPLE,
 )
-print(result["matched_nodes"])
-print(result["context_text"])
-print(result["answer"])
+print(result["paths"][:2])
+# [['Gene::7157', 'Disease::DOID:1612'], ['Gene::7157', 'Gene::4869', 'Disease::DOID:0060073']]
+print(result["answer"][:150])
+# 🔗 RELATIONSHIPS FOUND:
+#
+# 📌 DAG (5 connections):
+#   • TP53 (Gene) → breast cancer (Disease)
+#   • breast cancer (Disease) → CDKN1A (Gene) ...
 ```
 
-**HTTP API**
+`RetrievalMethod` selects the algorithm (`INTELLIGENT`, `BFS`, `DFS`, `SHORTEST_PATH`, `NEIGHBORS`, `HYBRID`, `MULTI_METHOD`, `N_HOP_RETRIEVAL`, `PAGERANK_BASED`, `COMMUNITY_DETECTION`, ...) and `GenerationModel` selects the answer generator (`SIMPLE` for the local template, or the OpenAI, Anthropic, Gemini, and Hugging Face options).
+
+### REST API
 
 ```bash
-curl -X POST http://localhost:5000/api/process_query \
-     -H "Content-Type: application/json" \
-     -d '{"query": "Which compounds treat hypertension?", "retrieval_method": "INTELLIGENT", "generation_model": "SIMPLE"}'
+# Question answering
+curl -X POST http://localhost:5000/api/process_query -H "Content-Type: application/json" \
+  -d '{"query": "What is the relationship between TP53 and breast cancer?", "retrieval_method": "SHORTEST_PATH", "generation_model": "SIMPLE"}'
+
+# Text to graph (saved under uploaded_graphs/ and returned for preview)
+curl -X POST http://localhost:5000/api/text_to_graph -H "Content-Type: application/json" \
+  -d '{"text": "Metformin treats type 2 diabetes. Metformin activates AMPK.", "method": "spacy"}'
 ```
 
-`retrieval_method` takes any `RetrievalMethod` member name, and `generation_model` takes any `GenerationModel` member name.
+Other endpoints: `/api/upload_graph`, `/api/list_graphs`, `/api/load_graph`, `/api/graph_view_data`, `/api/evaluate_text_to_graph`, `/api/evaluate_text_to_graph_llm`, `/api/compare_with_gpt`, and `/api/config`.
+
+## Screenshots
+
+| Text or URL input | Extraction methods |
+|---|---|
+| ![Input](docs/images/text-input.png) | ![Methods](docs/images/extraction-methods.png) |
+
+| Automatic graph-quality metrics | LLM-as-a-judge review |
+|---|---|
+| ![Metrics](docs/images/graph-quality-metrics.png) | ![Judge](docs/images/llm-judge.png) |
+
+The interface is in Persian. The graph at the top of this page was built from a Persian paragraph with an LLM-based extractor.
 
 ## Evaluation
 
@@ -155,32 +207,40 @@ python evaluation/run_eval.py      # add --llm-model gpt-4o-mini with OPENAI_API
 - **Retrieval is slow on the full graph.** On CPU, `INTELLIGENT` takes about 57 s per question. Two output-preserving fixes made during this evaluation (enumerating only the first shortest paths, and skipping the neighbour scan at the last DFS level) removed a worst case of about one hour per question. The baseline answers in 0.04 s, but only after a one-time embedding of the corpus that took about 2.5 hours on CPU.
 - **Two retrieval methods were not evaluated.** `KG_SEARCH` and `N_HOP_RETRIEVAL` returned no nodes on the test questions tried locally. They appear to depend on components that are not set up here (an LLM backend or a search index).
 - **The sample is small and templated.** The benchmark has 56 questions from one run. They use exact Hetionet entity names, so real user questions would be harder for both systems.
+- **Rule-based text-to-graph extraction is limited.** On the four sentences *"Metformin treats type 2 diabetes. Metformin activates AMPK. AMPK inhibits mTOR. Rapamycin also inhibits mTOR."*, `simple` recovered 1 relation, `spacy` recovered 3 (two of them with wrong entity boundaries such as "Metformin treats"), and `spacy_svo_enhanced` recovered 2. The LLM-based extractors are intended for real use. The text-to-graph module is not part of the benchmark above.
 
 ## Project structure
 
 ```
 graphRAG/
-├── graphrag_service.py            # core pipeline
-├── enhanced_graphrag_service.py   # extended service (configurable retrieval, communities)
-├── enhanced_context_generator.py  # context templates
-├── node_lookup_system.py          # node id -> name / type / description
-├── text_to_graph_service.py       # text -> knowledge graph
-├── url_extractor.py, wikipedia_extractor.py
-├── persian_normalizer.py, persian_models.py
-├── web_app.py, templates/, static/
-├── rebuild_graph.py               # Hetionet files -> hetionet_graph.pkl
-├── scripts/download_data.py       # downloads Hetionet and builds the graph
-├── graphrag_new/, rag_new/        # adapted GraphRAG/RAG utilities (see NOTICE)
-├── evaluation/                    # benchmark questions, baseline, runner, results
-├── tests/                         # test and debugging scripts
-├── docs/fa/                       # Persian documentation
-└── requirements.txt
+├── graphrag_service.py          # QA pipeline
+├── enhanced_graphrag_service.py # QA pipeline with the graphrag_new modules
+├── enhanced_context_generator.py
+├── text_to_graph_service.py     # text and URL to graph
+├── web_app.py                   # Flask app and REST API
+├── graphrag_new/                # retrieval add-ons (adapted in part from RAGFlow)
+├── rag_new/                     # RAG utilities (adapted in part from RAGFlow)
+├── templates/, static/          # web interface
+├── evaluation/                  # benchmark questions, dense-RAG baseline, runner, results
+├── scripts/download_data.py     # downloads Hetionet and builds the graph
+├── tests/                       # unit and integration tests
+├── docs/fa/                     # Persian documentation
+├── docs/images/                 # screenshots
+├── uploaded_graphs/             # graphs saved by the app
+└── hetionet-v1.0-nodes.tsv, edges.sif, hetionet_graph.pkl   # downloaded, not tracked
 ```
+
+## Authors and citation
+
+- Amirhossein Khoshbakht
+- Ali Rahimi
+
+Use [`CITATION.cff`](CITATION.cff), or GitHub's "Cite this repository" button.
 
 ## License and third-party code
 
-The project is released under the [MIT License](LICENSE). `graphrag_new/search.py` and `rag_new/nlp/search.py` are adapted from [RAGFlow](https://github.com/infiniflow/ragflow) and keep their Apache-2.0 license headers. [NOTICE](NOTICE) lists all third-party code. Hetionet itself is distributed by its authors under CC0 1.0 where possible. Some of its integrated resources carry their own licenses; see [het.io](https://het.io/about/).
+MIT, see [`LICENSE`](LICENSE). `graphrag_new/search.py` and `rag_new/nlp/search.py` are adapted from [RAGFlow](https://github.com/infiniflow/ragflow) (Copyright 2024 The InfiniFlow Authors) and keep their Apache-2.0 headers; [`NOTICE`](NOTICE) lists all third-party code. Hetionet is by Himmelstein et al. (*eLife*, 2017); see [hetio/hetionet](https://github.com/hetio/hetionet) for its data licenses.
 
 ## Persian documentation
 
-A Persian translation of this README is in [docs/fa/README.md](docs/fa/README.md). The same folder holds the detailed Persian documentation: the run guide, troubleshooting notes, and reports on the text-to-graph module.
+A Persian summary of this README, with the evaluation section translated in full, is in [`docs/fa/README.md`](docs/fa/README.md). The same folder holds the original Persian documentation ([`detailed-guide.md`](docs/fa/detailed-guide.md)), the run guides, and the design reports for the text-to-graph pipeline.

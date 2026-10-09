@@ -5,11 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "graphrag"
 version = "1.0.0"
-description = "سیستم بازیابی و تولید پاسخ مبتنی بر گراف دانش زیستی"
+description = "Knowledge-graph retrieval-augmented generation for biomedical question answering over Hetionet"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "Amirhossein Khoshbakht", email = "amirhossein.khoshbakhtce@gmail.com"}
+    {name = "Amirhossein Khoshbakht", email = "amirhossein.khoshbakhtce@gmail.com"},
+    {name = "Ali Rahimi"}
 ]
 maintainers = [
     {name = "Amirhossein Khoshbakht", email = "amirhossein.khoshbakhtce@gmail.com"}

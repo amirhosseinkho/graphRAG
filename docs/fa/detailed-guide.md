@@ -1,3 +1,5 @@
+> نسخهٔ خلاصهٔ فارسی: [README.md](README.md) · English version: [../../README.md](../../README.md)
+
 # GraphRAG - سیستم بازیابی و تولید پاسخ مبتنی بر گراف دانش
 
 ## 📋 خلاصه پروژه
@@ -225,21 +227,21 @@ final_answer = generate_answer(context_text, query, generation_model)
 
 ```
 graphRAG/
-├── docs/fa/                       # مستندات فارسی
-├── evaluation/                    # اسکریپت‌ها و نتایج ارزیابی
 ├── graphrag_new/                  # ماژول‌های جدید GraphRAG
 ├── rag_new/                       # ماژول‌های RAG
+├── evaluation/                    # اسکریپت‌ها و نتایج ارزیابی
 ├── scripts/download_data.py       # دانلود Hetionet و ساخت گراف
-├── static/                        # فایل‌های استاتیک
+├── static/                        # فایل‌های استاتیک (CSS/JS)
 ├── templates/                     # قالب‌های HTML
 ├── tests/                         # تست‌ها
 ├── uploaded_graphs/               # گراف‌های آپلود شده
+├── graphrag_service.py            # سرویس اصلی
 ├── enhanced_graphrag_service.py   # سرویس پیشرفته
 ├── enhanced_context_generator.py  # تولیدکننده متن زمینه
-├── graphrag_service.py            # سرویس اصلی
+├── text_to_graph_service.py       # ساخت گراف از متن
 ├── node_lookup_system.py          # سیستم جستجوی نود
 ├── rebuild_graph.py               # ساخت گراف از فایل‌های Hetionet
-├── web_app.py                     # رابط وب
+├── web_app.py                     # رابط وب (Flask)
 └── requirements.txt               # وابستگی‌ها
 ```
 
@@ -281,8 +283,6 @@ python -m pytest tests/test_enhanced_algorithms.py
 python -m pytest tests/test_comprehensive_system.py
 ```
 
-### ارزیابی عملکرد
-نتایج ارزیابی قابل بازتولید و روش اجرای آن در بخش Evaluation فایل [README انگلیسی](../../README.md#evaluation) آمده است.
 
 ## 📈 کاربردها
 
@@ -317,16 +317,13 @@ python -m pytest tests/test_comprehensive_system.py
 
 ## 📄 مجوز
 
-این پروژه تحت مجوز MIT منتشر شده است (فایل [LICENSE](../../LICENSE)). کدهای شخص ثالث در فایل [NOTICE](../../NOTICE) فهرست شده‌اند.
+این پروژه تحت مجوز MIT منتشر شده است. فایل [`LICENSE`](../../LICENSE) را ببینید. کدهای شخص ثالث در فایل [NOTICE](../../NOTICE) فهرست شده‌اند.
 
 ## 📞 پشتیبانی
 
-برای سوالات و مشکلات:
-- ایجاد Issue در GitHub
-- ارسال ایمیل به تیم توسعه
-- مراجعه به مستندات فارسی در پوشه `docs/fa/`
+برای سوالات و گزارش مشکلات، یک [Issue در GitHub](https://github.com/amirhosseinkho/graphRAG/issues) ایجاد کنید.
 
 ---
 
-**توسعه‌دهنده**: امیرحسین خوشبخت (پروژهٔ کارشناسی، ۱۴۰۴)
+**توسعه‌دهندگان**: امیرحسین خوشبخت و علی رحیمی (Amirhossein Khoshbakht and Ali Rahimi)
 **نسخه**: 2.0.0 

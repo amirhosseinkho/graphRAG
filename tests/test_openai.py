@@ -5,6 +5,7 @@
 """
 
 import json
+import os
 from graphrag_service import GraphRAGService, RetrievalMethod, GenerationModel
 
 def test_openai_gpt():
@@ -17,7 +18,7 @@ def test_openai_gpt():
     service = GraphRAGService()
     
     # تنظیم API Key
-    OPENAI_API_KEY = "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"
+    OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
     service.set_openai_api_key(OPENAI_API_KEY)
     
     # سوالات تست
@@ -75,7 +76,7 @@ def test_openai_models():
     print("=" * 50)
     
     service = GraphRAGService()
-    OPENAI_API_KEY = "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"
+    OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
     service.set_openai_api_key(OPENAI_API_KEY)
     
     question = "ژن TP53 چه نقشی در سرطان دارد و چگونه می‌توان از آن برای درمان استفاده کرد؟"

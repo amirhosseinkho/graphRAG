@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "GraphRAG: Knowledge-Graph Retrieval-Augmented Generation for Biomedical Question Answering"
+type: software
+authors:
+  - family-names: Khoshbakht
+    given-names: Amirhossein
+    email: amirhossein.khoshbakhtce@gmail.com
+  - family-names: Rahimi
+    given-names: Ali
+repository-code: "https://github.com/amirhosseinkho/graphRAG"
+license: MIT
+version: "1.0.0"
+date-released: "2025-07-24"
+keywords:
+  - retrieval-augmented generation
+  - knowledge graph
+  - Hetionet
+  - biomedical question answering
