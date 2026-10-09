@@ -183,4 +183,4 @@ The project is released under the [MIT License](LICENSE). `graphrag_new/search.p
 
 ## Persian documentation
 
-The original Persian documentation, including the run guide, troubleshooting notes, and reports on the text-to-graph module, is in [docs/fa/](docs/fa/README.md).
+A Persian translation of this README is in [docs/fa/README.md](docs/fa/README.md). The same folder holds the detailed Persian documentation: the run guide, troubleshooting notes, and reports on the text-to-graph module.
