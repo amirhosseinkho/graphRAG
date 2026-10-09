@@ -1,355 +1,195 @@
-# GraphRAG: Knowledge-Graph Retrieval-Augmented Generation
+# GraphRAG: Knowledge-Graph Retrieval-Augmented Generation over Hetionet
 
-**English summary.** GraphRAG answers biomedical questions by retrieving evidence from the [Hetionet](https://het.io) knowledge graph and passing it to a language model as context.
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-- **Question analysis**: entity extraction (spaCy, fuzzy matching), question-type and intent detection; Persian questions are normalized and mapped to English entities.
-- **Graph retrieval**: BFS, DFS, Dijkstra shortest paths, N-hop path search, PageRank ranking, and community detection (Louvain, label propagation, Girvan–Newman, spectral), plus biomedical searches such as gene–disease networks (NetworkX).
-- **Context and answer generation**: several context styles (scientific, narrative, data-driven, pathway-focused) fed to local template models or to OpenAI, Anthropic, and Google LLM APIs.
-- **Text-to-graph**: building new knowledge graphs from uploaded text or URLs.
-- **Interface**: Flask web application (`python web_app.py`, then open `http://localhost:5000`).
+GraphRAG answers biomedical questions by retrieving evidence from a knowledge graph instead of from text chunks. A question is mapped to graph entities, a graph algorithm collects the relevant nodes, edges, and paths, and the result is turned into a context that a language model (or a local template) uses to write the answer. The default graph is [Hetionet v1.0](https://het.io), and new graphs can be built from free text or web pages and queried the same way.
 
-## Authors
+This is the B.Sc. thesis project of **Amirhossein Khoshbakht** and **Ali Rahimi** at Sharif University of Technology, supervised by Dr. Hamid Beigy.
 
-- **Amirhossein Khoshbakht**
-- **Ali Rahimi**
+![Knowledge graph built from a paragraph of text](docs/images/text-to-graph-preview.png)
 
-Developed as a B.Sc. thesis project at Sharif University of Technology, supervised by Dr. Hamid Beigy. To cite this repository, use [`CITATION.cff`](CITATION.cff) (GitHub shows a "Cite this repository" button).
+## Features
 
-## License
+**Question answering over a knowledge graph**
+- Entity linking: keywords are extracted with spaCy (or an LLM) and matched to graph nodes by exact, alias, and fuzzy name lookup. Persian questions are normalized and mapped to English entity names.
+- Graph retrieval with a choice of algorithms: BFS, DFS, shortest paths, direct neighbors, hybrid and multi-method search, N-hop path retrieval, PageRank-based ranking, and community-based retrieval (Louvain, label propagation, Girvan–Newman, spectral clustering).
+- Context generation in several styles (scientific, narrative, data-driven, step-by-step, biological pathway, clinical relevance, and others), with configurable limits on nodes, edges, depth, and context length.
+- Answer generation with a local template model (no API key needed) or with OpenAI, Anthropic, Google Gemini, or Hugging Face models.
 
-MIT. See [`LICENSE`](LICENSE). `graphrag_new/search.py` and `rag_new/nlp/search.py` keep their original Apache-2.0 headers (Copyright 2024 The InfiniFlow Authors).
+**Building graphs from text**
+- Input as raw text or a URL; Wikipedia pages get a dedicated extractor (infobox, categories, links).
+- Fourteen extraction methods, from rule-based (`simple`, `spacy`, `spacy_svo_enhanced`) to LLM-based (`llm`, `llm_multipass`, `autoregressive`, `edc`), joint and span-based models (`joint_er`, `span_based` with BioBERT), coreference resolution, Persian-language extraction, and chunked extraction for long documents (`long_text`, `incremental`).
+- Entity resolution, relation weighting, and optional removal of isolated nodes before the graph is saved as a NetworkX graph that the QA pipeline can load.
+- Built-in graph-quality checks: automatic metrics (entity grounding, edge support in the source text, type compatibility, structural statistics, redundancy) and an optional LLM-as-a-judge review.
 
-The detailed documentation below is in Persian.
+**Web interface** (Flask) for asking questions, uploading graphs, converting text to graphs, browsing and managing saved graphs, and comparing answers.
 
----
+## Architecture
 
-# GraphRAG - سیستم بازیابی و تولید پاسخ مبتنی بر گراف دانش
+```mermaid
+flowchart LR
+    Q[Question] --> KW[Keyword extraction<br/>spaCy or LLM]
+    KW --> EL[Entity linking<br/>name, alias, fuzzy match]
+    EL --> R{Retrieval algorithm}
+    R --> R1[BFS / DFS / neighbors]
+    R --> R2[Shortest and N-hop paths]
+    R --> R3[PageRank ranking]
+    R --> R4[Community detection]
+    R1 & R2 & R3 & R4 --> C[Context generation<br/>styles and limits]
+    C --> G[Answer generation<br/>template or LLM API]
+    G --> A[Answer]
 
-## 📋 خلاصه پروژه
+    T[Text or URL] --> X[Entity and relation extraction<br/>14 methods]
+    X --> B[Graph building<br/>resolution, weighting]
+    B --> KG[(Knowledge graph<br/>Hetionet or uploaded)]
+    KG --> EL
+```
 
-GraphRAG یک سیستم پیشرفته بازیابی و تولید پاسخ (Retrieval-Augmented Generation) است که از گراف دانش برای استخراج اطلاعات دقیق و تولید پاسخ‌های معنادار استفاده می‌کند. این سیستم به طور خاص برای حوزه زیست‌پزشکی طراحی شده و از گراف دانش Hetionet برای پاسخگویی به سوالات تخصصی استفاده می‌کند.
+| Component | File |
+|---|---|
+| QA pipeline: entity linking, retrieval, context, generation | `graphrag_service.py` |
+| Context styles | `enhanced_context_generator.py` |
+| Retrieval add-ons (KG search, N-hop, PageRank, community detection, entity resolution) | `graphrag_new/` |
+| Text-to-graph extraction and graph building | `text_to_graph_service.py`, `span_based_extractor.py`, `bert_relation_extractor.py`, `coreference_resolver.py`, `smart_chunker.py`, `hierarchical_merger.py`, `modular_pipeline.py` |
+| URL and Wikipedia text extraction | `url_extractor.py`, `wikipedia_extractor.py` |
+| Persian support | `persian_normalizer.py`, `persian_models.py` |
+| Web app and REST API | `web_app.py`, `templates/`, `static/` |
+| Building the Hetionet graph from the raw files | `rebuild_graph.py`, `main_grpahrag.py` |
 
-## 🏗️ معماری سیستم
+## Data
 
-### اجزای اصلی:
+Hetionet v1.0 integrates 29 public biomedical resources. The files in this repository contain **47,031 nodes** of 11 types (20,945 genes, 11,381 biological processes, 5,734 side effects, 2,884 molecular functions, 1,822 pathways, 1,552 compounds, 1,391 cellular components, 438 symptoms, 402 anatomies, 345 pharmacologic classes, 137 diseases) and **2,250,197 edges** of 24 relation types (for example `DaG` disease–associates–gene, `CtD` compound–treats–disease, `CbG` compound–binds–gene). The prebuilt `hetionet_graph.pkl` is an undirected NetworkX graph in which parallel edges between the same pair of nodes are merged, leaving 2,107,709 edges.
 
-1. **سرویس GraphRAG اصلی** (`graphrag_service.py`)
-2. **سرویس GraphRAG پیشرفته** (`enhanced_graphrag_service.py`)
-3. **تولیدکننده متن زمینه بهبود یافته** (`enhanced_context_generator.py`)
-4. **رابط وب تعاملی** (`web_app.py`)
-5. **سیستم جستجوی موجودیت‌ها** (`node_lookup_system.py`)
+| File | Content |
+|---|---|
+| `hetionet-v1.0-nodes.tsv` | node id, name, kind |
+| `edges.sif` | source, metaedge, target |
+| `hetionet_graph.pkl` | prebuilt NetworkX graph, loaded by default |
 
-## 🚀 نحوه اجرا
+To rebuild the pickle from the raw files, run `python rebuild_graph.py`. The raw files come from [hetio/hetionet](https://github.com/hetio/hetionet).
 
-### پیش‌نیازها
+## Installation
+
+Requires Python 3.10 or newer (developed on 3.13).
 
 ```bash
-# نصب Python 3.8 یا بالاتر
-# نصب pip
-
-# نصب وابستگی‌ها
+git clone https://github.com/amirhosseinkho/graphRAG.git
+cd graphRAG
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-
-# دانلود مدل spaCy
 python -m spacy download en_core_web_sm
 ```
 
-### اجرای برنامه
+API keys are optional and are read from the environment or from a `.env` file:
+
+| Variable | Used for |
+|---|---|
+| `OPENAI_API_KEY` | OpenAI answer generation, LLM keyword extraction, and the judge |
+| `HF_TOKEN` | Hugging Face models for LLM-based text-to-graph extraction and the judge |
+
+Without any key, the template generator and the rule-based extractors still work.
+
+## Usage
+
+### Web app
 
 ```bash
-# اجرای رابط وب
 python web_app.py
-
-# یا اجرای مستقیم
-python run_graphrag.py
 ```
 
-پس از اجرا، برنامه در آدرس `http://localhost:5000` در دسترس خواهد بود.
+Open `http://localhost:5000`. The pages are `/` (question answering), `/upload_graph` (text or URL to graph), `/manage_graphs`, `/view_graph`, and `/evaluation`.
 
-## 🔍 الگوریتم‌های بازیابی
+### Python
 
-### 1. الگوریتم‌های پایه
+The output below is from a real run on the bundled Hetionet graph with the template generator (no API key):
 
-#### BFS (جستجوی سطح اول)
-- **هدف**: یافتن همسایه‌های مستقیم نودهای شروع
-- **کاربرد**: جستجوی روابط مستقیم بین موجودیت‌ها
-- **مزایا**: سریع و کارآمد برای روابط سطح اول
-
-#### DFS (جستجوی عمیق اول)
-- **هدف**: کاوش عمیق در گراف تا عمق مشخص
-- **کاربرد**: یافتن مسیرهای طولانی و روابط غیرمستقیم
-- **مزایا**: کشف روابط پیچیده و مسیرهای عمیق
-
-#### Dijkstra (کوتاه‌ترین مسیر)
-- **هدف**: یافتن کوتاه‌ترین مسیر بین نودها
-- **کاربرد**: بهینه‌سازی مسیرهای ارتباطی
-- **مزایا**: تضمین کوتاه‌ترین مسیر
-
-### 2. الگوریتم‌های پیشرفته
-
-#### PageRank
-- **هدف**: رتبه‌بندی نودها بر اساس اهمیت
-- **کاربرد**: شناسایی نودهای کلیدی در شبکه
-- **پارامترها**: 
-  - `alpha`: ضریب تله (پیش‌فرض: 0.85)
-  - `max_iter`: حداکثر تعداد تکرار
-
-#### تشخیص جامعه (Community Detection)
-- **روش‌ها**:
-  - **Louvain**: تشخیص جامعه بر اساس بهینه‌سازی مدولاریته
-  - **Label Propagation**: انتشار برچسب‌ها
-  - **Girvan-Newman**: حذف یال‌های بین جامعه‌ای
-  - **Spectral**: تجزیه طیفی ماتریس مجاورت
-
-#### جستجوی N-Hop
-- **هدف**: یافتن مسیرهای N سطحی
-- **کاربرد**: کشف روابط غیرمستقیم
-- **پارامترها**:
-  - `max_depth`: حداکثر عمق جستجو
-  - `max_paths`: حداکثر تعداد مسیرها
-
-### 3. الگوریتم‌های تخصصی زیست‌پزشکی
-
-#### جستجوی مسیر زیستی
-- **هدف**: شناسایی مسیرهای زیستی مرتبط
-- **کاربرد**: تحلیل مسیرهای متابولیک و سیگنالینگ
-- **ویژگی‌ها**: تمرکز بر روابط زیستی معنادار
-
-#### جستجوی خوشه‌های ژنی
-- **هدف**: گروه‌بندی ژن‌های مرتبط
-- **کاربرد**: شناسایی خانواده‌های ژنی
-- **الگوریتم**: خوشه‌بندی بر اساس شباهت عملکردی
-
-#### جستجوی شبکه بیماری-ژن
-- **هدف**: تحلیل روابط بیماری‌ها و ژن‌ها
-- **کاربرد**: شناسایی ژن‌های مرتبط با بیماری‌ها
-- **ویژگی‌ها**: تمرکز بر روابط بالینی
-
-## 🔧 فرآیند پردازش سوال
-
-### مرحله 1: تحلیل سوال
 ```python
-# استخراج موجودیت‌ها از سوال
-entities = extract_entities(query)
+from graphrag_service import GraphRAGService, RetrievalMethod, GenerationModel
 
-# تشخیص نوع سوال
-question_type = analyze_question_type(query)
-
-# شناسایی قصد کاربر
-intent = identify_user_intent(query)
+service = GraphRAGService("hetionet_graph.pkl")
+result = service.process_query(
+    "What is the relationship between TP53 and breast cancer?",
+    RetrievalMethod.SHORTEST_PATH,
+    GenerationModel.SIMPLE,
+)
+print(result["paths"][:2])
+# [['Gene::7157', 'Disease::DOID:1612'], ['Gene::7157', 'Gene::4869', 'Disease::DOID:0060073']]
+print(result["answer"][:150])
+# 🔗 RELATIONSHIPS FOUND:
+#
+# 📌 DAG (5 connections):
+#   • TP53 (Gene) → breast cancer (Disease)
+#   • breast cancer (Disease) → CDKN1A (Gene) ...
 ```
 
-### مرحله 2: بازیابی اطلاعات
-```python
-# انتخاب الگوریتم بازیابی مناسب
-retrieval_algorithm = select_algorithm(question_type)
+`RetrievalMethod` selects the algorithm (`BFS`, `DFS`, `SHORTEST_PATH`, `NEIGHBORS`, `HYBRID`, `MULTI_METHOD`, `N_HOP_RETRIEVAL`, `PAGERANK_BASED`, `COMMUNITY_DETECTION`, ...) and `GenerationModel` selects the answer generator (`SIMPLE` for the local template, or the OpenAI, Anthropic, Gemini, and Hugging Face options).
 
-# اجرای بازیابی
-retrieved_nodes = retrieval_algorithm.search(entities)
+### REST API
 
-# رتبه‌بندی نتایج
-ranked_results = rank_results(retrieved_nodes)
+```bash
+# Question answering
+curl -X POST http://localhost:5000/api/process_query -H "Content-Type: application/json" \
+  -d '{"query": "What is the relationship between TP53 and breast cancer?", "retrieval_method": "SHORTEST_PATH", "generation_model": "SIMPLE"}'
+
+# Text to graph (saved under uploaded_graphs/ and returned for preview)
+curl -X POST http://localhost:5000/api/text_to_graph -H "Content-Type: application/json" \
+  -d '{"text": "Metformin treats type 2 diabetes. Metformin activates AMPK.", "method": "spacy"}'
 ```
 
-### مرحله 3: تولید متن زمینه
-```python
-# انتخاب سبک متن زمینه
-context_style = select_context_style(question_type)
+Other endpoints: `/api/upload_graph`, `/api/list_graphs`, `/api/load_graph`, `/api/graph_view_data`, `/api/evaluate_text_to_graph`, `/api/evaluate_text_to_graph_llm`, `/api/compare_with_gpt`, and `/api/config`.
 
-# تولید متن زمینه
-context_text = generate_context(retrieved_nodes, context_style)
-```
+## Screenshots
 
-### مرحله 4: تولید پاسخ
-```python
-# انتخاب مدل تولید
-generation_model = select_generation_model()
+| Text or URL input | Extraction methods |
+|---|---|
+| ![Input](docs/images/text-input.png) | ![Methods](docs/images/extraction-methods.png) |
 
-# تولید پاسخ نهایی
-final_answer = generate_answer(context_text, query, generation_model)
-```
+| Automatic graph-quality metrics | LLM-as-a-judge review |
+|---|---|
+| ![Metrics](docs/images/graph-quality-metrics.png) | ![Judge](docs/images/llm-judge.png) |
 
-## 📊 سبک‌های تولید متن زمینه
+The interface is in Persian. The graph at the top of this page was built from a Persian paragraph with an LLM-based extractor.
 
-### 1. متن تخصصی هوشمند
-- **ویژگی**: تحلیل عمیق روابط و مکانیسم‌ها
-- **کاربرد**: سوالات تخصصی زیست‌پزشکی
-- **ساختار**: استدلال گام به گام + تحلیل مکانیسمی
+## Evaluation status
 
-### 2. متن علمی-تحلیلی
-- **ویژگی**: تمرکز بر شواهد علمی و تحقیقات
-- **کاربرد**: سوالات تحقیقاتی
-- **ساختار**: مرور ادبیات + تحلیل داده‌ها
+The repository includes the tools to evaluate graphs built from text (automatic metrics and an LLM judge, shown above), but **no benchmark of question-answering accuracy has been run yet**, so no accuracy figures are reported. Observations from running the code:
 
-### 3. متن روایی
-- **ویژگی**: توضیح ساده و قابل فهم
-- **کاربرد**: سوالات عمومی
-- **ساختار**: داستان‌سرایی + مثال‌های عملی
+- **Entity linking is the weakest step.** Generic words in a question can be matched to unrelated nodes. In "Which genes are associated with breast cancer?", the word "gene" was linked to the biological process *generation of catalytic spliceosome for second transesterification step*. Because of this, neighbor retrieval for that question returned genes that were not associated with breast cancer.
+- **Retrieval does not yet use the relation type implied by the question.** For "Which compounds treat hypertension?", neighbor retrieval returned genes instead of following `CtD` (treats) edges.
+- **Rule-based extraction is limited.** On the four sentences *"Metformin treats type 2 diabetes. Metformin activates AMPK. AMPK inhibits mTOR. Rapamycin also inhibits mTOR."*, `simple` recovered 1 relation, `spacy` recovered 3 (two of them with wrong entity boundaries such as "Metformin treats"), and `spacy_svo_enhanced` recovered 2. The LLM-based extractors are intended for real use.
 
-### 4. متن داده‌محور
-- **ویژگی**: ارائه اطلاعات به صورت ساختاریافته
-- **کاربرد**: سوالات آماری و مقایسه‌ای
-- **ساختار**: لیست‌ها + جداول + نمودارها
+The planned evaluation generates questions from Hetionet edges (so the gold answers come from the graph itself), compares graph retrieval with a dense-retrieval RAG baseline using recall@k, and reports answer precision and recall when an LLM key is available.
 
-### 5. متن مسیر زیستی
-- **ویژگی**: تمرکز بر مسیرهای زیستی
-- **کاربرد**: سوالات مربوط به مسیرهای متابولیک
-- **ساختار**: ترسیم مسیر + تحلیل گام‌ها
-
-## 🤖 مدل‌های تولید پاسخ
-
-### مدل‌های محلی
-- **General Simple**: پاسخ‌های ساده و عمومی
-- **Simple Template**: قالب‌های از پیش تعریف شده
-- **GPT Simulation**: شبیه‌سازی GPT
-- **Custom Model**: مدل‌های سفارشی
-
-### مدل‌های OpenAI
-- **GPT-4o**: جدیدترین و قوی‌ترین
-- **GPT-4o Mini**: سریع و اقتصادی
-- **GPT-4 Turbo**: تعادل سرعت و کیفیت
-- **GPT-3.5 Turbo**: سریع و اقتصادی
-
-### مدل‌های Anthropic
-- **Claude 3.5 Sonnet**: جدیدترین
-- **Claude 3.5 Haiku**: سریع
-- **Claude 3 Opus**: قوی‌ترین
-
-### مدل‌های Google
-- **Gemini 1.5 Pro**: جدیدترین
-- **Gemini 1.5 Flash**: سریع
-- **Gemini 1.0 Pro**: پایدار
-
-## 🎯 ویژگی‌های پیشرفته
-
-### 1. تشخیص موجودیت‌های هوشمند
-- تطبیق ژن‌های مشهور (TP53, BRCA1, APOE)
-- تبدیل کلمات فارسی به انگلیسی
-- تشخیص موجودیت‌های نام‌دار
-- جستجوی فازی برای کلمات مشابه
-
-### 2. تحلیل معنایی
-- تشخیص نوع سوال
-- شناسایی قصد کاربر
-- تحلیل روابط معنایی
-- رتبه‌بندی هوشمند نتایج
-
-### 3. بهینه‌سازی عملکرد
-- کش کردن نتایج LLM
-- پردازش موازی
-- مدیریت حافظه
-- بهینه‌سازی جستجو
-
-### 4. ارزیابی کیفیت
-- مقایسه با GPT
-- تحلیل شباهت متون
-- ارزیابی دقت پاسخ‌ها
-- گزارش‌گیری جامع
-
-## 📁 ساختار پروژه
+## Project structure
 
 ```
 graphRAG/
-├── graphrag_new/                  # ماژول‌های جدید GraphRAG
-├── rag_new/                       # ماژول‌های RAG
-├── static/                        # فایل‌های استاتیک (CSS/JS)
-├── templates/                     # قالب‌های HTML
-├── tests/                         # تست‌ها
-├── uploaded_graphs/               # گراف‌های آپلود شده
-├── graphrag_service.py            # سرویس اصلی
-├── enhanced_graphrag_service.py   # سرویس پیشرفته
-├── enhanced_context_generator.py  # تولیدکننده متن زمینه
-├── text_to_graph_service.py       # ساخت گراف از متن
-├── node_lookup_system.py          # سیستم جستجوی نود
-├── rebuild_graph.py               # ساخت گراف از فایل‌های Hetionet
-├── web_app.py                     # رابط وب (Flask)
-└── requirements.txt               # وابستگی‌ها
+├── graphrag_service.py          # QA pipeline
+├── enhanced_graphrag_service.py # QA pipeline with the graphrag_new modules
+├── enhanced_context_generator.py
+├── text_to_graph_service.py     # text and URL to graph
+├── web_app.py                   # Flask app and REST API
+├── graphrag_new/                # retrieval add-ons (adapted in part from RAGFlow)
+├── rag_new/                     # RAG utilities (adapted in part from RAGFlow)
+├── templates/, static/          # web interface
+├── tests/                       # unit and integration tests
+├── docs/fa/                     # Persian documentation
+├── docs/images/                 # screenshots
+├── uploaded_graphs/             # graphs saved by the app
+└── hetionet-v1.0-nodes.tsv, edges.sif, hetionet_graph.pkl
 ```
 
-## 🔧 تنظیمات پیشرفته
+## Authors and citation
 
-### تنظیمات بازیابی
-```python
-config = {
-    'token_extraction_method': 'llm_based',
-    'retrieval_algorithm': 'hybrid',
-    'max_depth': 3,
-    'max_nodes': 20,
-    'similarity_threshold': 0.3,
-    'enable_semantic_search': True
-}
-```
+- Amirhossein Khoshbakht
+- Ali Rahimi
 
-### تنظیمات تولید متن
-```python
-context_config = {
-    'style': 'INTELLIGENT',
-    'include_mechanisms': True,
-    'include_pathways': True,
-    'max_length': 2000
-}
-```
+Use [`CITATION.cff`](CITATION.cff), or GitHub's "Cite this repository" button.
 
-## 🧪 تست و ارزیابی
+## License and third-party code
 
-### اجرای تست‌ها
-```bash
-# تست‌های پایه
-python -m pytest tests/test_basic_functionality.py
+MIT, see [`LICENSE`](LICENSE). `graphrag_new/search.py` and `rag_new/nlp/search.py` are adapted from [RAGFlow](https://github.com/infiniflow/ragflow) (Copyright 2024 The InfiniFlow Authors) and keep their Apache-2.0 headers. Hetionet is by Himmelstein et al. (*eLife*, 2017); see [hetio/hetionet](https://github.com/hetio/hetionet) for its data licenses.
 
-# تست‌های پیشرفته
-python -m pytest tests/test_enhanced_algorithms.py
+## Persian documentation
 
-# تست‌های جامع
-python -m pytest tests/test_comprehensive_system.py
-```
-
-### ارزیابی عملکرد
-- **دقت بازیابی**: 85-95%
-- **سرعت پاسخ**: 2-5 ثانیه
-- **کیفیت متن زمینه**: 90-95%
-- **رضایت کاربر**: 85-90%
-
-## 📈 کاربردها
-
-### 1. پژوهش زیست‌پزشکی
-- تحلیل مسیرهای زیستی
-- شناسایی ژن‌های مرتبط با بیماری‌ها
-- بررسی روابط دارو-ژن
-
-### 2. آموزش پزشکی
-- پاسخ به سوالات دانشجویان
-- توضیح مفاهیم پیچیده
-- ارائه مثال‌های عملی
-
-### 3. پژوهش دارویی
-- شناسایی اهداف دارویی
-- تحلیل عوارض جانبی
-- بررسی تداخلات دارویی
-
-### 4. تشخیص پزشکی
-- کمک به تشخیص بیماری‌ها
-- شناسایی عوامل خطر
-- پیشنهاد آزمایش‌های تشخیصی
-
-## 🤝 مشارکت
-
-برای مشارکت در پروژه:
-
-1. Fork کردن repository
-2. ایجاد branch جدید
-3. اعمال تغییرات
-4. ارسال Pull Request
-
-## 📄 مجوز
-
-این پروژه تحت مجوز MIT منتشر شده است. فایل [`LICENSE`](LICENSE) را ببینید.
-
-## 📞 پشتیبانی
-
-برای سوالات و گزارش مشکلات، یک [Issue در GitHub](https://github.com/amirhosseinkho/graphRAG/issues) ایجاد کنید.
-
----
-
-**توسعه‌دهندگان**: امیرحسین خوشبخت و علی رحیمی (Amirhossein Khoshbakht and Ali Rahimi)
-**نسخه**: 2.0.0 
+The original Persian documentation, run guides, and the design reports for the text-to-graph pipeline are in [`docs/fa/`](docs/fa/README.md).

@@ -11,7 +11,7 @@ setup(
     version="1.0.0",
     author="Amirhossein Khoshbakht, Ali Rahimi",
     author_email="amirhossein.khoshbakhtce@gmail.com",
-    description="سیستم بازیابی و تولید پاسخ مبتنی بر گراف دانش زیستی",
+    description="Knowledge-graph retrieval-augmented generation for biomedical question answering over Hetionet",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/amirhosseinkho/graphRAG",
