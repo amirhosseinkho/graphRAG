@@ -1,6 +1,6 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
-Text to Graph Service - سرویس تبدیل متن به گراف دانش
+Text to Graph Service - ط³ط±ظˆغŒط³ طھط¨ط¯غŒظ„ ظ…طھظ† ط¨ظ‡ ع¯ط±ط§ظپ ط¯ط§ظ†ط´
 """
 
 import re
@@ -86,7 +86,15 @@ except ImportError as e:
 
 
 class TextToGraphService:
-    """سرویس تبدیل متن به گراف دانش"""
+    """ط³ط±ظˆغŒط³ طھط¨ط¯غŒظ„ ظ…طھظ† ط¨ظ‡ ع¯ط±ط§ظپ ط¯ط§ظ†ط´"""
+
+    # Safety limits for incremental extraction (prevents runaway memory usage)
+    INCREMENTAL_MIN_CHUNK_SIZE = 100
+    INCREMENTAL_MAX_CHUNK_SIZE = 2000
+    INCREMENTAL_MAX_OVERLAP = 500
+    INCREMENTAL_MAX_CHUNKS = 2000
+    INCREMENTAL_MAX_ENTITIES = 1000
+    INCREMENTAL_MAX_RELATIONSHIPS = 2000
     
     def __init__(self, openai_api_key: Optional[str] = None, spacy_model: str = "en_core_web_sm", hf_token: Optional[str] = None):
         """
@@ -184,13 +192,13 @@ class TextToGraphService:
     
     def _detect_text_language(self, text: str) -> str:
         """
-        تشخیص زبان متن
+        طھط´ط®غŒطµ ط²ط¨ط§ظ† ظ…طھظ†
         
         Args:
-            text: متن ورودی
+            text: ظ…طھظ† ظˆط±ظˆط¯غŒ
             
         Returns:
-            'fa' برای فارسی، 'en' برای انگلیسی، 'mixed' برای ترکیبی
+            'fa' ط¨ط±ط§غŒ ظپط§ط±ط³غŒطŒ 'en' ط¨ط±ط§غŒ ط§ظ†ع¯ظ„غŒط³غŒطŒ 'mixed' ط¨ط±ط§غŒ طھط±ع©غŒط¨غŒ
         """
         if PERSIAN_NORMALIZER_AVAILABLE and detect_language:
             return detect_language(text)
@@ -213,13 +221,13 @@ class TextToGraphService:
     
     def _get_spacy_model(self, language: str = "auto"):
         """
-        دریافت مدل spaCy مناسب بر اساس زبان
+        ط¯ط±غŒط§ظپطھ ظ…ط¯ظ„ spaCy ظ…ظ†ط§ط³ط¨ ط¨ط± ط§ط³ط§ط³ ط²ط¨ط§ظ†
         
         Args:
-            language: زبان (auto/fa/en)
+            language: ط²ط¨ط§ظ† (auto/fa/en)
             
         Returns:
-            مدل spaCy مناسب یا None
+            ظ…ط¯ظ„ spaCy ظ…ظ†ط§ط³ط¨ غŒط§ None
         """
         if language == "auto":
             return self.nlp  # Default to English
@@ -232,33 +240,33 @@ class TextToGraphService:
     def _preprocess_text_for_graph(self, text: str, language: str = "auto", 
                                     remove_stop_words: bool = True) -> str:
         """
-        پیش‌پردازش متن برای استخراج گراف
+        ظ¾غŒط´â€Œظ¾ط±ط¯ط§ط²ط´ ظ…طھظ† ط¨ط±ط§غŒ ط§ط³طھط®ط±ط§ط¬ ع¯ط±ط§ظپ
         
-        نکته مهم: این تابع stop words را حذف می‌کند تا در گراف ظاهر نشوند،
-        اما متن اصلی باید برای مدل‌های زبانی (LLM) حفظ شود تا معنی کامل حفظ شود.
+        ظ†ع©طھظ‡ ظ…ظ‡ظ…: ط§غŒظ† طھط§ط¨ط¹ stop words ط±ط§ ط­ط°ظپ ظ…غŒâ€Œع©ظ†ط¯ طھط§ ط¯ط± ع¯ط±ط§ظپ ط¸ط§ظ‡ط± ظ†ط´ظˆظ†ط¯طŒ
+        ط§ظ…ط§ ظ…طھظ† ط§طµظ„غŒ ط¨ط§غŒط¯ ط¨ط±ط§غŒ ظ…ط¯ظ„â€Œظ‡ط§غŒ ط²ط¨ط§ظ†غŒ (LLM) ط­ظپط¸ ط´ظˆط¯ طھط§ ظ…ط¹ظ†غŒ ع©ط§ظ…ظ„ ط­ظپط¸ ط´ظˆط¯.
         
         Args:
-            text: متن ورودی
-            language: زبان متن (auto/fa/en)
-            remove_stop_words: آیا stop words حذف شوند؟
+            text: ظ…طھظ† ظˆط±ظˆط¯غŒ
+            language: ط²ط¨ط§ظ† ظ…طھظ† (auto/fa/en)
+            remove_stop_words: ط¢غŒط§ stop words ط­ط°ظپ ط´ظˆظ†ط¯طں
             
         Returns:
-            متن پیش‌پردازش شده
+            ظ…طھظ† ظ¾غŒط´â€Œظ¾ط±ط¯ط§ط²ط´ ط´ط¯ظ‡
         """
         if not remove_stop_words:
             return text
         
-        # تشخیص خودکار زبان اگر لازم باشد
+        # طھط´ط®غŒطµ ط®ظˆط¯ع©ط§ط± ط²ط¨ط§ظ† ط§ع¯ط± ظ„ط§ط²ظ… ط¨ط§ط´ط¯
         if language == "auto":
             language = self._detect_text_language(text)
         
-        # اگر spaCy در دسترس است، از آن استفاده کن
+        # ط§ع¯ط± spaCy ط¯ط± ط¯ط³طھط±ط³ ط§ط³طھطŒ ط§ط² ط¢ظ† ط§ط³طھظپط§ط¯ظ‡ ع©ظ†
         if SPACY_AVAILABLE:
             nlp_model = self._get_spacy_model(language)
             if nlp_model:
                 try:
                     doc = nlp_model(text)
-                    # حذف stop words و علائم نگارشی
+                    # ط­ط°ظپ stop words ظˆ ط¹ظ„ط§ط¦ظ… ظ†ع¯ط§ط±ط´غŒ
                     filtered_tokens = [
                         token.text for token in doc 
                         if not token.is_stop and not token.is_punct and not token.is_space
@@ -267,16 +275,16 @@ class TextToGraphService:
                 except Exception as e:
                     logging.warning(f"Error in spaCy preprocessing: {e}")
         
-        # Fallback: حذف ساده stop words با regex
-        # Stop words فارسی رایج
+        # Fallback: ط­ط°ظپ ط³ط§ط¯ظ‡ stop words ط¨ط§ regex
+        # Stop words ظپط§ط±ط³غŒ ط±ط§غŒط¬
         persian_stop_words = {
-            'از', 'به', 'در', 'که', 'این', 'آن', 'با', 'برای', 'تا', 'را', 'هم', 'یا',
-            'اما', 'ولی', 'اگر', 'چون', 'چرا', 'چگونه', 'چه', 'کجا', 'کی', 'چی',
-            'است', 'هست', 'بود', 'باش', 'شود', 'می', 'می‌شود', 'می‌کند', 'می‌کنند',
-            'یک', 'دو', 'سه', 'چند', 'همه', 'هیچ', 'بعضی', 'هر', 'همین', 'همان'
+            'ط§ط²', 'ط¨ظ‡', 'ط¯ط±', 'ع©ظ‡', 'ط§غŒظ†', 'ط¢ظ†', 'ط¨ط§', 'ط¨ط±ط§غŒ', 'طھط§', 'ط±ط§', 'ظ‡ظ…', 'غŒط§',
+            'ط§ظ…ط§', 'ظˆظ„غŒ', 'ط§ع¯ط±', 'ع†ظˆظ†', 'ع†ط±ط§', 'ع†ع¯ظˆظ†ظ‡', 'ع†ظ‡', 'ع©ط¬ط§', 'ع©غŒ', 'ع†غŒ',
+            'ط§ط³طھ', 'ظ‡ط³طھ', 'ط¨ظˆط¯', 'ط¨ط§ط´', 'ط´ظˆط¯', 'ظ…غŒ', 'ظ…غŒâ€Œط´ظˆط¯', 'ظ…غŒâ€Œع©ظ†ط¯', 'ظ…غŒâ€Œع©ظ†ظ†ط¯',
+            'غŒع©', 'ط¯ظˆ', 'ط³ظ‡', 'ع†ظ†ط¯', 'ظ‡ظ…ظ‡', 'ظ‡غŒع†', 'ط¨ط¹ط¶غŒ', 'ظ‡ط±', 'ظ‡ظ…غŒظ†', 'ظ‡ظ…ط§ظ†'
         }
         
-        # Stop words انگلیسی
+        # Stop words ط§ظ†ع¯ظ„غŒط³غŒ
         english_stop_words = {
             'a', 'an', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
             'of', 'with', 'by', 'from', 'as', 'is', 'are', 'was', 'were', 'be',
@@ -290,7 +298,7 @@ class TextToGraphService:
             'same', 'so', 'than', 'too', 'very', 'just', 'now'
         }
         
-        # انتخاب stop words مناسب
+        # ط§ظ†طھط®ط§ط¨ stop words ظ…ظ†ط§ط³ط¨
         if language == "fa":
             stop_words = persian_stop_words
         elif language == "en":
@@ -298,36 +306,36 @@ class TextToGraphService:
         else:  # mixed
             stop_words = persian_stop_words | english_stop_words
         
-        # تقسیم متن به کلمات و حذف stop words
+        # طھظ‚ط³غŒظ… ظ…طھظ† ط¨ظ‡ ع©ظ„ظ…ط§طھ ظˆ ط­ط°ظپ stop words
         words = text.split()
         filtered_words = [
             word for word in words 
             if word.lower().strip('.,!?;:()[]{}"\'-') not in stop_words
-            and len(word.strip('.,!?;:()[]{}"\'-')) > 1  # حذف کاراکترهای تکی
+            and len(word.strip('.,!?;:()[]{}"\'-')) > 1  # ط­ط°ظپ ع©ط§ط±ط§ع©طھط±ظ‡ط§غŒ طھع©غŒ
         ]
         
         return " ".join(filtered_words)
     
     def extract_simple(self, text: str, max_entities: int = 100, max_relationships: int = 200) -> Dict[str, Any]:
         """
-        استخراج موجودیت‌ها و روابط با روش ساده (Rule-based)
+        ط§ط³طھط®ط±ط§ط¬ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§ ظˆ ط±ظˆط§ط¨ط· ط¨ط§ ط±ظˆط´ ط³ط§ط¯ظ‡ (Rule-based)
         
         Args:
-            text: متن ورودی
-            max_entities: حداکثر تعداد موجودیت‌ها
-            max_relationships: حداکثر تعداد روابط
+            text: ظ…طھظ† ظˆط±ظˆط¯غŒ
+            max_entities: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§
+            max_relationships: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ط±ظˆط§ط¨ط·
             
         Returns:
             Dictionary containing entities and relationships
         """
         if not text or not text.strip():
-            raise ValueError("متن ورودی نمی‌تواند خالی باشد")
+            raise ValueError("ظ…طھظ† ظˆط±ظˆط¯غŒ ظ†ظ…غŒâ€Œطھظˆط§ظ†ط¯ ط®ط§ظ„غŒ ط¨ط§ط´ط¯")
         
         if max_entities < 1 or max_entities > 10000:
-            raise ValueError("حداکثر موجودیت‌ها باید بین 1 تا 10000 باشد")
+            raise ValueError("ط­ط¯ط§ع©ط«ط± ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§ ط¨ط§غŒط¯ ط¨غŒظ† 1 طھط§ 10000 ط¨ط§ط´ط¯")
         
         if max_relationships < 1 or max_relationships > 20000:
-            raise ValueError("حداکثر روابط باید بین 1 تا 20000 باشد")
+            raise ValueError("ط­ط¯ط§ع©ط«ط± ط±ظˆط§ط¨ط· ط¨ط§غŒط¯ ط¨غŒظ† 1 طھط§ 20000 ط¨ط§ط´ط¯")
         
         entities = []
         relationships = []
@@ -432,8 +440,8 @@ class TextToGraphService:
                     })
                     entity_map[target] = target_id
                 
-                # استخراج نام رابطه از متن (از pattern matched)
-                relation_name = match.group(0).strip()  # کل pattern matched (مثلاً "regulates", "interacts with")
+                # ط§ط³طھط®ط±ط§ط¬ ظ†ط§ظ… ط±ط§ط¨ط·ظ‡ ط§ط² ظ…طھظ† (ط§ط² pattern matched)
+                relation_name = match.group(0).strip()  # ع©ظ„ pattern matched (ظ…ط«ظ„ط§ظ‹ "regulates", "interacts with")
                 
                 # Add relationship
                 if source_id and target_id:
@@ -441,7 +449,7 @@ class TextToGraphService:
                         "source": source_id,
                         "target": target_id,
                         "metaedge": relation_type,
-                        "relation": relation_name,  # نام واقعی رابطه از متن
+                        "relation": relation_name,  # ظ†ط§ظ… ظˆط§ظ‚ط¹غŒ ط±ط§ط¨ط·ظ‡ ط§ط² ظ…طھظ†
                         "attributes": {
                             "pattern": match.group(0),
                             "description": relation_name
@@ -464,24 +472,24 @@ class TextToGraphService:
     
     def extract_spacy(self, text: str, max_entities: int = 100, max_relationships: int = 200) -> Dict[str, Any]:
         """
-        استخراج موجودیت‌ها و روابط با استفاده از spaCy
+        ط§ط³طھط®ط±ط§ط¬ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§ ظˆ ط±ظˆط§ط¨ط· ط¨ط§ ط§ط³طھظپط§ط¯ظ‡ ط§ط² spaCy
         
         Args:
-            text: متن ورودی
-            max_entities: حداکثر تعداد موجودیت‌ها
-            max_relationships: حداکثر تعداد روابط
+            text: ظ…طھظ† ظˆط±ظˆط¯غŒ
+            max_entities: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§
+            max_relationships: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ط±ظˆط§ط¨ط·
             
         Returns:
             Dictionary containing entities and relationships
         """
         if not text or not text.strip():
-            raise ValueError("متن ورودی نمی‌تواند خالی باشد")
+            raise ValueError("ظ…طھظ† ظˆط±ظˆط¯غŒ ظ†ظ…غŒâ€Œطھظˆط§ظ†ط¯ ط®ط§ظ„غŒ ط¨ط§ط´ط¯")
         
         if max_entities < 1 or max_entities > 10000:
-            raise ValueError("حداکثر موجودیت‌ها باید بین 1 تا 10000 باشد")
+            raise ValueError("ط­ط¯ط§ع©ط«ط± ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§ ط¨ط§غŒط¯ ط¨غŒظ† 1 طھط§ 10000 ط¨ط§ط´ط¯")
         
         if max_relationships < 1 or max_relationships > 20000:
-            raise ValueError("حداکثر روابط باید بین 1 تا 20000 باشد")
+            raise ValueError("ط­ط¯ط§ع©ط«ط± ط±ظˆط§ط¨ط· ط¨ط§غŒط¯ ط¨غŒظ† 1 طھط§ 20000 ط¨ط§ط´ط¯")
         
         if not self.nlp:
             raise ValueError("spaCy model not loaded. Please install spaCy and download a model.")
@@ -566,7 +574,7 @@ class TextToGraphService:
                                     "source": subject_id,
                                     "target": obj_id,
                                     "metaedge": relation_type,
-                                    "relation": relation_name,  # نام واقعی رابطه از متن
+                                    "relation": relation_name,  # ظ†ط§ظ… ظˆط§ظ‚ط¹غŒ ط±ط§ط¨ط·ظ‡ ط§ط² ظ…طھظ†
                                     "attributes": {
                                         "verb": token.text,
                                         "verb_lemma": token.lemma_,
@@ -612,7 +620,7 @@ class TextToGraphService:
                                         "source": subject_id,
                                         "target": obj_id,
                                         "metaedge": relation_type,
-                                        "relation": relation_name,  # نام واقعی رابطه از متن
+                                        "relation": relation_name,  # ظ†ط§ظ… ظˆط§ظ‚ط¹غŒ ط±ط§ط¨ط·ظ‡ ط§ط² ظ…طھظ†
                                         "attributes": {
                                             "verb": verb.text,
                                             "verb_lemma": verb.lemma_,
@@ -665,7 +673,7 @@ class TextToGraphService:
                                             "source": subj_id,
                                             "target": obj_id,
                                             "metaedge": relation_type,
-                                            "relation": relation_name,  # نام واقعی رابطه از متن
+                                            "relation": relation_name,  # ظ†ط§ظ… ظˆط§ظ‚ط¹غŒ ط±ط§ط¨ط·ظ‡ ط§ط² ظ…طھظ†
                                             "attributes": {
                                                 "verb": token.text,
                                                 "verb_lemma": token.lemma_,
@@ -692,29 +700,29 @@ class TextToGraphService:
     def extract_llm(self, text: str, model: str = "gpt-4o", max_entities: int = 100, 
                     max_relationships: int = 200, confidence_threshold: float = 0.5) -> Dict[str, Any]:
         """
-        استخراج موجودیت‌ها و روابط با استفاده از LLM
+        ط§ط³طھط®ط±ط§ط¬ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§ ظˆ ط±ظˆط§ط¨ط· ط¨ط§ ط§ط³طھظپط§ط¯ظ‡ ط§ط² LLM
         
         Args:
-            text: متن ورودی
-            model: نام مدل LLM (gpt-4o, gpt-3.5-turbo, etc.)
-            max_entities: حداکثر تعداد موجودیت‌ها
-            max_relationships: حداکثر تعداد روابط
-            confidence_threshold: حداقل confidence برای روابط
+            text: ظ…طھظ† ظˆط±ظˆط¯غŒ
+            model: ظ†ط§ظ… ظ…ط¯ظ„ LLM (gpt-4o, gpt-3.5-turbo, etc.)
+            max_entities: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§
+            max_relationships: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ط±ظˆط§ط¨ط·
+            confidence_threshold: ط­ط¯ط§ظ‚ظ„ confidence ط¨ط±ط§غŒ ط±ظˆط§ط¨ط·
             
         Returns:
             Dictionary containing entities and relationships
         """
         if not text or not text.strip():
-            raise ValueError("متن ورودی نمی‌تواند خالی باشد")
+            raise ValueError("ظ…طھظ† ظˆط±ظˆط¯غŒ ظ†ظ…غŒâ€Œطھظˆط§ظ†ط¯ ط®ط§ظ„غŒ ط¨ط§ط´ط¯")
         
         if max_entities < 1 or max_entities > 10000:
-            raise ValueError("حداکثر موجودیت‌ها باید بین 1 تا 10000 باشد")
+            raise ValueError("ط­ط¯ط§ع©ط«ط± ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§ ط¨ط§غŒط¯ ط¨غŒظ† 1 طھط§ 10000 ط¨ط§ط´ط¯")
         
         if max_relationships < 1 or max_relationships > 20000:
-            raise ValueError("حداکثر روابط باید بین 1 تا 20000 باشد")
+            raise ValueError("ط­ط¯ط§ع©ط«ط± ط±ظˆط§ط¨ط· ط¨ط§غŒط¯ ط¨غŒظ† 1 طھط§ 20000 ط¨ط§ط´ط¯")
         
         if confidence_threshold < 0 or confidence_threshold > 1:
-            raise ValueError("آستانه اطمینان باید بین 0 تا 1 باشد")
+            raise ValueError("ط¢ط³طھط§ظ†ظ‡ ط§ط·ظ…غŒظ†ط§ظ† ط¨ط§غŒط¯ ط¨غŒظ† 0 طھط§ 1 ط¨ط§ط´ط¯")
         
         # Use HuggingFace by default (OpenAI is currently disabled)
         # Try to initialize if not already done
@@ -733,7 +741,7 @@ class TextToGraphService:
         
     def _extract_llm_huggingface(self, text: str, model: str, max_entities: int, max_relationships: int, 
                                  confidence_threshold: float, provider: str = "auto", hf_token: Optional[str] = None) -> Dict[str, Any]:
-        """استخراج با استفاده از HuggingFace Inference API (الهام از knowledgegraph.ipynb)"""
+        """ط§ط³طھط®ط±ط§ط¬ ط¨ط§ ط§ط³طھظپط§ط¯ظ‡ ط§ط² HuggingFace Inference API (ط§ظ„ظ‡ط§ظ… ط§ط² knowledgegraph.ipynb)"""
         
         # Check if we have a client, if not try to initialize with provided token
         if not self.hf_client:
@@ -746,15 +754,15 @@ class TextToGraphService:
                     logging.info("HuggingFace InferenceClient initialized successfully with provided token")
                 except Exception as e:
                     logging.error(f"Failed to initialize HuggingFace client with token: {str(e)}")
-                    raise ValueError(f"نمی‌توان HuggingFace client را راه‌اندازی کرد. لطفاً توکن خود را بررسی کنید. خطا: {str(e)}")
+                    raise ValueError(f"ظ†ظ…غŒâ€Œطھظˆط§ظ† HuggingFace client ط±ط§ ط±ط§ظ‡â€Œط§ظ†ط¯ط§ط²غŒ ع©ط±ط¯. ظ„ط·ظپط§ظ‹ طھظˆع©ظ† ط®ظˆط¯ ط±ط§ ط¨ط±ط±ط³غŒ ع©ظ†غŒط¯. ط®ط·ط§: {str(e)}")
             else:
                 error_msg = "HuggingFace client not initialized. "
                 if not HUGGINGFACE_AVAILABLE:
-                    error_msg += "کتابخانه huggingface_hub نصب نشده است. لطفاً با دستور 'pip install huggingface_hub' نصب کنید."
+                    error_msg += "ع©طھط§ط¨ط®ط§ظ†ظ‡ huggingface_hub ظ†طµط¨ ظ†ط´ط¯ظ‡ ط§ط³طھ. ظ„ط·ظپط§ظ‹ ط¨ط§ ط¯ط³طھظˆط± 'pip install huggingface_hub' ظ†طµط¨ ع©ظ†غŒط¯."
                 elif not token_to_use:
-                    error_msg += "توکن HuggingFace تنظیم نشده است. لطفاً توکن خود را در فیلد مربوطه وارد کنید یا متغیر محیطی HF_TOKEN را تنظیم کنید."
+                    error_msg += "طھظˆع©ظ† HuggingFace طھظ†ط¸غŒظ… ظ†ط´ط¯ظ‡ ط§ط³طھ. ظ„ط·ظپط§ظ‹ طھظˆع©ظ† ط®ظˆط¯ ط±ط§ ط¯ط± ظپغŒظ„ط¯ ظ…ط±ط¨ظˆط·ظ‡ ظˆط§ط±ط¯ ع©ظ†غŒط¯ غŒط§ ظ…طھط؛غŒط± ظ…ط­غŒط·غŒ HF_TOKEN ط±ط§ طھظ†ط¸غŒظ… ع©ظ†غŒط¯."
                 else:
-                    error_msg += "لطفاً توکن خود را بررسی کنید."
+                    error_msg += "ظ„ط·ظپط§ظ‹ طھظˆع©ظ† ط®ظˆط¯ ط±ط§ ط¨ط±ط±ط³غŒ ع©ظ†غŒط¯."
                 logging.error(error_msg)
                 raise ValueError(error_msg)
         
@@ -775,9 +783,9 @@ Format:
 CRITICAL INSTRUCTIONS FOR RELATIONSHIPS:
 1. The "relation" field MUST contain the actual verb/phrase from the text in a readable, meaningful format.
 2. Examples of good relation names:
-   - "علی به مدرسه رفت" → relation: "رفتن به" or "goes to" or "attends"
-   - "TP53 regulates apoptosis" → relation: "regulates" or "regulates"
-   - "دارو بیماری را درمان می‌کند" → relation: "درمان می‌کند" or "treats"
+   - "ط¹ظ„غŒ ط¨ظ‡ ظ…ط¯ط±ط³ظ‡ ط±ظپطھ" â†’ relation: "ط±ظپطھظ† ط¨ظ‡" or "goes to" or "attends"
+   - "TP53 regulates apoptosis" â†’ relation: "regulates" or "regulates"
+   - "ط¯ط§ط±ظˆ ط¨غŒظ…ط§ط±غŒ ط±ط§ ط¯ط±ظ…ط§ظ† ظ…غŒâ€Œع©ظ†ط¯" â†’ relation: "ط¯ط±ظ…ط§ظ† ظ…غŒâ€Œع©ظ†ط¯" or "treats"
 3. DO NOT use metaedge codes (like "GoA", "GiG", "CtD") as the relation name.
 4. The relation should be in the same language as the text (Persian/Farsi or English).
 5. Use natural, descriptive phrases that clearly express the relationship.
@@ -800,14 +808,14 @@ Response:"""
         
         try:
             # Call HuggingFace Inference API
-            logging.info(f"🔵 Calling HuggingFace API with model: {model}")
-            logging.info(f"🔵 Using token: {self.hf_api_key[:10]}..." if self.hf_api_key else "❌ No token")
-            logging.info(f"🔵 Client type: {type(self.hf_client)}")
-            logging.info(f"🔵 Client available: {self.hf_client is not None}")
+            logging.info(f"ًں”µ Calling HuggingFace API with model: {model}")
+            logging.info(f"ًں”µ Using token: {self.hf_api_key[:10]}..." if self.hf_api_key else "â‌Œ No token")
+            logging.info(f"ًں”µ Client type: {type(self.hf_client)}")
+            logging.info(f"ًں”µ Client available: {self.hf_client is not None}")
             
             # Test connection first
             if not self.hf_client:
-                raise ValueError("❌ HuggingFace client not initialized. لطفاً توکن را بررسی کنید.")
+                raise ValueError("â‌Œ HuggingFace client not initialized. ظ„ط·ظپط§ظ‹ طھظˆع©ظ† ط±ط§ ط¨ط±ط±ط³غŒ ع©ظ†غŒط¯.")
             
             try:
                 response = self.hf_client.chat.completions.create(
@@ -819,32 +827,32 @@ Response:"""
                     temperature=0.2,
                     max_tokens=4096,
                 )
-                logging.info(f"✅ API call successful, response type: {type(response)}")
+                logging.info(f"âœ… API call successful, response type: {type(response)}")
             except Exception as api_error:
                 error_type = type(api_error).__name__
                 error_msg = str(api_error)
-                logging.error(f"❌ API call failed: {error_type} - {error_msg}")
+                logging.error(f"â‌Œ API call failed: {error_type} - {error_msg}")
                 
                 # Provide specific error messages
                 if "401" in error_msg or "Unauthorized" in error_msg:
-                    raise ValueError("❌ خطای احراز هویت: توکن HuggingFace نامعتبر است. لطفاً توکن خود را از https://huggingface.co/settings/tokens دریافت و بررسی کنید.")
+                    raise ValueError("â‌Œ ط®ط·ط§غŒ ط§ط­ط±ط§ط² ظ‡ظˆغŒطھ: طھظˆع©ظ† HuggingFace ظ†ط§ظ…ط¹طھط¨ط± ط§ط³طھ. ظ„ط·ظپط§ظ‹ طھظˆع©ظ† ط®ظˆط¯ ط±ط§ ط§ط² https://huggingface.co/settings/tokens ط¯ط±غŒط§ظپطھ ظˆ ط¨ط±ط±ط³غŒ ع©ظ†غŒط¯.")
                 elif "404" in error_msg or "not found" in error_msg.lower():
-                    raise ValueError(f"❌ مدل '{model}' یافت نشد. لطفاً نام مدل را بررسی کنید یا از یک مدل رایگان دیگر استفاده کنید.")
+                    raise ValueError(f"â‌Œ ظ…ط¯ظ„ '{model}' غŒط§ظپطھ ظ†ط´ط¯. ظ„ط·ظپط§ظ‹ ظ†ط§ظ… ظ…ط¯ظ„ ط±ط§ ط¨ط±ط±ط³غŒ ع©ظ†غŒط¯ غŒط§ ط§ط² غŒع© ظ…ط¯ظ„ ط±ط§غŒع¯ط§ظ† ط¯غŒع¯ط± ط§ط³طھظپط§ط¯ظ‡ ع©ظ†غŒط¯.")
                 elif "rate limit" in error_msg.lower() or "429" in error_msg:
-                    raise ValueError("❌ محدودیت نرخ درخواست: لطفاً چند لحظه صبر کنید و دوباره تلاش کنید.")
+                    raise ValueError("â‌Œ ظ…ط­ط¯ظˆط¯غŒطھ ظ†ط±ط® ط¯ط±ط®ظˆط§ط³طھ: ظ„ط·ظپط§ظ‹ ع†ظ†ط¯ ظ„ط­ط¸ظ‡ طµط¨ط± ع©ظ†غŒط¯ ظˆ ط¯ظˆط¨ط§ط±ظ‡ طھظ„ط§ط´ ع©ظ†غŒط¯.")
                 elif "timeout" in error_msg.lower():
-                    raise ValueError("❌ زمان اتصال به HuggingFace به پایان رسید. لطفاً اتصال اینترنت خود را بررسی کنید.")
+                    raise ValueError("â‌Œ ط²ظ…ط§ظ† ط§طھطµط§ظ„ ط¨ظ‡ HuggingFace ط¨ظ‡ ظ¾ط§غŒط§ظ† ط±ط³غŒط¯. ظ„ط·ظپط§ظ‹ ط§طھطµط§ظ„ ط§غŒظ†طھط±ظ†طھ ط®ظˆط¯ ط±ط§ ط¨ط±ط±ط³غŒ ع©ظ†غŒط¯.")
                 else:
-                    raise ValueError(f"❌ خطا در ارتباط با HuggingFace API: {error_msg}\nلطفاً توکن و مدل را بررسی کنید.")
+                    raise ValueError(f"â‌Œ ط®ط·ط§ ط¯ط± ط§ط±طھط¨ط§ط· ط¨ط§ HuggingFace API: {error_msg}\nظ„ط·ظپط§ظ‹ طھظˆع©ظ† ظˆ ظ…ط¯ظ„ ط±ط§ ط¨ط±ط±ط³غŒ ع©ظ†غŒط¯.")
             
             if not response or not hasattr(response, 'choices') or not response.choices:
-                logging.error(f"❌ Invalid response structure: {response}")
-                raise ValueError("❌ پاسخ نامعتبر از HuggingFace API دریافت شد. لطفاً توکن و مدل را بررسی کنید.")
+                logging.error(f"â‌Œ Invalid response structure: {response}")
+                raise ValueError("â‌Œ ظ¾ط§ط³ط® ظ†ط§ظ…ط¹طھط¨ط± ط§ط² HuggingFace API ط¯ط±غŒط§ظپطھ ط´ط¯. ظ„ط·ظپط§ظ‹ طھظˆع©ظ† ظˆ ظ…ط¯ظ„ ط±ط§ ط¨ط±ط±ط³غŒ ع©ظ†غŒط¯.")
             
             response_text = response.choices[0].message.content.strip()
-            logging.info(f"✅ Received response from HuggingFace (length: {len(response_text)} chars)")
-            logging.info(f"📝 Response starts with: {repr(response_text[:200])}")
-            logging.info(f"📝 Response preview: {response_text[:300]}")
+            logging.info(f"âœ… Received response from HuggingFace (length: {len(response_text)} chars)")
+            logging.info(f"ًں“‌ Response starts with: {repr(response_text[:200])}")
+            logging.info(f"ًں“‌ Response preview: {response_text[:300]}")
             
             result = self._parse_llm_response(response_text)
             
@@ -864,25 +872,25 @@ Response:"""
                 has_closing_brace = '}' in response_text
                 
                 error_details = []
-                error_details.append(f"📊 تحلیل پاسخ مدل:")
-                error_details.append(f"  - طول پاسخ: {len(response_text)} کاراکتر")
-                error_details.append(f"  - شامل 'entities': {'✅' if has_entities else '❌'}")
-                error_details.append(f"  - شامل 'relationships': {'✅' if has_relationships else '❌'}")
-                error_details.append(f"  - شامل '{{': {'✅' if has_opening_brace else '❌'}")
-                error_details.append(f"  - شامل '}}': {'✅' if has_closing_brace else '❌'}")
+                error_details.append(f"ًں“ٹ طھط­ظ„غŒظ„ ظ¾ط§ط³ط® ظ…ط¯ظ„:")
+                error_details.append(f"  - ط·ظˆظ„ ظ¾ط§ط³ط®: {len(response_text)} ع©ط§ط±ط§ع©طھط±")
+                error_details.append(f"  - ط´ط§ظ…ظ„ 'entities': {'âœ…' if has_entities else 'â‌Œ'}")
+                error_details.append(f"  - ط´ط§ظ…ظ„ 'relationships': {'âœ…' if has_relationships else 'â‌Œ'}")
+                error_details.append(f"  - ط´ط§ظ…ظ„ '{{': {'âœ…' if has_opening_brace else 'â‌Œ'}")
+                error_details.append(f"  - ط´ط§ظ…ظ„ '}}': {'âœ…' if has_closing_brace else 'â‌Œ'}")
                 
                 # Show preview of response
                 error_preview = response_text[:400] if len(response_text) > 400 else response_text
-                error_details.append(f"\n📝 شروع پاسخ مدل:")
+                error_details.append(f"\nًں“‌ ط´ط±ظˆط¹ ظ¾ط§ط³ط® ظ…ط¯ظ„:")
                 error_details.append(f"{error_preview}")
                 if len(response_text) > 400:
-                    error_details.append(f"... (بقیه {len(response_text) - 400} کاراکتر)")
+                    error_details.append(f"... (ط¨ظ‚غŒظ‡ {len(response_text) - 400} ع©ط§ط±ط§ع©طھط±)")
                 
-                error_details.append(f"\n💡 راه‌حل‌های پیشنهادی:")
-                error_details.append(f"1. مدل را تغییر دهید (TinyLlama یا Phi-3 معمولاً بهتر کار می‌کنند)")
-                error_details.append(f"2. از روش‌های دیگر استفاده کنید: spaCy یا spaCy SVO Enhanced")
-                error_details.append(f"3. متن ورودی را کوتاه‌تر کنید")
-                error_details.append(f"4. دوباره تلاش کنید (مدل‌ها گاهی پاسخ‌های متفاوتی می‌دهند)")
+                error_details.append(f"\nًں’، ط±ط§ظ‡â€Œط­ظ„â€Œظ‡ط§غŒ ظ¾غŒط´ظ†ظ‡ط§ط¯غŒ:")
+                error_details.append(f"1. ظ…ط¯ظ„ ط±ط§ طھط؛غŒغŒط± ط¯ظ‡غŒط¯ (TinyLlama غŒط§ Phi-3 ظ…ط¹ظ…ظˆظ„ط§ظ‹ ط¨ظ‡طھط± ع©ط§ط± ظ…غŒâ€Œع©ظ†ظ†ط¯)")
+                error_details.append(f"2. ط§ط² ط±ظˆط´â€Œظ‡ط§غŒ ط¯غŒع¯ط± ط§ط³طھظپط§ط¯ظ‡ ع©ظ†غŒط¯: spaCy غŒط§ spaCy SVO Enhanced")
+                error_details.append(f"3. ظ…طھظ† ظˆط±ظˆط¯غŒ ط±ط§ ع©ظˆطھط§ظ‡â€Œطھط± ع©ظ†غŒط¯")
+                error_details.append(f"4. ط¯ظˆط¨ط§ط±ظ‡ طھظ„ط§ط´ ع©ظ†غŒط¯ (ظ…ط¯ظ„â€Œظ‡ط§ ع¯ط§ظ‡غŒ ظ¾ط§ط³ط®â€Œظ‡ط§غŒ ظ…طھظپط§ظˆطھغŒ ظ…غŒâ€Œط¯ظ‡ظ†ط¯)")
                 
                 error_msg = "\n".join(error_details)
                 raise ValueError(error_msg)
@@ -899,19 +907,19 @@ Response:"""
             
             # Provide more helpful error messages
             if "401" in error_msg or "Unauthorized" in error_msg or "authentication" in error_msg.lower():
-                raise ValueError("خطای احراز هویت: توکن HuggingFace نامعتبر است. لطفاً توکن خود را از https://huggingface.co/settings/tokens دریافت و بررسی کنید.")
+                raise ValueError("ط®ط·ط§غŒ ط§ط­ط±ط§ط² ظ‡ظˆغŒطھ: طھظˆع©ظ† HuggingFace ظ†ط§ظ…ط¹طھط¨ط± ط§ط³طھ. ظ„ط·ظپط§ظ‹ طھظˆع©ظ† ط®ظˆط¯ ط±ط§ ط§ط² https://huggingface.co/settings/tokens ط¯ط±غŒط§ظپطھ ظˆ ط¨ط±ط±ط³غŒ ع©ظ†غŒط¯.")
             elif "404" in error_msg or "not found" in error_msg.lower():
-                raise ValueError(f"مدل '{model}' یافت نشد. لطفاً نام مدل را بررسی کنید یا از یک مدل رایگان دیگر استفاده کنید.")
+                raise ValueError(f"ظ…ط¯ظ„ '{model}' غŒط§ظپطھ ظ†ط´ط¯. ظ„ط·ظپط§ظ‹ ظ†ط§ظ… ظ…ط¯ظ„ ط±ط§ ط¨ط±ط±ط³غŒ ع©ظ†غŒط¯ غŒط§ ط§ط² غŒع© ظ…ط¯ظ„ ط±ط§غŒع¯ط§ظ† ط¯غŒع¯ط± ط§ط³طھظپط§ط¯ظ‡ ع©ظ†غŒط¯.")
             elif "rate limit" in error_msg.lower() or "429" in error_msg:
-                raise ValueError("محدودیت نرخ درخواست: لطفاً چند لحظه صبر کنید و دوباره تلاش کنید.")
+                raise ValueError("ظ…ط­ط¯ظˆط¯غŒطھ ظ†ط±ط® ط¯ط±ط®ظˆط§ط³طھ: ظ„ط·ظپط§ظ‹ ع†ظ†ط¯ ظ„ط­ط¸ظ‡ طµط¨ط± ع©ظ†غŒط¯ ظˆ ط¯ظˆط¨ط§ط±ظ‡ طھظ„ط§ط´ ع©ظ†غŒط¯.")
             elif "timeout" in error_msg.lower():
-                raise ValueError("زمان اتصال به HuggingFace به پایان رسید. لطفاً اتصال اینترنت خود را بررسی کنید و دوباره تلاش کنید.")
+                raise ValueError("ط²ظ…ط§ظ† ط§طھطµط§ظ„ ط¨ظ‡ HuggingFace ط¨ظ‡ ظ¾ط§غŒط§ظ† ط±ط³غŒط¯. ظ„ط·ظپط§ظ‹ ط§طھطµط§ظ„ ط§غŒظ†طھط±ظ†طھ ط®ظˆط¯ ط±ط§ ط¨ط±ط±ط³غŒ ع©ظ†غŒط¯ ظˆ ط¯ظˆط¨ط§ط±ظ‡ طھظ„ط§ط´ ع©ظ†غŒط¯.")
             else:
-                raise ValueError(f"خطا در استخراج با HuggingFace: {error_msg}. لطفاً توکن و مدل را بررسی کنید.")
+                raise ValueError(f"ط®ط·ط§ ط¯ط± ط§ط³طھط®ط±ط§ط¬ ط¨ط§ HuggingFace: {error_msg}. ظ„ط·ظپط§ظ‹ طھظˆع©ظ† ظˆ ظ…ط¯ظ„ ط±ط§ ط¨ط±ط±ط³غŒ ع©ظ†غŒط¯.")
     
     def _process_llm_result(self, result: Dict[str, Any], max_entities: int, max_relationships: int, 
                            confidence_threshold: float, method: str, model: str) -> Dict[str, Any]:
-        """پردازش نتیجه LLM (مشترک برای OpenAI و HuggingFace)"""
+        """ظ¾ط±ط¯ط§ط²ط´ ظ†طھغŒط¬ظ‡ LLM (ظ…ط´طھط±ع© ط¨ط±ط§غŒ OpenAI ظˆ HuggingFace)"""
         # Validate and clean result
         entities = result.get("entities", [])
         relationships = result.get("relationships", [])
@@ -971,18 +979,18 @@ Response:"""
     
     def extract_spacy_svo_enhanced(self, text: str, max_entities: int = 100, max_relationships: int = 200) -> Dict[str, Any]:
         """
-        استخراج موجودیت‌ها و روابط با استفاده از spaCy SVO Enhanced (الهام از knowledgegraph.ipynb)
+        ط§ط³طھط®ط±ط§ط¬ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§ ظˆ ط±ظˆط§ط¨ط· ط¨ط§ ط§ط³طھظپط§ط¯ظ‡ ط§ط² spaCy SVO Enhanced (ط§ظ„ظ‡ط§ظ… ط§ط² knowledgegraph.ipynb)
         
         Args:
-            text: متن ورودی
-            max_entities: حداکثر تعداد موجودیت‌ها
-            max_relationships: حداکثر تعداد روابط
+            text: ظ…طھظ† ظˆط±ظˆط¯غŒ
+            max_entities: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§
+            max_relationships: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ط±ظˆط§ط¨ط·
             
         Returns:
             Dictionary containing entities and relationships
         """
         if not text or not text.strip():
-            raise ValueError("متن ورودی نمی‌تواند خالی باشد")
+            raise ValueError("ظ…طھظ† ظˆط±ظˆط¯غŒ ظ†ظ…غŒâ€Œطھظˆط§ظ†ط¯ ط®ط§ظ„غŒ ط¨ط§ط´ط¯")
         
         if not self.nlp:
             raise ValueError("spaCy model not loaded. Please install spaCy and download a model.")
@@ -1085,14 +1093,14 @@ Response:"""
                         if not relation_type:
                             relation_type = "GiG"  # Default
                         
-                        # استخراج نام رابطه از متن
+                        # ط§ط³طھط®ط±ط§ط¬ ظ†ط§ظ… ط±ط§ط¨ط·ظ‡ ط§ط² ظ…طھظ†
                         relation_name = self._extract_relation_name_from_text(token, token.sent if hasattr(token, 'sent') and token.sent else None)
                         
                         relationships.append({
                             "source": subj_id,
                             "target": obj_id,
                             "metaedge": relation_type,
-                            "relation": relation_name,  # نام واقعی رابطه از متن
+                            "relation": relation_name,  # ظ†ط§ظ… ظˆط§ظ‚ط¹غŒ ط±ط§ط¨ط·ظ‡ ط§ط² ظ…طھظ†
                             "attributes": {
                                 "verb": token.text,
                                 "verb_lemma": token.lemma_,
@@ -1120,22 +1128,22 @@ Response:"""
                              max_relationships: int = 200, max_gleanings: int = 2,
                              confidence_threshold: float = 0.5) -> Dict[str, Any]:
         """
-        استخراج موجودیت‌ها و روابط با استفاده از LLM Multi-pass (الهام از ragflow)
-        با iterative gleaning برای حداکثر کردن recall
+        ط§ط³طھط®ط±ط§ط¬ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§ ظˆ ط±ظˆط§ط¨ط· ط¨ط§ ط§ط³طھظپط§ط¯ظ‡ ط§ط² LLM Multi-pass (ط§ظ„ظ‡ط§ظ… ط§ط² ragflow)
+        ط¨ط§ iterative gleaning ط¨ط±ط§غŒ ط­ط¯ط§ع©ط«ط± ع©ط±ط¯ظ† recall
         
         Args:
-            text: متن ورودی
-            model: نام مدل LLM (HuggingFace models by default)
-            max_entities: حداکثر تعداد موجودیت‌ها
-            max_relationships: حداکثر تعداد روابط
-            max_gleanings: تعداد پاس‌های iterative (پیش‌فرض: 2)
-            confidence_threshold: حداقل confidence برای روابط
+            text: ظ…طھظ† ظˆط±ظˆط¯غŒ
+            model: ظ†ط§ظ… ظ…ط¯ظ„ LLM (HuggingFace models by default)
+            max_entities: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§
+            max_relationships: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ط±ظˆط§ط¨ط·
+            max_gleanings: طھط¹ط¯ط§ط¯ ظ¾ط§ط³â€Œظ‡ط§غŒ iterative (ظ¾غŒط´â€Œظپط±ط¶: 2)
+            confidence_threshold: ط­ط¯ط§ظ‚ظ„ confidence ط¨ط±ط§غŒ ط±ظˆط§ط¨ط·
             
         Returns:
             Dictionary containing entities and relationships
         """
         if not text or not text.strip():
-            raise ValueError("متن ورودی نمی‌تواند خالی باشد")
+            raise ValueError("ظ…طھظ† ظˆط±ظˆط¯غŒ ظ†ظ…غŒâ€Œطھظˆط§ظ†ط¯ ط®ط§ظ„غŒ ط¨ط§ط´ط¯")
         
         # Try to initialize if not already done
         if not self.hf_client:
@@ -1147,9 +1155,9 @@ Response:"""
                     logging.info("HuggingFace InferenceClient initialized for multipass")
                 except Exception as e:
                     logging.error(f"Failed to initialize HuggingFace client: {e}")
-                    raise ValueError(f"نمی‌توان HuggingFace client را راه‌اندازی کرد: {str(e)}")
+                    raise ValueError(f"ظ†ظ…غŒâ€Œطھظˆط§ظ† HuggingFace client ط±ط§ ط±ط§ظ‡â€Œط§ظ†ط¯ط§ط²غŒ ع©ط±ط¯: {str(e)}")
             else:
-                raise ValueError("HuggingFace client not initialized. لطفاً توکن HuggingFace را در فیلد مربوطه وارد کنید یا متغیر محیطی HF_TOKEN را تنظیم کنید.")
+                raise ValueError("HuggingFace client not initialized. ظ„ط·ظپط§ظ‹ طھظˆع©ظ† HuggingFace ط±ط§ ط¯ط± ظپغŒظ„ط¯ ظ…ط±ط¨ظˆط·ظ‡ ظˆط§ط±ط¯ ع©ظ†غŒط¯ غŒط§ ظ…طھط؛غŒط± ظ…ط­غŒط·غŒ HF_TOKEN ط±ط§ طھظ†ط¸غŒظ… ع©ظ†غŒط¯.")
         
         # Get the extraction prompt
         prompt_template = GRAPH_PROMPTS.get("extract_entities", "")
@@ -1168,9 +1176,9 @@ Format:
 CRITICAL INSTRUCTIONS FOR RELATIONSHIPS:
 1. The "relation" field MUST contain the actual verb/phrase from the text in a readable, meaningful format.
 2. Examples of good relation names:
-   - "علی به مدرسه رفت" → relation: "رفتن به" or "goes to" or "attends"
-   - "TP53 regulates apoptosis" → relation: "regulates"
-   - "دارو بیماری را درمان می‌کند" → relation: "درمان می‌کند" or "treats"
+   - "ط¹ظ„غŒ ط¨ظ‡ ظ…ط¯ط±ط³ظ‡ ط±ظپطھ" â†’ relation: "ط±ظپطھظ† ط¨ظ‡" or "goes to" or "attends"
+   - "TP53 regulates apoptosis" â†’ relation: "regulates"
+   - "ط¯ط§ط±ظˆ ط¨غŒظ…ط§ط±غŒ ط±ط§ ط¯ط±ظ…ط§ظ† ظ…غŒâ€Œع©ظ†ط¯" â†’ relation: "ط¯ط±ظ…ط§ظ† ظ…غŒâ€Œع©ظ†ط¯" or "treats"
 3. DO NOT use metaedge codes (like "GoA", "GiG", "CtD") as the relation name.
 4. The relation should be in the same language as the text (Persian/Farsi or English).
 5. Use natural, descriptive phrases that clearly express the relationship.
@@ -1221,11 +1229,11 @@ Response:"""
                         seen_entity_ids.add(ent_id)
                 
                 for rel in result.get("relationships", []):
-                    # بهبود نام رابطه
+                    # ط¨ظ‡ط¨ظˆط¯ ظ†ط§ظ… ط±ط§ط¨ط·ظ‡
                     relation_name = rel.get("relation", "")
                     metaedge = rel.get("metaedge", "")
                     
-                    # اگر relation خالی است یا فقط یک metaedge code است
+                    # ط§ع¯ط± relation ط®ط§ظ„غŒ ط§ط³طھ غŒط§ ظپظ‚ط· غŒع© metaedge code ط§ط³طھ
                     if not relation_name or relation_name == metaedge or (len(relation_name) <= 5 and relation_name.isupper()):
                         verb = rel.get("attributes", {}).get("verb", "")
                         description = rel.get("attributes", {}).get("description", "")
@@ -1278,11 +1286,11 @@ Response:"""
                             added_any = True
                     
                     for rel in result.get("relationships", []):
-                        # بهبود نام رابطه
+                        # ط¨ظ‡ط¨ظˆط¯ ظ†ط§ظ… ط±ط§ط¨ط·ظ‡
                         relation_name = rel.get("relation", "")
                         metaedge = rel.get("metaedge", "")
                         
-                        # اگر relation خالی است یا فقط یک metaedge code است
+                        # ط§ع¯ط± relation ط®ط§ظ„غŒ ط§ط³طھ غŒط§ ظپظ‚ط· غŒع© metaedge code ط§ط³طھ
                         if not relation_name or relation_name == metaedge or (len(relation_name) <= 5 and relation_name.isupper()):
                             verb = rel.get("attributes", {}).get("verb", "")
                             description = rel.get("attributes", {}).get("description", "")
@@ -1309,7 +1317,7 @@ Response:"""
             
             # Post-filter entities/relationships against original text to reduce hallucinations.
             # For very short texts (e.g., single-sentence queries), we skip this filter to avoid
-            # accidentally dropping valid but slightly rephrased/translated entities (e.g., "school" vs "مدرسه").
+            # accidentally dropping valid but slightly rephrased/translated entities (e.g., "school" vs "ظ…ط¯ط±ط³ظ‡").
             try:
                 token_count = len(str(text).split())
             except Exception:
@@ -1353,7 +1361,7 @@ Response:"""
         # Lowercase
         t = text.lower()
         # Normalize Persian/Arabic variants of ye/ke
-        t = t.replace("ي", "ی").replace("ك", "ک")
+        t = t.replace("ظٹ", "غŒ").replace("ظƒ", "ع©")
         # Replace half-space with normal space
         t = t.replace("\u200c", " ")
         # Remove basic punctuation
@@ -1373,7 +1381,7 @@ Response:"""
 
         This is a defensive, conservative filter intended to cut hallucinated nodes/edges
         when using LLM-based extraction on general text (e.g., preventing extra people
-        like 'محمد' or 'معلم' when the text only mentions 'علی' and 'مدرسه').
+        like 'ظ…ط­ظ…ط¯' or 'ظ…ط¹ظ„ظ…' when the text only mentions 'ط¹ظ„غŒ' and 'ظ…ط¯ط±ط³ظ‡').
         """
         if not original_text:
             return entities, relationships
@@ -1455,8 +1463,8 @@ Response:"""
             
             if json_start < 0:
                 # No { found, try to construct JSON from partial response
-                logging.warning("⚠️ No opening brace found, trying to construct JSON")
-                logging.warning(f"⚠️ Response starts with: {repr(response_text[:100])}")
+                logging.warning("âڑ ï¸ڈ No opening brace found, trying to construct JSON")
+                logging.warning(f"âڑ ï¸ڈ Response starts with: {repr(response_text[:100])}")
                 
                 # Look for entities or relationships keys (more flexible pattern)
                 entities_match = re.search(r'["\']?entities["\']?\s*:', response_text, re.IGNORECASE)
@@ -1472,7 +1480,7 @@ Response:"""
                     
                     if positions:
                         start_pos = min(positions)
-                        logging.info(f"✅ Found key at position {start_pos}")
+                        logging.info(f"âœ… Found key at position {start_pos}")
                         
                         # Go back to find the opening quote
                         # Handle case like: '\n "entities": [...]'
@@ -1498,7 +1506,7 @@ Response:"""
                         if found_quote and quote_start >= 0:
                             # Start from the quote
                             json_content = response_text[quote_start:]
-                            logging.info(f"✅ Extracted from quote at position {quote_start}")
+                            logging.info(f"âœ… Extracted from quote at position {quote_start}")
                         else:
                             # Start from the key name itself
                             json_content = response_text[start_pos:]
@@ -1512,13 +1520,13 @@ Response:"""
                                 if key_match:
                                     key_name = key_match.group(1)
                                     json_content = f'"{key_name}":' + json_content[key_match.end():]
-                                    logging.info(f"✅ Reconstructed key: {key_name}")
+                                    logging.info(f"âœ… Reconstructed key: {key_name}")
                                 else:
                                     json_content = '"' + json_content
                         
                         # Wrap in braces
                         json_str = '{' + json_content.strip()
-                        logging.info(f"✅ Constructed JSON (first 200 chars): {json_str[:200]}")
+                        logging.info(f"âœ… Constructed JSON (first 200 chars): {json_str[:200]}")
                         
                         # Try to find the end - look for the last }
                         last_brace = json_str.rfind('}')
@@ -1529,14 +1537,14 @@ Response:"""
                             json_str = re.sub(r',\s*$', '', json_str)
                             # Add closing brace
                             json_str += '}'
-                            logging.info("✅ Added missing closing brace")
+                            logging.info("âœ… Added missing closing brace")
                         elif json_str.count('{') > json_str.count('}'):
                             # Missing closing braces
                             missing = json_str.count('{') - json_str.count('}')
                             json_str += '}' * missing
-                            logging.info(f"✅ Added {missing} missing closing brace(s)")
+                            logging.info(f"âœ… Added {missing} missing closing brace(s)")
                     else:
-                        logging.warning("❌ Could not find entities or relationships keys")
+                        logging.warning("â‌Œ Could not find entities or relationships keys")
                         return None
                 else:
                     # Try to find any JSON-like structure
@@ -1626,16 +1634,16 @@ Response:"""
                       methods: List[str] = None, confidence_threshold: float = 0.5,
                       original_text: Optional[str] = None, **kwargs) -> Dict[str, Any]:
         """
-        استخراج ترکیبی: ترکیب نتایج از چندین روش
+        ط§ط³طھط®ط±ط§ط¬ طھط±ع©غŒط¨غŒ: طھط±ع©غŒط¨ ظ†طھط§غŒط¬ ط§ط² ع†ظ†ط¯غŒظ† ط±ظˆط´
         
         Args:
-            text: متن ورودی (ممکن است پیش‌پردازش شده باشد)
-            max_entities: حداکثر تعداد موجودیت‌ها
-            max_relationships: حداکثر تعداد روابط
-            methods: لیست روش‌های استخراج (پیش‌فرض: ['spacy', 'llm'])
-            confidence_threshold: حداقل confidence برای روابط
-            original_text: متن اصلی (برای استفاده در LLM - اگر preprocessing فعال باشد)
-            **kwargs: پارامترهای اضافی
+            text: ظ…طھظ† ظˆط±ظˆط¯غŒ (ظ…ظ…ع©ظ† ط§ط³طھ ظ¾غŒط´â€Œظ¾ط±ط¯ط§ط²ط´ ط´ط¯ظ‡ ط¨ط§ط´ط¯)
+            max_entities: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§
+            max_relationships: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ط±ظˆط§ط¨ط·
+            methods: ظ„غŒط³طھ ط±ظˆط´â€Œظ‡ط§غŒ ط§ط³طھط®ط±ط§ط¬ (ظ¾غŒط´â€Œظپط±ط¶: ['spacy', 'llm'])
+            confidence_threshold: ط­ط¯ط§ظ‚ظ„ confidence ط¨ط±ط§غŒ ط±ظˆط§ط¨ط·
+            original_text: ظ…طھظ† ط§طµظ„غŒ (ط¨ط±ط§غŒ ط§ط³طھظپط§ط¯ظ‡ ط¯ط± LLM - ط§ع¯ط± preprocessing ظپط¹ط§ظ„ ط¨ط§ط´ط¯)
+            **kwargs: ظ¾ط§ط±ط§ظ…طھط±ظ‡ط§غŒ ط§ط¶ط§ظپغŒ
             
         Returns:
             Dictionary containing entities and relationships
@@ -1643,7 +1651,7 @@ Response:"""
         if methods is None:
             methods = kwargs.get("hybrid_methods", ['spacy', 'llm'])
         
-        # استفاده از متن اصلی برای LLM (اگر موجود باشد)
+        # ط§ط³طھظپط§ط¯ظ‡ ط§ط² ظ…طھظ† ط§طµظ„غŒ ط¨ط±ط§غŒ LLM (ط§ع¯ط± ظ…ظˆط¬ظˆط¯ ط¨ط§ط´ط¯)
         llm_text = original_text if original_text else text
         
         all_entities = []
@@ -1654,8 +1662,8 @@ Response:"""
         # Run each method
         for method in methods:
             try:
-                # برای LLM: از متن اصلی استفاده کن (حتی اگر preprocessing فعال باشد)
-                # برای بقیه: از متن پیش‌پردازش شده استفاده کن
+                # ط¨ط±ط§غŒ LLM: ط§ط² ظ…طھظ† ط§طµظ„غŒ ط§ط³طھظپط§ط¯ظ‡ ع©ظ† (ط­طھغŒ ط§ع¯ط± preprocessing ظپط¹ط§ظ„ ط¨ط§ط´ط¯)
+                # ط¨ط±ط§غŒ ط¨ظ‚غŒظ‡: ط§ط² ظ…طھظ† ظ¾غŒط´â€Œظ¾ط±ط¯ط§ط²ط´ ط´ط¯ظ‡ ط§ط³طھظپط§ط¯ظ‡ ع©ظ†
                 text_for_method = llm_text if method in ["llm", "llm_multipass"] else text
                 
                 if method == "simple":
@@ -1752,16 +1760,16 @@ Response:"""
     
     def build_graph(self, extraction_result: Dict[str, Any]) -> nx.MultiDiGraph:
         """
-        ساخت گراف NetworkX از موجودیت‌ها و روابط استخراج شده
+        ط³ط§ط®طھ ع¯ط±ط§ظپ NetworkX ط§ط² ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§ ظˆ ط±ظˆط§ط¨ط· ط§ط³طھط®ط±ط§ط¬ ط´ط¯ظ‡
         
         Args:
-            extraction_result: نتیجه استخراج (از extract_simple, extract_spacy, یا extract_llm)
+            extraction_result: ظ†طھغŒط¬ظ‡ ط§ط³طھط®ط±ط§ط¬ (ط§ط² extract_simple, extract_spacy, غŒط§ extract_llm)
             
         Returns:
             NetworkX MultiDiGraph
         """
         if not extraction_result:
-            raise ValueError("نتیجه استخراج خالی است")
+            raise ValueError("ظ†طھغŒط¬ظ‡ ط§ط³طھط®ط±ط§ط¬ ط®ط§ظ„غŒ ط§ط³طھ")
         
         G = nx.MultiDiGraph()
         
@@ -1769,13 +1777,13 @@ Response:"""
         relationships = extraction_result.get("relationships", [])
         
         if not entities:
-            raise ValueError("هیچ موجودیتی استخراج نشده است")
+            raise ValueError("ظ‡غŒع† ظ…ظˆط¬ظˆط¯غŒطھغŒ ط§ط³طھط®ط±ط§ط¬ ظ†ط´ط¯ظ‡ ط§ط³طھ")
         
         if not isinstance(entities, list):
-            raise ValueError("موجودیت‌ها باید به صورت لیست باشند")
+            raise ValueError("ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§ ط¨ط§غŒط¯ ط¨ظ‡ طµظˆط±طھ ظ„غŒط³طھ ط¨ط§ط´ظ†ط¯")
         
         if not isinstance(relationships, list):
-            raise ValueError("روابط باید به صورت لیست باشند")
+            raise ValueError("ط±ظˆط§ط¨ط· ط¨ط§غŒط¯ ط¨ظ‡ طµظˆط±طھ ظ„غŒط³طھ ط¨ط§ط´ظ†ط¯")
         
         # Add nodes with validation
         for entity in entities:
@@ -1809,7 +1817,7 @@ Response:"""
         
         # Validate graph has nodes
         if G.number_of_nodes() == 0:
-            raise ValueError("هیچ نودی به گراف اضافه نشد")
+            raise ValueError("ظ‡غŒع† ظ†ظˆط¯غŒ ط¨ظ‡ ع¯ط±ط§ظپ ط§ط¶ط§ظپظ‡ ظ†ط´ط¯")
         
         # Add edges with validation
         edges_added = 0
@@ -1832,13 +1840,13 @@ Response:"""
             
             if G.has_node(source) and G.has_node(target):
                 try:
-                    # استخراج نام رابطه از rel یا attributes
+                    # ط§ط³طھط®ط±ط§ط¬ ظ†ط§ظ… ط±ط§ط¨ط·ظ‡ ط§ط² rel غŒط§ attributes
                     relation_name = rel.get("relation")
                     if not relation_name:
-                        # سعی کن از attributes استخراج کن
+                        # ط³ط¹غŒ ع©ظ† ط§ط² attributes ط§ط³طھط®ط±ط§ط¬ ع©ظ†
                         relation_name = attributes.get("description") or attributes.get("verb") or attributes.get("pattern")
                     if not relation_name:
-                        # Fallback: استفاده از metaedge
+                        # Fallback: ط§ط³طھظپط§ط¯ظ‡ ط§ط² metaedge
                         relation_name = metaedge
                     
                     # Add edge with both metaedge and relation
@@ -1852,8 +1860,8 @@ Response:"""
                         source,
                         target,
                         metaedge=metaedge,  # Hetionet code
-                        relation=relation_name,  # نام واقعی رابطه از متن
-                        relation_meaning=relation_meaning,  # مفهوم رابطه برای نمایش
+                        relation=relation_name,  # ظ†ط§ظ… ظˆط§ظ‚ط¹غŒ ط±ط§ط¨ط·ظ‡ ط§ط² ظ…طھظ†
+                        relation_meaning=relation_meaning,  # ظ…ظپظ‡ظˆظ… ط±ط§ط¨ط·ظ‡ ط¨ط±ط§غŒ ظ†ظ…ط§غŒط´
                         **attributes
                     )
                     edges_added += 1
@@ -1864,38 +1872,38 @@ Response:"""
                 logging.debug(f"Skipping edge {source} -> {target}: nodes not in graph")
         
         if edges_added == 0 and len(relationships) > 0:
-            logging.warning("هیچ یالی به گراف اضافه نشد")
+            logging.warning("ظ‡غŒع† غŒط§ظ„غŒ ط¨ظ‡ ع¯ط±ط§ظپ ط§ط¶ط§ظپظ‡ ظ†ط´ط¯")
         
         return G
     
     def save_graph(self, graph: nx.MultiDiGraph, output_dir: str = "uploaded_graphs", 
                    filename: Optional[str] = None) -> str:
         """
-        ذخیره گراف به فایل PKL
+        ط°ط®غŒط±ظ‡ ع¯ط±ط§ظپ ط¨ظ‡ ظپط§غŒظ„ PKL
         
         Args:
-            graph: گراف NetworkX
-            output_dir: پوشه خروجی
-            filename: نام فایل (اختیاری، اگر نباشد با timestamp ساخته می‌شود)
+            graph: ع¯ط±ط§ظپ NetworkX
+            output_dir: ظ¾ظˆط´ظ‡ ط®ط±ظˆط¬غŒ
+            filename: ظ†ط§ظ… ظپط§غŒظ„ (ط§ط®طھغŒط§ط±غŒطŒ ط§ع¯ط± ظ†ط¨ط§ط´ط¯ ط¨ط§ timestamp ط³ط§ط®طھظ‡ ظ…غŒâ€Œط´ظˆط¯)
             
         Returns:
-            مسیر فایل ذخیره شده
+            ظ…ط³غŒط± ظپط§غŒظ„ ط°ط®غŒط±ظ‡ ط´ط¯ظ‡
         """
         import pickle
         
         if graph is None:
-            raise ValueError("گراف نمی‌تواند None باشد")
+            raise ValueError("ع¯ط±ط§ظپ ظ†ظ…غŒâ€Œطھظˆط§ظ†ط¯ None ط¨ط§ط´ط¯")
         
         if not isinstance(graph, (nx.Graph, nx.DiGraph, nx.MultiGraph, nx.MultiDiGraph)):
-            raise ValueError("گراف باید از نوع NetworkX باشد")
+            raise ValueError("ع¯ط±ط§ظپ ط¨ط§غŒط¯ ط§ط² ظ†ظˆط¹ NetworkX ط¨ط§ط´ط¯")
         
         if graph.number_of_nodes() == 0:
-            raise ValueError("گراف خالی نمی‌تواند ذخیره شود")
+            raise ValueError("ع¯ط±ط§ظپ ط®ط§ظ„غŒ ظ†ظ…غŒâ€Œطھظˆط§ظ†ط¯ ط°ط®غŒط±ظ‡ ط´ظˆط¯")
         
         try:
             os.makedirs(output_dir, exist_ok=True)
         except Exception as e:
-            raise ValueError(f"خطا در ایجاد پوشه خروجی: {str(e)}")
+            raise ValueError(f"ط®ط·ط§ ط¯ط± ط§غŒط¬ط§ط¯ ظ¾ظˆط´ظ‡ ط®ط±ظˆط¬غŒ: {str(e)}")
         
         if not filename:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1912,7 +1920,7 @@ Response:"""
                 pickle.dump(graph, f)
             logging.info(f"Graph saved to {filepath}")
         except Exception as e:
-            raise ValueError(f"خطا در ذخیره گراف: {str(e)}")
+            raise ValueError(f"ط®ط·ط§ ط¯ط± ط°ط®غŒط±ظ‡ ع¯ط±ط§ظپ: {str(e)}")
         
         return filepath
     
@@ -2013,13 +2021,13 @@ Response:"""
     
     def _map_metaedge_to_readable_name(self, metaedge: str) -> str:
         """
-        تبدیل metaedge code به نام معنی‌دار و خوانا
+        طھط¨ط¯غŒظ„ metaedge code ط¨ظ‡ ظ†ط§ظ… ظ…ط¹ظ†غŒâ€Œط¯ط§ط± ظˆ ط®ظˆط§ظ†ط§
         
         Args:
-            metaedge: کد metaedge (مثل GoA, GiG, CtD)
+            metaedge: ع©ط¯ metaedge (ظ…ط«ظ„ GoA, GiG, CtD)
             
         Returns:
-            نام معنی‌دار رابطه
+            ظ†ط§ظ… ظ…ط¹ظ†غŒâ€Œط¯ط§ط± ط±ط§ط¨ط·ظ‡
         """
         metaedge_to_name = {
             "GoA": "goes to",
@@ -2041,32 +2049,32 @@ Response:"""
     
     def _extract_relation_name_from_text(self, verb_token, sent, preposition: Optional[str] = None) -> str:
         """
-        استخراج نام رابطه از متن بر اساس فعل و جمله
+        ط§ط³طھط®ط±ط§ط¬ ظ†ط§ظ… ط±ط§ط¨ط·ظ‡ ط§ط² ظ…طھظ† ط¨ط± ط§ط³ط§ط³ ظپط¹ظ„ ظˆ ط¬ظ…ظ„ظ‡
         
         Args:
-            verb_token: توکن فعل از spaCy
-            sent: جمله از spaCy
-            preposition: حرف اضافه (در صورت وجود)
+            verb_token: طھظˆع©ظ† ظپط¹ظ„ ط§ط² spaCy
+            sent: ط¬ظ…ظ„ظ‡ ط§ط² spaCy
+            preposition: ط­ط±ظپ ط§ط¶ط§ظپظ‡ (ط¯ط± طµظˆط±طھ ظˆط¬ظˆط¯)
             
         Returns:
-            نام رابطه از متن (مثل "interacts with", "treats", "participates in")
+            ظ†ط§ظ… ط±ط§ط¨ط·ظ‡ ط§ط² ظ…طھظ† (ظ…ط«ظ„ "interacts with", "treats", "participates in")
         """
         try:
             verb_text = verb_token.text
             verb_lemma = verb_token.lemma_
             
-            # اگر حرف اضافه وجود دارد، آن را اضافه کن
+            # ط§ع¯ط± ط­ط±ظپ ط§ط¶ط§ظپظ‡ ظˆط¬ظˆط¯ ط¯ط§ط±ط¯طŒ ط¢ظ† ط±ط§ ط§ط¶ط§ظپظ‡ ع©ظ†
             if preposition:
-                # پیدا کردن حرف اضافه در جمله
+                # ظ¾غŒط¯ط§ ع©ط±ط¯ظ† ط­ط±ظپ ط§ط¶ط§ظپظ‡ ط¯ط± ط¬ظ…ظ„ظ‡
                 prep_text = preposition.lower()
-                # ساخت نام رابطه: verb + preposition
+                # ط³ط§ط®طھ ظ†ط§ظ… ط±ط§ط¨ط·ظ‡: verb + preposition
                 relation_name = f"{verb_lemma} {prep_text}"
             else:
-                # فقط فعل
+                # ظپظ‚ط· ظپط¹ظ„
                 relation_name = verb_lemma
             
-            # تبدیل به فرم خوانا (مثلاً "interact_with" -> "interacts with")
-            # برای فعل‌های رایج، نام بهتری بده
+            # طھط¨ط¯غŒظ„ ط¨ظ‡ ظپط±ظ… ط®ظˆط§ظ†ط§ (ظ…ط«ظ„ط§ظ‹ "interact_with" -> "interacts with")
+            # ط¨ط±ط§غŒ ظپط¹ظ„â€Œظ‡ط§غŒ ط±ط§غŒط¬طŒ ظ†ط§ظ… ط¨ظ‡طھط±غŒ ط¨ط¯ظ‡
             relation_mapping = {
                 "interact": "interacts with",
                 "regulate": "regulates",
@@ -2095,20 +2103,20 @@ Response:"""
                 "migrate": "migrates to"
             }
             
-            # اگر mapping وجود دارد، از آن استفاده کن
+            # ط§ع¯ط± mapping ظˆط¬ظˆط¯ ط¯ط§ط±ط¯طŒ ط§ط² ط¢ظ† ط§ط³طھظپط§ط¯ظ‡ ع©ظ†
             if verb_lemma in relation_mapping:
                 relation_name = relation_mapping[verb_lemma]
             elif preposition:
-                # اگر حرف اضافه داریم، verb + prep
+                # ط§ع¯ط± ط­ط±ظپ ط§ط¶ط§ظپظ‡ ط¯ط§ط±غŒظ…طŒ verb + prep
                 relation_name = f"{verb_lemma} {preposition.lower()}"
             else:
-                # فقط فعل
+                # ظپظ‚ط· ظپط¹ظ„
                 relation_name = verb_lemma
             
             return relation_name
         except Exception as e:
             logging.warning(f"Error extracting relation name: {e}")
-            # Fallback: استفاده از lemma فعل
+            # Fallback: ط§ط³طھظپط§ط¯ظ‡ ط§ط² lemma ظپط¹ظ„
             return verb_token.lemma_ if hasattr(verb_token, 'lemma_') else str(verb_token)
     
     def _map_verb_to_relation(self, verb: str) -> Optional[str]:
@@ -2229,19 +2237,19 @@ Response:"""
     
     def extract_persian(self, text: str, max_entities: int = 100, max_relationships: int = 200, **kwargs) -> Dict[str, Any]:
         """
-        استخراج موجودیت‌ها و روابط از متن فارسی با استفاده از مدل‌های فارسی
+        ط§ط³طھط®ط±ط§ط¬ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§ ظˆ ط±ظˆط§ط¨ط· ط§ط² ظ…طھظ† ظپط§ط±ط³غŒ ط¨ط§ ط§ط³طھظپط§ط¯ظ‡ ط§ط² ظ…ط¯ظ„â€Œظ‡ط§غŒ ظپط§ط±ط³غŒ
         
         Args:
-            text: متن ورودی فارسی
-            max_entities: حداکثر تعداد موجودیت‌ها
-            max_relationships: حداکثر تعداد روابط
-            **kwargs: پارامترهای اضافی
+            text: ظ…طھظ† ظˆط±ظˆط¯غŒ ظپط§ط±ط³غŒ
+            max_entities: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§
+            max_relationships: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ط±ظˆط§ط¨ط·
+            **kwargs: ظ¾ط§ط±ط§ظ…طھط±ظ‡ط§غŒ ط§ط¶ط§ظپغŒ
             
         Returns:
             Dictionary containing entities and relationships
         """
         if not NEW_MODULES_AVAILABLE:
-            raise ValueError("ماژول‌های فارسی در دسترس نیستند. لطفاً requirements.txt را نصب کنید.")
+            raise ValueError("ظ…ط§عکظˆظ„â€Œظ‡ط§غŒ ظپط§ط±ط³غŒ ط¯ط± ط¯ط³طھط±ط³ ظ†غŒط³طھظ†ط¯. ظ„ط·ظپط§ظ‹ requirements.txt ط±ط§ ظ†طµط¨ ع©ظ†غŒط¯.")
         
         # Normalize text
         normalized_text = text
@@ -2301,25 +2309,25 @@ Response:"""
             if nlp_model:
                 return self.extract_spacy(normalized_text, max_entities=max_entities, max_relationships=max_relationships)
             else:
-                raise ValueError(f"استخراج فارسی ناموفق بود: {str(e)}")
+                raise ValueError(f"ط§ط³طھط®ط±ط§ط¬ ظپط§ط±ط³غŒ ظ†ط§ظ…ظˆظپظ‚ ط¨ظˆط¯: {str(e)}")
     
     def extract_span_based(self, text: str, model_type: str = "biobert", max_entities: int = 100, 
                           max_relationships: int = 200, **kwargs) -> Dict[str, Any]:
         """
-        استخراج مبتنی بر Span با BioBERT یا SciBERT
+        ط§ط³طھط®ط±ط§ط¬ ظ…ط¨طھظ†غŒ ط¨ط± Span ط¨ط§ BioBERT غŒط§ SciBERT
         
         Args:
-            text: متن ورودی
-            model_type: نوع مدل (biobert/scibert/auto)
-            max_entities: حداکثر تعداد موجودیت‌ها
-            max_relationships: حداکثر تعداد روابط
-            **kwargs: پارامترهای اضافی
+            text: ظ…طھظ† ظˆط±ظˆط¯غŒ
+            model_type: ظ†ظˆط¹ ظ…ط¯ظ„ (biobert/scibert/auto)
+            max_entities: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§
+            max_relationships: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ط±ظˆط§ط¨ط·
+            **kwargs: ظ¾ط§ط±ط§ظ…طھط±ظ‡ط§غŒ ط§ط¶ط§ظپغŒ
             
         Returns:
             Dictionary containing entities and relationships
         """
         if not NEW_MODULES_AVAILABLE:
-            raise ValueError("ماژول‌های span-based در دسترس نیستند.")
+            raise ValueError("ظ…ط§عکظˆظ„â€Œظ‡ط§غŒ span-based ط¯ط± ط¯ط³طھط±ط³ ظ†غŒط³طھظ†ط¯.")
         
         language = self._detect_text_language(text)
         
@@ -2389,20 +2397,20 @@ Response:"""
     def extract_with_coreference(self, text: str, base_method: str = "spacy", 
                                  max_entities: int = 100, max_relationships: int = 200, **kwargs) -> Dict[str, Any]:
         """
-        استخراج با Coreference Resolution
+        ط§ط³طھط®ط±ط§ط¬ ط¨ط§ Coreference Resolution
         
         Args:
-            text: متن ورودی
-            base_method: روش پایه استخراج
-            max_entities: حداکثر تعداد موجودیت‌ها
-            max_relationships: حداکثر تعداد روابط
-            **kwargs: پارامترهای اضافی
+            text: ظ…طھظ† ظˆط±ظˆط¯غŒ
+            base_method: ط±ظˆط´ ظ¾ط§غŒظ‡ ط§ط³طھط®ط±ط§ط¬
+            max_entities: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§
+            max_relationships: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ط±ظˆط§ط¨ط·
+            **kwargs: ظ¾ط§ط±ط§ظ…طھط±ظ‡ط§غŒ ط§ط¶ط§ظپغŒ
             
         Returns:
             Dictionary containing entities and relationships
         """
         if not NEW_MODULES_AVAILABLE:
-            raise ValueError("ماژول coreference resolution در دسترس نیست.")
+            raise ValueError("ظ…ط§عکظˆظ„ coreference resolution ط¯ط± ط¯ط³طھط±ط³ ظ†غŒط³طھ.")
         
         # Extract with base method
         extraction_result = self.extract(text, method=base_method, max_entities=max_entities, 
@@ -2432,23 +2440,23 @@ Response:"""
                          max_tokens: int = 512, max_entities: int = 100, 
                          max_relationships: int = 200, **kwargs) -> Dict[str, Any]:
         """
-        استخراج از متن‌های طولانی با chunking
+        ط§ط³طھط®ط±ط§ط¬ ط§ط² ظ…طھظ†â€Œظ‡ط§غŒ ط·ظˆظ„ط§ظ†غŒ ط¨ط§ chunking
         
         Args:
-            text: متن ورودی
-            method: روش استخراج پایه
-            chunking_strategy: استراتژی chunking (smart/sliding_window/sentence/paragraph)
-            chunk_overlap: نسبت overlap در sliding window
-            max_tokens: حداکثر توکن در هر chunk
-            max_entities: حداکثر تعداد موجودیت‌ها
-            max_relationships: حداکثر تعداد روابط
-            **kwargs: پارامترهای اضافی
+            text: ظ…طھظ† ظˆط±ظˆط¯غŒ
+            method: ط±ظˆط´ ط§ط³طھط®ط±ط§ط¬ ظ¾ط§غŒظ‡
+            chunking_strategy: ط§ط³طھط±ط§طھعکغŒ chunking (smart/sliding_window/sentence/paragraph)
+            chunk_overlap: ظ†ط³ط¨طھ overlap ط¯ط± sliding window
+            max_tokens: ط­ط¯ط§ع©ط«ط± طھظˆع©ظ† ط¯ط± ظ‡ط± chunk
+            max_entities: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§
+            max_relationships: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ط±ظˆط§ط¨ط·
+            **kwargs: ظ¾ط§ط±ط§ظ…طھط±ظ‡ط§غŒ ط§ط¶ط§ظپغŒ
             
         Returns:
             Dictionary containing entities and relationships
         """
         if not NEW_MODULES_AVAILABLE:
-            raise ValueError("ماژول‌های chunking در دسترس نیستند.")
+            raise ValueError("ظ…ط§عکظˆظ„â€Œظ‡ط§غŒ chunking ط¯ط± ط¯ط³طھط±ط³ ظ†غŒط³طھظ†ط¯.")
         
         language = self._detect_text_language(text)
         
@@ -2513,46 +2521,46 @@ Response:"""
     def extract(self, text: str, method: str = "simple", enable_preprocessing: bool = False, 
                 language: str = "auto", **kwargs) -> Dict[str, Any]:
         """
-        استخراج موجودیت‌ها و روابط با روش انتخابی
+        ط§ط³طھط®ط±ط§ط¬ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§ ظˆ ط±ظˆط§ط¨ط· ط¨ط§ ط±ظˆط´ ط§ظ†طھط®ط§ط¨غŒ
         
-        نکته مهم در مورد پیش‌پردازش:
-        - برای مدل‌های زبانی (LLM): متن اصلی استفاده می‌شود تا معنی کامل حفظ شود
-        - برای روش‌های rule-based و spaCy: می‌توان از متن پیش‌پردازش شده استفاده کرد
-          تا stop words در گراف ظاهر نشوند
+        ظ†ع©طھظ‡ ظ…ظ‡ظ… ط¯ط± ظ…ظˆط±ط¯ ظ¾غŒط´â€Œظ¾ط±ط¯ط§ط²ط´:
+        - ط¨ط±ط§غŒ ظ…ط¯ظ„â€Œظ‡ط§غŒ ط²ط¨ط§ظ†غŒ (LLM): ظ…طھظ† ط§طµظ„غŒ ط§ط³طھظپط§ط¯ظ‡ ظ…غŒâ€Œط´ظˆط¯ طھط§ ظ…ط¹ظ†غŒ ع©ط§ظ…ظ„ ط­ظپط¸ ط´ظˆط¯
+        - ط¨ط±ط§غŒ ط±ظˆط´â€Œظ‡ط§غŒ rule-based ظˆ spaCy: ظ…غŒâ€Œطھظˆط§ظ† ط§ط² ظ…طھظ† ظ¾غŒط´â€Œظ¾ط±ط¯ط§ط²ط´ ط´ط¯ظ‡ ط§ط³طھظپط§ط¯ظ‡ ع©ط±ط¯
+          طھط§ stop words ط¯ط± ع¯ط±ط§ظپ ط¸ط§ظ‡ط± ظ†ط´ظˆظ†ط¯
         
         Args:
-            text: متن ورودی
-            method: روش استخراج (simple, spacy, spacy_svo_enhanced, llm, llm_multipass, hybrid)
-            enable_preprocessing: فعال‌سازی پیش‌پردازش (حذف stop words از گراف)
-            language: زبان متن برای پیش‌پردازش (auto/fa/en)
-            **kwargs: پارامترهای اضافی
+            text: ظ…طھظ† ظˆط±ظˆط¯غŒ
+            method: ط±ظˆط´ ط§ط³طھط®ط±ط§ط¬ (simple, spacy, spacy_svo_enhanced, llm, llm_multipass, hybrid)
+            enable_preprocessing: ظپط¹ط§ظ„â€Œط³ط§ط²غŒ ظ¾غŒط´â€Œظ¾ط±ط¯ط§ط²ط´ (ط­ط°ظپ stop words ط§ط² ع¯ط±ط§ظپ)
+            language: ط²ط¨ط§ظ† ظ…طھظ† ط¨ط±ط§غŒ ظ¾غŒط´â€Œظ¾ط±ط¯ط§ط²ط´ (auto/fa/en)
+            **kwargs: ظ¾ط§ط±ط§ظ…طھط±ظ‡ط§غŒ ط§ط¶ط§ظپغŒ
             
         Returns:
             Dictionary containing entities and relationships
         """
         if not text or not text.strip():
-            raise ValueError("متن ورودی نمی‌تواند خالی باشد")
+            raise ValueError("ظ…طھظ† ظˆط±ظˆط¯غŒ ظ†ظ…غŒâ€Œطھظˆط§ظ†ط¯ ط®ط§ظ„غŒ ط¨ط§ط´ط¯")
         
         valid_methods = ["simple", "spacy", "spacy_svo_enhanced", "llm", "llm_multipass", "hybrid", 
                         "persian", "span_based", "with_coreference", "long_text",
                         "joint_er", "autoregressive", "edc", "incremental"]
         if method not in valid_methods:
-            raise ValueError(f"روش استخراج نامعتبر: {method}. روش‌های مجاز: {', '.join(valid_methods)}")
+            raise ValueError(f"ط±ظˆط´ ط§ط³طھط®ط±ط§ط¬ ظ†ط§ظ…ط¹طھط¨ط±: {method}. ط±ظˆط´â€Œظ‡ط§غŒ ظ…ط¬ط§ط²: {', '.join(valid_methods)}")
         
-        # تعیین اینکه آیا این روش از LLM استفاده می‌کند
+        # طھط¹غŒغŒظ† ط§غŒظ†ع©ظ‡ ط¢غŒط§ ط§غŒظ† ط±ظˆط´ ط§ط² LLM ط§ط³طھظپط§ط¯ظ‡ ظ…غŒâ€Œع©ظ†ط¯
         llm_methods = ["llm", "llm_multipass"]
         uses_llm = method in llm_methods or (method == "hybrid" and "llm" in kwargs.get("hybrid_methods", []))
         
-        # برای روش‌های LLM: متن اصلی را نگه دار (stop words برای معنی مهم هستند)
-        # برای روش‌های rule-based/spaCy: می‌توان از متن پیش‌پردازش شده استفاده کرد
+        # ط¨ط±ط§غŒ ط±ظˆط´â€Œظ‡ط§غŒ LLM: ظ…طھظ† ط§طµظ„غŒ ط±ط§ ظ†ع¯ظ‡ ط¯ط§ط± (stop words ط¨ط±ط§غŒ ظ…ط¹ظ†غŒ ظ…ظ‡ظ… ظ‡ط³طھظ†ط¯)
+        # ط¨ط±ط§غŒ ط±ظˆط´â€Œظ‡ط§غŒ rule-based/spaCy: ظ…غŒâ€Œطھظˆط§ظ† ط§ط² ظ…طھظ† ظ¾غŒط´â€Œظ¾ط±ط¯ط§ط²ط´ ط´ط¯ظ‡ ط§ط³طھظپط§ط¯ظ‡ ع©ط±ط¯
         if enable_preprocessing and not uses_llm:
-            # پیش‌پردازش فقط برای روش‌های غیر-LLM
+            # ظ¾غŒط´â€Œظ¾ط±ط¯ط§ط²ط´ ظپظ‚ط· ط¨ط±ط§غŒ ط±ظˆط´â€Œظ‡ط§غŒ ط؛غŒط±-LLM
             processed_text = self._preprocess_text_for_graph(text, language=language, remove_stop_words=True)
             logging.info(f"Preprocessing applied for method {method}: {len(text)} -> {len(processed_text)} chars")
         else:
             processed_text = text
         
-        # برای روش‌های LLM: همیشه از متن اصلی استفاده کن
+        # ط¨ط±ط§غŒ ط±ظˆط´â€Œظ‡ط§غŒ LLM: ظ‡ظ…غŒط´ظ‡ ط§ط² ظ…طھظ† ط§طµظ„غŒ ط§ط³طھظپط§ط¯ظ‡ ع©ظ†
         text_for_extraction = text if uses_llm else processed_text
         
         try:
@@ -2563,18 +2571,18 @@ Response:"""
             elif method == "spacy_svo_enhanced":
                 return self.extract_spacy_svo_enhanced(text_for_extraction, **kwargs)
             elif method == "llm":
-                # برای LLM: متن اصلی را استفاده کن (حتی اگر preprocessing فعال باشد)
+                # ط¨ط±ط§غŒ LLM: ظ…طھظ† ط§طµظ„غŒ ط±ط§ ط§ط³طھظپط§ط¯ظ‡ ع©ظ† (ط­طھغŒ ط§ع¯ط± preprocessing ظپط¹ط§ظ„ ط¨ط§ط´ط¯)
                 return self.extract_llm(text, **kwargs)
             elif method == "llm_multipass":
-                # برای LLM: متن اصلی را استفاده کن
+                # ط¨ط±ط§غŒ LLM: ظ…طھظ† ط§طµظ„غŒ ط±ط§ ط§ط³طھظپط§ط¯ظ‡ ع©ظ†
                 return self.extract_llm_multipass(text, **kwargs)
             elif method == "hybrid":
-                # برای hybrid: اگر LLM در hybrid_methods است، متن اصلی را به آن بده
+                # ط¨ط±ط§غŒ hybrid: ط§ع¯ط± LLM ط¯ط± hybrid_methods ط§ط³طھطŒ ظ…طھظ† ط§طµظ„غŒ ط±ط§ ط¨ظ‡ ط¢ظ† ط¨ط¯ظ‡
                 hybrid_methods = kwargs.get("hybrid_methods", kwargs.get("methods", ["spacy", "llm"]))
-                kwargs["methods"] = hybrid_methods  # اطمینان از اینکه methods تنظیم شده است
+                kwargs["methods"] = hybrid_methods  # ط§ط·ظ…غŒظ†ط§ظ† ط§ط² ط§غŒظ†ع©ظ‡ methods طھظ†ط¸غŒظ… ط´ط¯ظ‡ ط§ط³طھ
                 if "llm" in hybrid_methods or "llm_multipass" in hybrid_methods:
-                    # متن اصلی را برای LLM و متن پیش‌پردازش شده را برای بقیه
-                    kwargs["original_text"] = text  # برای استفاده در hybrid
+                    # ظ…طھظ† ط§طµظ„غŒ ط±ط§ ط¨ط±ط§غŒ LLM ظˆ ظ…طھظ† ظ¾غŒط´â€Œظ¾ط±ط¯ط§ط²ط´ ط´ط¯ظ‡ ط±ط§ ط¨ط±ط§غŒ ط¨ظ‚غŒظ‡
+                    kwargs["original_text"] = text  # ط¨ط±ط§غŒ ط§ط³طھظپط§ط¯ظ‡ ط¯ط± hybrid
                 return self.extract_hybrid(text_for_extraction, **kwargs)
             elif method == "persian":
                 return self.extract_persian(text_for_extraction, **kwargs)
@@ -2588,10 +2596,10 @@ Response:"""
             elif method == "joint_er":
                 return self.extract_joint_er(text_for_extraction, **kwargs)
             elif method == "autoregressive":
-                # برای autoregressive: متن اصلی را استفاده کن (نیاز به LLM)
+                # ط¨ط±ط§غŒ autoregressive: ظ…طھظ† ط§طµظ„غŒ ط±ط§ ط§ط³طھظپط§ط¯ظ‡ ع©ظ† (ظ†غŒط§ط² ط¨ظ‡ LLM)
                 return self.extract_autoregressive(text, **kwargs)
             elif method == "edc":
-                # برای EDC: متن اصلی را استفاده کن (نیاز به LLM)
+                # ط¨ط±ط§غŒ EDC: ظ…طھظ† ط§طµظ„غŒ ط±ط§ ط§ط³طھظپط§ط¯ظ‡ ع©ظ† (ظ†غŒط§ط² ط¨ظ‡ LLM)
                 return self.extract_edc(text, **kwargs)
             elif method == "incremental":
                 return self.extract_incremental(text_for_extraction, **kwargs)
@@ -2600,7 +2608,7 @@ Response:"""
             raise
         except Exception as e:
             logging.error(f"Error in {method} extraction: {e}")
-            raise ValueError(f"خطا در استخراج با روش {method}: {str(e)}")
+            raise ValueError(f"ط®ط·ط§ ط¯ط± ط§ط³طھط®ط±ط§ط¬ ط¨ط§ ط±ظˆط´ {method}: {str(e)}")
     
     def process_url_to_graph(self, url: str, method: str = "simple",
                              use_wikipedia_extraction: bool = True,
@@ -2613,25 +2621,25 @@ Response:"""
                              language: str = "auto",
                              **kwargs) -> Dict[str, Any]:
         """
-        پردازش کامل: استخراج متن از URL و ساخت گراف
+        ظ¾ط±ط¯ط§ط²ط´ ع©ط§ظ…ظ„: ط§ط³طھط®ط±ط§ط¬ ظ…طھظ† ط§ط² URL ظˆ ط³ط§ط®طھ ع¯ط±ط§ظپ
         
-        این متد دو مرحله دارد:
-        1. استخراج متن مفید از URL (با حذف محتوای غیرضروری)
-        2. تبدیل متن به گراف با روش انتخابی
+        ط§غŒظ† ظ…طھط¯ ط¯ظˆ ظ…ط±ط­ظ„ظ‡ ط¯ط§ط±ط¯:
+        1. ط§ط³طھط®ط±ط§ط¬ ظ…طھظ† ظ…ظپغŒط¯ ط§ط² URL (ط¨ط§ ط­ط°ظپ ظ…ط­طھظˆط§غŒ ط؛غŒط±ط¶ط±ظˆط±غŒ)
+        2. طھط¨ط¯غŒظ„ ظ…طھظ† ط¨ظ‡ ع¯ط±ط§ظپ ط¨ط§ ط±ظˆط´ ط§ظ†طھط®ط§ط¨غŒ
         
         Args:
-            url: URL صفحه وب
-            method: روش استخراج گراف
-            use_wikipedia_extraction: استفاده از استخراج تخصصی برای ویکی‌پدیا
-            save: آیا گراف ذخیره شود؟
-            output_dir: پوشه خروجی
-            enable_entity_resolution: فعال/غیرفعال کردن entity resolution
-            enable_relationship_weighting: فعال/غیرفعال کردن relationship weighting
-            min_relationship_weight: حداقل وزن برای نگه داشتن رابطه
-            remove_isolated_nodes: حذف نودهای ایزوله
-            enable_preprocessing: فعال‌سازی پیش‌پردازش (حذف stop words از گراف)
-            language: زبان متن برای پیش‌پردازش (auto/fa/en)
-            **kwargs: پارامترهای اضافی برای استخراج
+            url: URL طµظپط­ظ‡ ظˆط¨
+            method: ط±ظˆط´ ط§ط³طھط®ط±ط§ط¬ ع¯ط±ط§ظپ
+            use_wikipedia_extraction: ط§ط³طھظپط§ط¯ظ‡ ط§ط² ط§ط³طھط®ط±ط§ط¬ طھط®طµطµغŒ ط¨ط±ط§غŒ ظˆغŒع©غŒâ€Œظ¾ط¯غŒط§
+            save: ط¢غŒط§ ع¯ط±ط§ظپ ط°ط®غŒط±ظ‡ ط´ظˆط¯طں
+            output_dir: ظ¾ظˆط´ظ‡ ط®ط±ظˆط¬غŒ
+            enable_entity_resolution: ظپط¹ط§ظ„/ط؛غŒط±ظپط¹ط§ظ„ ع©ط±ط¯ظ† entity resolution
+            enable_relationship_weighting: ظپط¹ط§ظ„/ط؛غŒط±ظپط¹ط§ظ„ ع©ط±ط¯ظ† relationship weighting
+            min_relationship_weight: ط­ط¯ط§ظ‚ظ„ ظˆط²ظ† ط¨ط±ط§غŒ ظ†ع¯ظ‡ ط¯ط§ط´طھظ† ط±ط§ط¨ط·ظ‡
+            remove_isolated_nodes: ط­ط°ظپ ظ†ظˆط¯ظ‡ط§غŒ ط§غŒط²ظˆظ„ظ‡
+            enable_preprocessing: ظپط¹ط§ظ„â€Œط³ط§ط²غŒ ظ¾غŒط´â€Œظ¾ط±ط¯ط§ط²ط´ (ط­ط°ظپ stop words ط§ط² ع¯ط±ط§ظپ)
+            language: ط²ط¨ط§ظ† ظ…طھظ† ط¨ط±ط§غŒ ظ¾غŒط´â€Œظ¾ط±ط¯ط§ط²ط´ (auto/fa/en)
+            **kwargs: ظ¾ط§ط±ط§ظ…طھط±ظ‡ط§غŒ ط§ط¶ط§ظپغŒ ط¨ط±ط§غŒ ط§ط³طھط®ط±ط§ط¬
             
         Returns:
             Dictionary containing graph info and filepath
@@ -2652,19 +2660,19 @@ Response:"""
             WIKIPEDIA_EXTRACTOR_AVAILABLE = False
             logging.warning("Wikipedia extractor not available")
         
-        # بررسی معتبر بودن URL
+        # ط¨ط±ط±ط³غŒ ظ…ط¹طھط¨ط± ط¨ظˆط¯ظ† URL
         if not URL_EXTRACTOR_AVAILABLE:
-            raise ValueError("استخراج از URL در دسترس نیست")
+            raise ValueError("ط§ط³طھط®ط±ط§ط¬ ط§ط² URL ط¯ط± ط¯ط³طھط±ط³ ظ†غŒط³طھ")
         
         if not is_valid_url(url):
-            raise ValueError("URL نامعتبر است")
+            raise ValueError("URL ظ†ط§ظ…ط¹طھط¨ط± ط§ط³طھ")
         
-        # مرحله 1: استخراج متن از URL
+        # ظ…ط±ط­ظ„ظ‡ 1: ط§ط³طھط®ط±ط§ط¬ ظ…طھظ† ط§ط² URL
         text = None
         is_wikipedia = 'wikipedia.org' in url.lower()
         
         if is_wikipedia and WIKIPEDIA_EXTRACTOR_AVAILABLE and use_wikipedia_extraction:
-            # استفاده از استخراج تخصصی ویکی‌پدیا
+            # ط§ط³طھظپط§ط¯ظ‡ ط§ط² ط§ط³طھط®ط±ط§ط¬ طھط®طµطµغŒ ظˆغŒع©غŒâ€Œظ¾ط¯غŒط§
             try:
                 wiki_language = 'fa' if 'fa.wikipedia' in url else 'en'
                 wiki_extractor = WikipediaExtractor(language=wiki_language)
@@ -2673,7 +2681,7 @@ Response:"""
                 if "error" not in wiki_data:
                     text = wiki_data.get("text", "")
                     
-                    # اگر متن خالی یا خیلی کوتاه است، از get_full_text استفاده کن
+                    # ط§ع¯ط± ظ…طھظ† ط®ط§ظ„غŒ غŒط§ ط®غŒظ„غŒ ع©ظˆطھط§ظ‡ ط§ط³طھطŒ ط§ط² get_full_text ط§ط³طھظپط§ط¯ظ‡ ع©ظ†
                     if not text or len(text.strip()) < 200:
                         logging.info(f"Text too short ({len(text)} chars), trying get_full_text...")
                         full_text = wiki_extractor.get_full_text(wiki_data.get("title", ""))
@@ -2681,7 +2689,7 @@ Response:"""
                             text = full_text
                             logging.info(f"Using get_full_text: {len(text)} characters")
                     
-                    # اگر هنوز متن کافی نداریم، از HTML parsing مستقیم استفاده کن
+                    # ط§ع¯ط± ظ‡ظ†ظˆط² ظ…طھظ† ع©ط§ظپغŒ ظ†ط¯ط§ط±غŒظ…طŒ ط§ط² HTML parsing ظ…ط³طھظ‚غŒظ… ط§ط³طھظپط§ط¯ظ‡ ع©ظ†
                     if not text or len(text.strip()) < 200:
                         logging.info("Trying direct HTML extraction...")
                         try:
@@ -2694,34 +2702,34 @@ Response:"""
                         except Exception as e:
                             logging.warning(f"Direct HTML extraction failed: {e}")
                     
-                    # اعمال محدودیت نهایی طول
+                    # ط§ط¹ظ…ط§ظ„ ظ…ط­ط¯ظˆط¯غŒطھ ظ†ظ‡ط§غŒغŒ ط·ظˆظ„
                     if text and len(text) > 10000:
-                        # قطع کردن هوشمند
+                        # ظ‚ط·ط¹ ع©ط±ط¯ظ† ظ‡ظˆط´ظ…ظ†ط¯
                         from url_extractor import _truncate_text_intelligently
                         text = _truncate_text_intelligently(text, 10000)
                         logging.info(f"Final text length limited to {len(text)} characters")
                     
                     if not text or len(text.strip()) < 50:
-                        raise ValueError(f"نمی‌توان متن کافی از ویکی‌پدیا استخراج کرد (فقط {len(text)} کاراکتر)")
+                        raise ValueError(f"ظ†ظ…غŒâ€Œطھظˆط§ظ† ظ…طھظ† ع©ط§ظپغŒ ط§ط² ظˆغŒع©غŒâ€Œظ¾ط¯غŒط§ ط§ط³طھط®ط±ط§ط¬ ع©ط±ط¯ (ظپظ‚ط· {len(text)} ع©ط§ط±ط§ع©طھط±)")
                     
                     logging.info(f"Wikipedia text extracted successfully: {len(text)} characters")
                 else:
-                    # Fallback به استخراج عادی
+                    # Fallback ط¨ظ‡ ط§ط³طھط®ط±ط§ط¬ ط¹ط§ط¯غŒ
                     logging.warning(f"Wikipedia extraction failed: {wiki_data.get('error')}")
                     text = extract_text_from_url(url, clean_content=True, max_length=10000)
             except Exception as e:
                 logging.warning(f"Wikipedia extraction failed: {e}")
                 text = extract_text_from_url(url, clean_content=True, max_length=10000)
         else:
-            # استخراج عادی از URL با clean_content=True
+            # ط§ط³طھط®ط±ط§ط¬ ط¹ط§ط¯غŒ ط§ط² URL ط¨ط§ clean_content=True
             text = extract_text_from_url(url, clean_content=True, max_length=10000)
         
         if not text or not text.strip():
-            raise ValueError("نمی‌توان متن را از URL استخراج کرد")
+            raise ValueError("ظ†ظ…غŒâ€Œطھظˆط§ظ† ظ…طھظ† ط±ط§ ط§ط² URL ط§ط³طھط®ط±ط§ط¬ ع©ط±ط¯")
         
         logging.info(f"Text extracted from URL ({len(text)} characters), proceeding to graph construction")
         
-        # مرحله 2: تبدیل متن به گراف
+        # ظ…ط±ط­ظ„ظ‡ 2: طھط¨ط¯غŒظ„ ظ…طھظ† ط¨ظ‡ ع¯ط±ط§ظپ
         return self.process_text_to_graph(
             text=text,
             method=method,
@@ -2746,20 +2754,20 @@ Response:"""
                               language: str = "auto",
                               **kwargs) -> Dict[str, Any]:
         """
-        پردازش کامل: استخراج از متن و ساخت گراف
+        ظ¾ط±ط¯ط§ط²ط´ ع©ط§ظ…ظ„: ط§ط³طھط®ط±ط§ط¬ ط§ط² ظ…طھظ† ظˆ ط³ط§ط®طھ ع¯ط±ط§ظپ
         
         Args:
-            text: متن ورودی
-            method: روش استخراج
-            save: آیا گراف ذخیره شود؟
-            output_dir: پوشه خروجی
-            enable_entity_resolution: فعال/غیرفعال کردن entity resolution
-            enable_relationship_weighting: فعال/غیرفعال کردن relationship weighting
-            min_relationship_weight: حداقل وزن برای نگه داشتن رابطه
-            remove_isolated_nodes: حذف نودهای ایزوله
-            enable_preprocessing: فعال‌سازی پیش‌پردازش (حذف stop words از گراف)
-            language: زبان متن برای پیش‌پردازش (auto/fa/en)
-            **kwargs: پارامترهای اضافی برای استخراج
+            text: ظ…طھظ† ظˆط±ظˆط¯غŒ
+            method: ط±ظˆط´ ط§ط³طھط®ط±ط§ط¬
+            save: ط¢غŒط§ ع¯ط±ط§ظپ ط°ط®غŒط±ظ‡ ط´ظˆط¯طں
+            output_dir: ظ¾ظˆط´ظ‡ ط®ط±ظˆط¬غŒ
+            enable_entity_resolution: ظپط¹ط§ظ„/ط؛غŒط±ظپط¹ط§ظ„ ع©ط±ط¯ظ† entity resolution
+            enable_relationship_weighting: ظپط¹ط§ظ„/ط؛غŒط±ظپط¹ط§ظ„ ع©ط±ط¯ظ† relationship weighting
+            min_relationship_weight: ط­ط¯ط§ظ‚ظ„ ظˆط²ظ† ط¨ط±ط§غŒ ظ†ع¯ظ‡ ط¯ط§ط´طھظ† ط±ط§ط¨ط·ظ‡
+            remove_isolated_nodes: ط­ط°ظپ ظ†ظˆط¯ظ‡ط§غŒ ط§غŒط²ظˆظ„ظ‡
+            enable_preprocessing: ظپط¹ط§ظ„â€Œط³ط§ط²غŒ ظ¾غŒط´â€Œظ¾ط±ط¯ط§ط²ط´ (ط­ط°ظپ stop words ط§ط² ع¯ط±ط§ظپ)
+            language: ط²ط¨ط§ظ† ظ…طھظ† ط¨ط±ط§غŒ ظ¾غŒط´â€Œظ¾ط±ط¯ط§ط²ط´ (auto/fa/en)
+            **kwargs: ظ¾ط§ط±ط§ظ…طھط±ظ‡ط§غŒ ط§ط¶ط§ظپغŒ ط¨ط±ط§غŒ ط§ط³طھط®ط±ط§ط¬
             
         Returns:
             Dictionary containing graph info and filepath
@@ -2772,10 +2780,10 @@ Response:"""
             
             # Validate extraction result
             if not extraction_result:
-                raise ValueError("نتیجه استخراج خالی است")
+                raise ValueError("ظ†طھغŒط¬ظ‡ ط§ط³طھط®ط±ط§ط¬ ط®ط§ظ„غŒ ط§ط³طھ")
             
             if "entities" not in extraction_result:
-                raise ValueError("نتیجه استخراج فاقد موجودیت‌ها است")
+                raise ValueError("ظ†طھغŒط¬ظ‡ ط§ط³طھط®ط±ط§ط¬ ظپط§ظ‚ط¯ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§ ط§ط³طھ")
             
             if "relationships" not in extraction_result:
                 extraction_result["relationships"] = []
@@ -2785,7 +2793,7 @@ Response:"""
             
             # Validate graph
             if graph.number_of_nodes() == 0:
-                raise ValueError("گراف ساخته شده خالی است")
+                raise ValueError("ع¯ط±ط§ظپ ط³ط§ط®طھظ‡ ط´ط¯ظ‡ ط®ط§ظ„غŒ ط§ط³طھ")
             
             # Apply relationship weighting if enabled
             if enable_relationship_weighting:
@@ -2825,7 +2833,7 @@ Response:"""
                     filepath = self.save_graph(graph, output_dir=output_dir)
                 except Exception as e:
                     logging.error(f"Error saving graph: {e}")
-                    raise ValueError(f"خطا در ذخیره گراف: {str(e)}")
+                    raise ValueError(f"ط®ط·ط§ ط¯ط± ط°ط®غŒط±ظ‡ ع¯ط±ط§ظپ: {str(e)}")
             
             return {
                 "graph": graph,
@@ -2845,7 +2853,7 @@ Response:"""
             raise
         except Exception as e:
             logging.error(f"Error in process_text_to_graph: {e}")
-            raise ValueError(f"خطا در پردازش متن به گراف: {str(e)}")
+            raise ValueError(f"ط®ط·ط§ ط¯ط± ظ¾ط±ط¯ط§ط²ط´ ظ…طھظ† ط¨ظ‡ ع¯ط±ط§ظپ: {str(e)}")
     
     def _apply_relationship_weighting(self, graph: nx.MultiDiGraph) -> nx.MultiDiGraph:
         """Apply weighting to relationships based on frequency and confidence"""
@@ -2912,30 +2920,30 @@ Response:"""
     def extract_joint_er(self, text: str, max_entities: int = 100, max_relationships: int = 200,
                         structure_iterations: int = 3, **kwargs) -> Dict[str, Any]:
         """
-        Joint Entity-Relation Extraction با Graph Structure Learning
+        Joint Entity-Relation Extraction ط¨ط§ Graph Structure Learning
         
-        این روش بر اساس GraphER و روش‌های state-of-the-art است که موجودیت‌ها و روابط را
-        به صورت همزمان استخراج می‌کند و ساختار گراف را در حین استخراج بهینه می‌کند.
+        ط§غŒظ† ط±ظˆط´ ط¨ط± ط§ط³ط§ط³ GraphER ظˆ ط±ظˆط´â€Œظ‡ط§غŒ state-of-the-art ط§ط³طھ ع©ظ‡ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§ ظˆ ط±ظˆط§ط¨ط· ط±ط§
+        ط¨ظ‡ طµظˆط±طھ ظ‡ظ…ط²ظ…ط§ظ† ط§ط³طھط®ط±ط§ط¬ ظ…غŒâ€Œع©ظ†ط¯ ظˆ ط³ط§ط®طھط§ط± ع¯ط±ط§ظپ ط±ط§ ط¯ط± ط­غŒظ† ط§ط³طھط®ط±ط§ط¬ ط¨ظ‡غŒظ†ظ‡ ظ…غŒâ€Œع©ظ†ط¯.
         
         Args:
-            text: متن ورودی
-            max_entities: حداکثر تعداد موجودیت‌ها
-            max_relationships: حداکثر تعداد روابط
-            structure_iterations: تعداد تکرار برای بهینه‌سازی ساختار گراف
-            **kwargs: پارامترهای اضافی
+            text: ظ…طھظ† ظˆط±ظˆط¯غŒ
+            max_entities: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§
+            max_relationships: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ط±ظˆط§ط¨ط·
+            structure_iterations: طھط¹ط¯ط§ط¯ طھع©ط±ط§ط± ط¨ط±ط§غŒ ط¨ظ‡غŒظ†ظ‡â€Œط³ط§ط²غŒ ط³ط§ط®طھط§ط± ع¯ط±ط§ظپ
+            **kwargs: ظ¾ط§ط±ط§ظ…طھط±ظ‡ط§غŒ ط§ط¶ط§ظپغŒ
             
         Returns:
             Dictionary containing entities and relationships
         """
         if not text or not text.strip():
-            raise ValueError("متن ورودی نمی‌تواند خالی باشد")
+            raise ValueError("ظ…طھظ† ظˆط±ظˆط¯غŒ ظ†ظ…غŒâ€Œطھظˆط§ظ†ط¯ ط®ط§ظ„غŒ ط¨ط§ط´ط¯")
         
-        # مرحله 1: استخراج اولیه موجودیت‌ها و روابط با روش‌های مختلف
-        # استفاده از ترکیب spaCy و LLM برای استخراج اولیه
+        # ظ…ط±ط­ظ„ظ‡ 1: ط§ط³طھط®ط±ط§ط¬ ط§ظˆظ„غŒظ‡ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§ ظˆ ط±ظˆط§ط¨ط· ط¨ط§ ط±ظˆط´â€Œظ‡ط§غŒ ظ…ط®طھظ„ظپ
+        # ط§ط³طھظپط§ط¯ظ‡ ط§ط² طھط±ع©غŒط¨ spaCy ظˆ LLM ط¨ط±ط§غŒ ط§ط³طھط®ط±ط§ط¬ ط§ظˆظ„غŒظ‡
         initial_entities = []
         initial_relationships = []
         
-        # استخراج با spaCy برای موجودیت‌ها
+        # ط§ط³طھط®ط±ط§ط¬ ط¨ط§ spaCy ط¨ط±ط§غŒ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§
         if self.nlp:
             try:
                 doc = self.nlp(text)
@@ -2953,14 +2961,14 @@ Response:"""
             except Exception as e:
                 logging.warning(f"spaCy entity extraction failed: {e}")
         
-        # استخراج روابط با استفاده از dependency parsing
+        # ط§ط³طھط®ط±ط§ط¬ ط±ظˆط§ط¨ط· ط¨ط§ ط§ط³طھظپط§ط¯ظ‡ ط§ط² dependency parsing
         if self.nlp and initial_entities:
             try:
                 doc = self.nlp(text)
                 entity_spans = {ent["name"]: ent for ent in initial_entities}
                 
                 for sent in doc.sents:
-                    # پیدا کردن موجودیت‌ها در جمله
+                    # ظ¾غŒط¯ط§ ع©ط±ط¯ظ† ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§ ط¯ط± ط¬ظ…ظ„ظ‡
                     sent_entities = []
                     for token in sent:
                         for ent_name, ent_data in entity_spans.items():
@@ -2968,19 +2976,19 @@ Response:"""
                                 sent_entities.append((token.i, ent_data))
                                 break
                     
-                    # استخراج روابط از dependency tree
+                    # ط§ط³طھط®ط±ط§ط¬ ط±ظˆط§ط¨ط· ط§ط² dependency tree
                     for token in sent:
                         if token.dep_ in ["nsubj", "dobj", "pobj", "attr", "acomp"]:
                             head_ent = None
                             dep_ent = None
                             
-                            # پیدا کردن موجودیت در head
+                            # ظ¾غŒط¯ط§ ع©ط±ط¯ظ† ظ…ظˆط¬ظˆط¯غŒطھ ط¯ط± head
                             for ent_idx, ent_data in sent_entities:
                                 if token.head.i == ent_idx or abs(token.head.i - ent_idx) <= 2:
                                     head_ent = ent_data
                                     break
                             
-                            # پیدا کردن موجودیت در dependent
+                            # ظ¾غŒط¯ط§ ع©ط±ط¯ظ† ظ…ظˆط¬ظˆط¯غŒطھ ط¯ط± dependent
                             for ent_idx, ent_data in sent_entities:
                                 if token.i == ent_idx or abs(token.i - ent_idx) <= 2:
                                     dep_ent = ent_data
@@ -2998,11 +3006,11 @@ Response:"""
             except Exception as e:
                 logging.warning(f"Dependency parsing failed: {e}")
         
-        # مرحله 2: بهینه‌سازی ساختار گراف با تکرار
+        # ظ…ط±ط­ظ„ظ‡ 2: ط¨ظ‡غŒظ†ظ‡â€Œط³ط§ط²غŒ ط³ط§ط®طھط§ط± ع¯ط±ط§ظپ ط¨ط§ طھع©ط±ط§ط±
         entities = initial_entities[:max_entities]
         relationships = initial_relationships[:max_relationships]
         
-        # ساخت گراف موقت برای بهینه‌سازی
+        # ط³ط§ط®طھ ع¯ط±ط§ظپ ظ…ظˆظ‚طھ ط¨ط±ط§غŒ ط¨ظ‡غŒظ†ظ‡â€Œط³ط§ط²غŒ
         temp_graph = nx.MultiDiGraph()
         for entity in entities:
             temp_graph.add_node(entity["id"], **entity)
@@ -3011,34 +3019,34 @@ Response:"""
             if temp_graph.has_node(rel["source"]) and temp_graph.has_node(rel["target"]):
                 temp_graph.add_edge(rel["source"], rel["target"], **rel)
         
-        # تکرار برای بهینه‌سازی ساختار
+        # طھع©ط±ط§ط± ط¨ط±ط§غŒ ط¨ظ‡غŒظ†ظ‡â€Œط³ط§ط²غŒ ط³ط§ط®طھط§ط±
         for iteration in range(structure_iterations):
-            # محاسبه اهمیت نودها بر اساس centrality
+            # ظ…ط­ط§ط³ط¨ظ‡ ط§ظ‡ظ…غŒطھ ظ†ظˆط¯ظ‡ط§ ط¨ط± ط§ط³ط§ط³ centrality
             try:
                 degree_centrality = nx.degree_centrality(temp_graph)
                 betweenness_centrality = nx.betweenness_centrality(temp_graph)
                 
-                # به‌روزرسانی موجودیت‌ها بر اساس اهمیت
+                # ط¨ظ‡â€Œط±ظˆط²ط±ط³ط§ظ†غŒ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§ ط¨ط± ط§ط³ط§ط³ ط§ظ‡ظ…غŒطھ
                 for entity in entities:
                     entity_id = entity["id"]
                     if entity_id in temp_graph:
                         entity["attributes"]["degree_centrality"] = degree_centrality.get(entity_id, 0.0)
                         entity["attributes"]["betweenness_centrality"] = betweenness_centrality.get(entity_id, 0.0)
                 
-                # حذف روابط ضعیف
+                # ط­ط°ظپ ط±ظˆط§ط¨ط· ط¶ط¹غŒظپ
                 relationships_to_keep = []
                 for rel in relationships:
                     source_importance = degree_centrality.get(rel["source"], 0.0)
                     target_importance = degree_centrality.get(rel["target"], 0.0)
                     confidence = rel.get("attributes", {}).get("confidence", 0.5)
                     
-                    # نگه داشتن روابط با اهمیت بالا
+                    # ظ†ع¯ظ‡ ط¯ط§ط´طھظ† ط±ظˆط§ط¨ط· ط¨ط§ ط§ظ‡ظ…غŒطھ ط¨ط§ظ„ط§
                     if (source_importance + target_importance) / 2 > 0.1 or confidence > 0.6:
                         relationships_to_keep.append(rel)
                 
                 relationships = relationships_to_keep[:max_relationships]
                 
-                # بازسازی گراف
+                # ط¨ط§ط²ط³ط§ط²غŒ ع¯ط±ط§ظپ
                 temp_graph = nx.MultiDiGraph()
                 for entity in entities:
                     temp_graph.add_node(entity["id"], **entity)
@@ -3065,32 +3073,32 @@ Response:"""
                               max_entities: int = 100, max_relationships: int = 200,
                               max_generation_length: int = 2048, **kwargs) -> Dict[str, Any]:
         """
-        Autoregressive Text-to-Graph با استفاده از Transformer Encoder-Decoder
+        Autoregressive Text-to-Graph ط¨ط§ ط§ط³طھظپط§ط¯ظ‡ ط§ط² Transformer Encoder-Decoder
         
-        این روش گراف را به صورت sequential تولید می‌کند و از ساختار autoregressive
-        برای تولید موجودیت‌ها و روابط استفاده می‌کند.
+        ط§غŒظ† ط±ظˆط´ ع¯ط±ط§ظپ ط±ط§ ط¨ظ‡ طµظˆط±طھ sequential طھظˆظ„غŒط¯ ظ…غŒâ€Œع©ظ†ط¯ ظˆ ط§ط² ط³ط§ط®طھط§ط± autoregressive
+        ط¨ط±ط§غŒ طھظˆظ„غŒط¯ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§ ظˆ ط±ظˆط§ط¨ط· ط§ط³طھظپط§ط¯ظ‡ ظ…غŒâ€Œع©ظ†ط¯.
         
         Args:
-            text: متن ورودی
-            model: نام مدل LLM
-            max_entities: حداکثر تعداد موجودیت‌ها
-            max_relationships: حداکثر تعداد روابط
-            max_generation_length: حداکثر طول تولید
-            **kwargs: پارامترهای اضافی
+            text: ظ…طھظ† ظˆط±ظˆط¯غŒ
+            model: ظ†ط§ظ… ظ…ط¯ظ„ LLM
+            max_entities: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§
+            max_relationships: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ط±ظˆط§ط¨ط·
+            max_generation_length: ط­ط¯ط§ع©ط«ط± ط·ظˆظ„ طھظˆظ„غŒط¯
+            **kwargs: ظ¾ط§ط±ط§ظ…طھط±ظ‡ط§غŒ ط§ط¶ط§ظپغŒ
             
         Returns:
             Dictionary containing entities and relationships
         """
         if not text or not text.strip():
-            raise ValueError("متن ورودی نمی‌تواند خالی باشد")
+            raise ValueError("ظ…طھظ† ظˆط±ظˆط¯غŒ ظ†ظ…غŒâ€Œطھظˆط§ظ†ط¯ ط®ط§ظ„غŒ ط¨ط§ط´ط¯")
         
         if not self.hf_client:
-            # Fallback به روش LLM عادی
+            # Fallback ط¨ظ‡ ط±ظˆط´ LLM ط¹ط§ط¯غŒ
             logging.warning("HuggingFace client not available, falling back to standard LLM extraction")
             return self.extract_llm(text, model=model, max_entities=max_entities,
                                    max_relationships=max_relationships, **kwargs)
         
-        # Prompt برای autoregressive generation
+        # Prompt ط¨ط±ط§غŒ autoregressive generation
         prompt = f"""You are a knowledge graph extraction system. Extract entities and relationships from the text in an autoregressive manner.
 
 Generate the graph step by step:
@@ -3153,29 +3161,29 @@ Response:"""
         """
         Extract-Define-Canonicalize (EDC) Framework
         
-        یک روش سه مرحله‌ای برای ساخت گراف دانش:
-        1. Extract: استخراج اولیه triplets
-        2. Define: تعریف schema با استفاده از LLM
-        3. Canonicalize: استانداردسازی روابط
+        غŒع© ط±ظˆط´ ط³ظ‡ ظ…ط±ط­ظ„ظ‡â€Œط§غŒ ط¨ط±ط§غŒ ط³ط§ط®طھ ع¯ط±ط§ظپ ط¯ط§ظ†ط´:
+        1. Extract: ط§ط³طھط®ط±ط§ط¬ ط§ظˆظ„غŒظ‡ triplets
+        2. Define: طھط¹ط±غŒظپ schema ط¨ط§ ط§ط³طھظپط§ط¯ظ‡ ط§ط² LLM
+        3. Canonicalize: ط§ط³طھط§ظ†ط¯ط§ط±ط¯ط³ط§ط²غŒ ط±ظˆط§ط¨ط·
         
         Args:
-            text: متن ورودی
-            max_entities: حداکثر تعداد موجودیت‌ها
-            max_relationships: حداکثر تعداد روابط
-            use_rag: استفاده از RAG برای بهبود استخراج
-            **kwargs: پارامترهای اضافی
+            text: ظ…طھظ† ظˆط±ظˆط¯غŒ
+            max_entities: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§
+            max_relationships: ط­ط¯ط§ع©ط«ط± طھط¹ط¯ط§ط¯ ط±ظˆط§ط¨ط·
+            use_rag: ط§ط³طھظپط§ط¯ظ‡ ط§ط² RAG ط¨ط±ط§غŒ ط¨ظ‡ط¨ظˆط¯ ط§ط³طھط®ط±ط§ط¬
+            **kwargs: ظ¾ط§ط±ط§ظ…طھط±ظ‡ط§غŒ ط§ط¶ط§ظپغŒ
             
         Returns:
             Dictionary containing entities and relationships
         """
         if not text or not text.strip():
-            raise ValueError("متن ورودی نمی‌تواند خالی باشد")
+            raise ValueError("ظ…طھظ† ظˆط±ظˆط¯غŒ ظ†ظ…غŒâ€Œطھظˆط§ظ†ط¯ ط®ط§ظ„غŒ ط¨ط§ط´ط¯")
         
-        # مرحله 1: Extract - استخراج اولیه triplets
+        # ظ…ط±ط­ظ„ظ‡ 1: Extract - ط§ط³طھط®ط±ط§ط¬ ط§ظˆظ„غŒظ‡ triplets
         logging.info("EDC Phase 1: Extracting initial triplets")
         initial_result = self.extract_hybrid(
             text,
-            max_entities=max_entities * 2,  # بیشتر استخراج کن برای فیلتر کردن
+            max_entities=max_entities * 2,  # ط¨غŒط´طھط± ط§ط³طھط®ط±ط§ط¬ ع©ظ† ط¨ط±ط§غŒ ظپغŒظ„طھط± ع©ط±ط¯ظ†
             max_relationships=max_relationships * 2,
             methods=["spacy", "llm"] if self.hf_client else ["spacy"],
             **kwargs
@@ -3184,10 +3192,10 @@ Response:"""
         initial_entities = initial_result.get("entities", [])[:max_entities * 2]
         initial_relationships = initial_result.get("relationships", [])[:max_relationships * 2]
         
-        # مرحله 2: Define - تعریف schema با LLM
+        # ظ…ط±ط­ظ„ظ‡ 2: Define - طھط¹ط±غŒظپ schema ط¨ط§ LLM
         logging.info("EDC Phase 2: Defining schema")
         if self.hf_client and use_rag:
-            # استفاده از LLM برای تعریف schema
+            # ط§ط³طھظپط§ط¯ظ‡ ط§ط² LLM ط¨ط±ط§غŒ طھط¹ط±غŒظپ schema
             schema_prompt = f"""Analyze the following extracted entities and relationships and define a canonical schema.
 
 Entities: {[e.get('name', '') for e in initial_entities[:20]]}
@@ -3221,12 +3229,12 @@ Response:"""
         else:
             canonical_mapping = {}
         
-        # مرحله 3: Canonicalize - استانداردسازی
+        # ظ…ط±ط­ظ„ظ‡ 3: Canonicalize - ط§ط³طھط§ظ†ط¯ط§ط±ط¯ط³ط§ط²غŒ
         logging.info("EDC Phase 3: Canonicalizing entities and relationships")
         
-        # استانداردسازی موجودیت‌ها
+        # ط§ط³طھط§ظ†ط¯ط§ط±ط¯ط³ط§ط²غŒ ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§
         canonicalized_entities = []
-        entity_name_map = {}  # برای merge کردن موجودیت‌های مشابه
+        entity_name_map = {}  # ط¨ط±ط§غŒ merge ع©ط±ط¯ظ† ظ…ظˆط¬ظˆط¯غŒطھâ€Œظ‡ط§غŒ ظ…ط´ط§ط¨ظ‡
         
         for entity in initial_entities:
             entity_name = entity.get("name", "").strip().lower()
@@ -3258,9 +3266,9 @@ Response:"""
                     "attributes": entity.get("attributes", {})
                 })
         
-        # استانداردسازی روابط
+        # ط§ط³طھط§ظ†ط¯ط§ط±ط¯ط³ط§ط²غŒ ط±ظˆط§ط¨ط·
         canonicalized_relationships = []
-        relationship_set = set()  # برای جلوگیری از duplicate
+        relationship_set = set()  # ط¨ط±ط§غŒ ط¬ظ„ظˆع¯غŒط±غŒ ط§ط² duplicate
         
         for rel in initial_relationships:
             source = rel.get("source", "")
@@ -3316,135 +3324,200 @@ Response:"""
                           base_method: str = "spacy", max_entities: int = 100,
                           max_relationships: int = 200, **kwargs) -> Dict[str, Any]:
         """
-        Incremental Knowledge Graph Construction
-        
-        ساخت تدریجی گراف با پردازش متن به صورت chunk و ادغام نتایج.
-        این روش برای متن‌های طولانی مناسب است و گراف را به صورت incremental می‌سازد.
-        
-        Args:
-            text: متن ورودی
-            chunk_size: اندازه هر chunk
-            overlap: overlap بین chunkها
-            base_method: روش پایه برای استخراج
-            max_entities: حداکثر تعداد موجودیت‌ها
-            max_relationships: حداکثر تعداد روابط
-            **kwargs: پارامترهای اضافی
-            
-        Returns:
-            Dictionary containing entities and relationships
+        Incremental Knowledge Graph Construction with hard safety limits.
+
+        This implementation processes chunks in a streaming manner and avoids
+        prebuilding a full chunk list in memory.
         """
         if not text or not text.strip():
             raise ValueError("متن ورودی نمی‌تواند خالی باشد")
-        
-        # تقسیم متن به chunks با overlap
-        chunks = []
-        start = 0
+
+        try:
+            chunk_size = int(chunk_size)
+            overlap = int(overlap)
+            max_entities = int(max_entities)
+            max_relationships = int(max_relationships)
+            max_chunks = int(kwargs.pop("max_chunks", self.INCREMENTAL_MAX_CHUNKS))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("پارامترهای incremental باید عددی باشند") from exc
+
+        if base_method in {"incremental", "long_text"}:
+            raise ValueError("base_method برای incremental نمی‌تواند incremental یا long_text باشد")
+        if chunk_size < self.INCREMENTAL_MIN_CHUNK_SIZE or chunk_size > self.INCREMENTAL_MAX_CHUNK_SIZE:
+            raise ValueError(
+                f"chunk_size باید بین {self.INCREMENTAL_MIN_CHUNK_SIZE} و {self.INCREMENTAL_MAX_CHUNK_SIZE} باشد"
+            )
+        if overlap < 0 or overlap > self.INCREMENTAL_MAX_OVERLAP:
+            raise ValueError(f"overlap باید بین 0 و {self.INCREMENTAL_MAX_OVERLAP} باشد")
+        if overlap >= chunk_size:
+            raise ValueError("overlap باید از chunk_size کمتر باشد")
+        if overlap > (chunk_size // 2):
+            raise ValueError("overlap نباید بیشتر از نصف chunk_size باشد")
+        if max_entities < 1 or max_entities > self.INCREMENTAL_MAX_ENTITIES:
+            raise ValueError(f"max_entities باید بین 1 و {self.INCREMENTAL_MAX_ENTITIES} باشد")
+        if max_relationships < 1 or max_relationships > self.INCREMENTAL_MAX_RELATIONSHIPS:
+            raise ValueError(f"max_relationships باید بین 1 و {self.INCREMENTAL_MAX_RELATIONSHIPS} باشد")
+        if max_chunks < 1 or max_chunks > self.INCREMENTAL_MAX_CHUNKS:
+            raise ValueError(f"max_chunks باید بین 1 و {self.INCREMENTAL_MAX_CHUNKS} باشد")
+
         text_length = len(text)
-        
-        while start < text_length:
+        step = chunk_size - overlap
+        if text_length <= chunk_size:
+            estimated_chunks = 1
+        else:
+            estimated_chunks = 1 + ((text_length - chunk_size + step - 1) // step)
+        if estimated_chunks > max_chunks:
+            raise ValueError(
+                f"تعداد chunkهای تخمینی ({estimated_chunks}) از سقف مجاز ({max_chunks}) بیشتر است. "
+                "chunk_size را بزرگ‌تر یا overlap را کوچک‌تر کنید."
+            )
+
+        all_entities: List[Dict[str, Any]] = []
+        all_relationships: List[Dict[str, Any]] = []
+        entity_map: Dict[str, str] = {}
+        entity_by_id: Dict[str, Dict[str, Any]] = {}
+        relationship_map: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
+
+        dropped_entities = 0
+        dropped_relationships = 0
+        processed_chunks = 0
+        start = 0
+
+        while start < text_length and processed_chunks < max_chunks:
             end = min(start + chunk_size, text_length)
             chunk_text = text[start:end]
-            
-            # اضافه کردن context از chunk قبلی
+
+            # Add a small context from the previous chunk.
             if start > 0 and overlap > 0:
                 overlap_start = max(0, start - overlap)
-                context = text[overlap_start:start]
-                chunk_text = context + " " + chunk_text
-            
-            chunks.append({
-                "text": chunk_text,
-                "start": start,
-                "end": end
-            })
-            
-            start = end - overlap if overlap > 0 else end
-        
-        # پردازش incremental
-        all_entities = []
-        all_relationships = []
-        entity_map = {}  # name -> entity_id
-        relationship_set = set()
-        
-        for i, chunk in enumerate(chunks):
-            logging.info(f"Processing chunk {i+1}/{len(chunks)}")
-            
+                chunk_text = f"{text[overlap_start:start]} {chunk_text}"
+
+            logging.info(f"Processing chunk {processed_chunks + 1}/{estimated_chunks}")
+
             try:
-                # استخراج از chunk
                 chunk_result = self.extract(
-                    chunk["text"],
+                    chunk_text,
                     method=base_method,
                     max_entities=max_entities,
                     max_relationships=max_relationships,
                     **kwargs
                 )
-                
+
                 chunk_entities = chunk_result.get("entities", [])
                 chunk_relationships = chunk_result.get("relationships", [])
-                
-                # ادغام موجودیت‌ها
+
                 for entity in chunk_entities:
-                    entity_name = entity.get("name", "").strip().lower()
-                    
-                    if entity_name in entity_map:
-                        # موجودیت تکراری - merge attributes
-                        entity_id = entity_map[entity_name]
-                        for e in all_entities:
-                            if e["id"] == entity_id:
-                                # Merge attributes
-                                existing_attrs = e.get("attributes", {})
-                                new_attrs = entity.get("attributes", {})
-                                
-                                # Track chunk appearances
-                                if "chunks" not in existing_attrs:
-                                    existing_attrs["chunks"] = []
-                                existing_attrs["chunks"].append(i)
-                                existing_attrs.update(new_attrs)
-                                break
-                    else:
-                        # موجودیت جدید
-                        entity_id = f"ENT_{len(all_entities)}"
-                        entity_map[entity_name] = entity_id
-                        entity["id"] = entity_id
-                        entity["attributes"]["chunks"] = [i]
-                        all_entities.append(entity)
-                
-                # ادغام روابط
+                    entity_name = str(entity.get("name", "")).strip().lower()
+                    if not entity_name:
+                        continue
+
+                    existing_id = entity_map.get(entity_name)
+                    if existing_id:
+                        existing_entity = entity_by_id.get(existing_id)
+                        if not existing_entity:
+                            continue
+                        existing_attrs = existing_entity.get("attributes")
+                        if not isinstance(existing_attrs, dict):
+                            existing_attrs = {}
+                            existing_entity["attributes"] = existing_attrs
+                        new_attrs = entity.get("attributes", {})
+                        if isinstance(new_attrs, dict):
+                            existing_attrs.update(new_attrs)
+                        chunk_list = existing_attrs.get("chunks")
+                        if not isinstance(chunk_list, list):
+                            chunk_list = []
+                            existing_attrs["chunks"] = chunk_list
+                        if processed_chunks not in chunk_list:
+                            chunk_list.append(processed_chunks)
+                        continue
+
+                    if len(all_entities) >= max_entities:
+                        dropped_entities += 1
+                        continue
+
+                    entity_id = f"ENT_{len(all_entities)}"
+                    entity_map[entity_name] = entity_id
+
+                    entity_record = dict(entity)
+                    entity_record["id"] = entity_id
+                    entity_attrs = entity_record.get("attributes")
+                    if not isinstance(entity_attrs, dict):
+                        entity_attrs = {}
+                    entity_attrs["chunks"] = [processed_chunks]
+                    entity_record["attributes"] = entity_attrs
+
+                    all_entities.append(entity_record)
+                    entity_by_id[entity_id] = entity_record
+
                 for rel in chunk_relationships:
-                    source_name = rel.get("source", "").strip().lower()
-                    target_name = rel.get("target", "").strip().lower()
-                    relation = rel.get("relation", "").strip()
-                    
-                    # Map to entity IDs
+                    source_name = str(rel.get("source", "")).strip().lower()
+                    target_name = str(rel.get("target", "")).strip().lower()
+                    relation = str(rel.get("relation", "")).strip()
+                    if not source_name or not target_name or not relation:
+                        continue
+
                     source_id = entity_map.get(source_name)
                     target_id = entity_map.get(target_name)
-                    
-                    if source_id and target_id:
-                        rel_key = (source_id, target_id, relation)
-                        if rel_key not in relationship_set:
-                            relationship_set.add(rel_key)
-                            rel["source"] = source_id
-                            rel["target"] = target_id
-                            rel["attributes"]["chunk"] = i
-                            all_relationships.append(rel)
-                        else:
-                            # Update confidence/frequency
-                            for r in all_relationships:
-                                if (r["source"], r["target"], r["relation"]) == rel_key:
-                                    r["attributes"]["frequency"] = r["attributes"].get("frequency", 1) + 1
-                                    break
-                
+                    if not source_id or not target_id or source_id == target_id:
+                        continue
+
+                    rel_key = (source_id, target_id, relation.lower())
+                    existing_rel = relationship_map.get(rel_key)
+                    if existing_rel:
+                        rel_attrs = existing_rel.get("attributes")
+                        if not isinstance(rel_attrs, dict):
+                            rel_attrs = {}
+                            existing_rel["attributes"] = rel_attrs
+                        rel_attrs["frequency"] = rel_attrs.get("frequency", 1) + 1
+                        rel_chunks = rel_attrs.get("chunks")
+                        if not isinstance(rel_chunks, list):
+                            rel_chunks = []
+                            rel_attrs["chunks"] = rel_chunks
+                        if processed_chunks not in rel_chunks:
+                            rel_chunks.append(processed_chunks)
+                        continue
+
+                    if len(all_relationships) >= max_relationships:
+                        dropped_relationships += 1
+                        continue
+
+                    rel_record = dict(rel)
+                    rel_record["source"] = source_id
+                    rel_record["target"] = target_id
+                    rel_attrs = rel_record.get("attributes")
+                    if not isinstance(rel_attrs, dict):
+                        rel_attrs = {}
+                    rel_attrs["chunk"] = processed_chunks
+                    rel_attrs["chunks"] = [processed_chunks]
+                    rel_attrs["frequency"] = 1
+                    rel_record["attributes"] = rel_attrs
+
+                    all_relationships.append(rel_record)
+                    relationship_map[rel_key] = rel_record
+
             except Exception as e:
-                logging.warning(f"Error processing chunk {i+1}: {e}")
-                continue
-        
+                logging.warning(f"Error processing chunk {processed_chunks + 1}: {e}")
+
+            processed_chunks += 1
+            if end >= text_length:
+                break
+
+            next_start = end - overlap if overlap > 0 else end
+            if next_start <= start:
+                # Hard guard against non-progressing loops.
+                next_start = end
+            start = next_start
+
         return {
-            "entities": all_entities[:max_entities],
-            "relationships": all_relationships[:max_relationships],
+            "entities": all_entities,
+            "relationships": all_relationships,
             "method": f"incremental_{base_method}",
             "stats": {
                 "num_entities": len(all_entities),
                 "num_relationships": len(all_relationships),
-                "num_chunks": len(chunks)
+                "num_chunks": processed_chunks,
+                "estimated_chunks": estimated_chunks,
+                "dropped_entities": dropped_entities,
+                "dropped_relationships": dropped_relationships
             }
         }
-

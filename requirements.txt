@@ -1,7 +1,8 @@
 flask==3.1.2
 pandas>=2.2.0
 networkx>=3.3
-spacy>=3.7.2
+spacy>=3.8.0
+pydantic>=2.9.0,<3.0.0
 numpy>=1.26.0
 scikit-learn>=1.5.0
 matplotlib>=3.9.0
@@ -32,7 +33,7 @@ sentence-transformers>=3.0.0
 textblob>=0.18.0
 jieba>=0.42.1
 json-repair>=0.27.0
-python-community>=0.15
+python-louvain>=0.16
 # کتابخانه‌های فارسی و پردازش پیشرفته
 hazm>=0.7.0
 # Spell checker (اختیاری - برای نصب: pip install virastar)

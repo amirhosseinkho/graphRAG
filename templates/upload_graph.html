@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
     <meta charset="UTF-8">
@@ -198,7 +198,10 @@
                         <div class="form-group" id="llm-settings" style="display: none;">
                             <label for="hf-token">توکن HuggingFace:</label>
                             <input type="password" id="hf-token" class="form-control" placeholder="hf_xxxxxxxxxxxxx" value="">
-                            <small class="form-text text-muted">توکن HuggingFace خود را وارد کنید. می‌توانید از <a href="https://huggingface.co/settings/tokens" target="_blank">اینجا</a> دریافت کنید.</small>
+                            <small class="form-text text-muted">
+                                توکن HuggingFace خود را وارد کنید. می‌توانید از <a href="https://huggingface.co/settings/tokens" target="_blank">اینجا</a> دریافت کنید.
+                                در تنظیمات توکن، مجوز <strong>Make calls to Inference Providers</strong> را هم فعال کنید.
+                            </small>
                             
                             <label for="llm-model" style="margin-top: 15px;">مدل LLM (رایگان):</label>
                             <select id="llm-model" class="form-control">
@@ -293,7 +296,7 @@
                             
                             <label for="overlap-size" style="margin-top: 15px;">Overlap بین Chunkها:</label>
                             <input type="number" id="overlap-size" class="form-control" value="100" min="0" max="500" step="50">
-                            <small class="form-text text-muted">تعداد کاراکترهای overlap بین chunkها (پیش‌فرض: 100)</small>
+                            <small class="form-text text-muted">تعداد کاراکترهای overlap بین chunkها (پیش‌فرض: 100) - باید کمتر از chunk size و حداکثر نصف آن باشد</small>
                             
                             <label for="incremental-base-method" style="margin-top: 15px;">روش پایه:</label>
                             <select id="incremental-base-method" class="form-control">
@@ -436,6 +439,77 @@
                                         </div>
                                     </div>
                                 </div>
+
+                                <div class="graph-evaluation-section" id="graph-evaluation-section" style="display: none;">
+                                    <div class="evaluation-hero">
+                                        <div class="evaluation-hero-main">
+                                            <h4><i class="fas fa-chart-line"></i> ارزیابی کیفیت گراف</h4>
+                                            <p>پس از ساخت گراف، کیفیت آن با معیارهای حرفه‌ای ارزیابی می‌شود: پشتیبانی از متن، همخوانی معنایی، سازگاری نوعی و کیفیت ساختاری.</p>
+                                        </div>
+                                        <div class="evaluation-hero-score">
+                                            <div id="auto-eval-overall-score" class="overall-score">0</div>
+                                            <div id="auto-eval-quality-band" class="overall-label">-</div>
+                                        </div>
+                                    </div>
+
+                                    <div id="auto-eval-dimensions" class="evaluation-dimensions"></div>
+                                    <div id="auto-eval-metrics-grid" class="evaluation-metrics-grid"></div>
+
+                                    <div class="evaluation-two-column">
+                                        <div class="evaluation-card">
+                                            <h5><i class="fas fa-list-ol"></i> آمار و هشدارها</h5>
+                                            <div id="auto-eval-counts" class="evaluation-kv"></div>
+                                            <div id="auto-eval-unsupported" class="unsupported-samples"></div>
+                                        </div>
+
+                                        <div class="evaluation-card">
+                                            <h5><i class="fas fa-balance-scale"></i> ارزیابی مبتنی بر مرجع (اختیاری)</h5>
+                                            <p class="eval-help">
+                                                اگر Ground Truth دارید، سه‌تایی‌ها را وارد کنید (هر خط: <code>head | relation | tail</code>).
+                                            </p>
+                                            <textarea id="reference-triples-input" class="eval-textarea" rows="6" placeholder="TP53 | regulates | apoptosis&#10;Trastuzumab | treats | breast cancer"></textarea>
+                                            <button id="run-reference-eval-btn" class="btn btn-secondary eval-btn">
+                                                <i class="fas fa-check-double"></i> محاسبه T-F1 / GED / G-BS
+                                            </button>
+                                            <div id="reference-eval-result" class="reference-eval-result"></div>
+                                        </div>
+                                    </div>
+
+                                    <div class="evaluation-card llm-eval-card">
+                                        <h5><i class="fas fa-robot"></i> ارزیابی LLM-as-a-Judge</h5>
+                                        <p class="eval-help">
+                                            مدل، «متن» و «گراف» را با هم می‌بیند و امتیاز چندبُعدی + نقاط قوت/ضعف ارائه می‌دهد.
+                                        </p>
+
+                                        <div class="llm-eval-controls">
+                                            <select id="llm-eval-model" class="form-control llm-select">
+                                                <optgroup label="HuggingFace (بدون OpenAI)">
+                                                    <option value="mistralai/Mistral-7B-Instruct-v0.2">Mistral-7B-Instruct (پیشنهادی)</option>
+                                                    <option value="Qwen/Qwen2.5-7B-Instruct">Qwen2.5-7B-Instruct</option>
+                                                    <option value="HuggingFaceH4/zephyr-7b-beta">Zephyr-7B-Beta</option>
+                                                    <option value="microsoft/Phi-3-mini-4k-instruct">Phi-3-mini-4k-instruct</option>
+                                                    <option value="meta-llama/Llama-3.2-3B-Instruct">Llama-3.2-3B-Instruct</option>
+                                                </optgroup>
+                                                <optgroup label="OpenAI (اختیاری)">
+                                                    <option value="gpt-4o-mini">gpt-4o-mini</option>
+                                                    <option value="gpt-4o">gpt-4o</option>
+                                                </optgroup>
+                                            </select>
+                                            <button id="run-llm-eval-btn" class="btn btn-primary eval-btn">
+                                                <i class="fas fa-sparkles"></i> اجرای ارزیابی LLM
+                                            </button>
+                                        </div>
+                                        <input type="password" id="llm-eval-hf-token" class="form-control" placeholder="HF token (اختیاری، اگر در محیط تنظیم نکرده‌اید)">
+                                        <small class="form-text text-muted" style="display:block; margin-bottom:10px;">
+                                            برای جلوگیری از خطای 403، در تنظیمات توکن HuggingFace مجوز
+                                            <strong>Make calls to Inference Providers</strong> را فعال کنید.
+                                        </small>
+
+                                        <textarea id="llm-eval-instruction" class="eval-textarea" rows="3" placeholder="دستور اضافی (اختیاری): مثلا روی روابط علّی تمرکز کن."></textarea>
+                                        <div id="llm-eval-loading" class="llm-eval-loading" style="display: none;">در حال ارزیابی با مدل...</div>
+                                        <div id="llm-eval-result" class="llm-eval-result"></div>
+                                    </div>
+                                </div>
                                 
                                 <div class="result-actions">
                                     <a href="/manage_graphs" class="btn btn-primary">
@@ -501,3 +575,4 @@
     <script src="{{ url_for('static', filename='js/upload.js') }}"></script>
 </body>
 </html> 
+

@@ -225,6 +225,22 @@ document.addEventListener('DOMContentLoaded', function() {
     const textErrorMessage = document.getElementById('text-error-message');
     const textProgressFill = document.getElementById('text-progress-fill');
     const textProgressText = document.getElementById('text-progress-text');
+    const graphEvaluationSection = document.getElementById('graph-evaluation-section');
+    const autoEvalOverallScore = document.getElementById('auto-eval-overall-score');
+    const autoEvalQualityBand = document.getElementById('auto-eval-quality-band');
+    const autoEvalDimensions = document.getElementById('auto-eval-dimensions');
+    const autoEvalMetricsGrid = document.getElementById('auto-eval-metrics-grid');
+    const autoEvalCounts = document.getElementById('auto-eval-counts');
+    const autoEvalUnsupported = document.getElementById('auto-eval-unsupported');
+    const referenceTriplesInput = document.getElementById('reference-triples-input');
+    const runReferenceEvalBtn = document.getElementById('run-reference-eval-btn');
+    const referenceEvalResult = document.getElementById('reference-eval-result');
+    const llmEvalModel = document.getElementById('llm-eval-model');
+    const llmEvalHfToken = document.getElementById('llm-eval-hf-token');
+    const llmEvalInstruction = document.getElementById('llm-eval-instruction');
+    const runLlmEvalBtn = document.getElementById('run-llm-eval-btn');
+    const llmEvalLoading = document.getElementById('llm-eval-loading');
+    const llmEvalResult = document.getElementById('llm-eval-result');
 
     // Update text length counter
     if (textInput && textLength) {
@@ -315,6 +331,24 @@ document.addEventListener('DOMContentLoaded', function() {
         // Trigger change event to set initial state
         extractionMethod.dispatchEvent(new Event('change'));
     }
+
+    const chunkSizeInput = document.getElementById('chunk-size');
+    const overlapSizeInput = document.getElementById('overlap-size');
+    const syncIncrementalOverlapLimit = function() {
+        if (!chunkSizeInput || !overlapSizeInput) return;
+        const chunkSizeValue = parseInt(chunkSizeInput.value, 10);
+        if (!Number.isFinite(chunkSizeValue) || chunkSizeValue <= 0) return;
+        const safeMaxOverlap = Math.floor(chunkSizeValue / 2);
+        overlapSizeInput.max = String(Math.max(0, safeMaxOverlap));
+        const overlapValue = parseInt(overlapSizeInput.value, 10);
+        if (Number.isFinite(overlapValue) && overlapValue > safeMaxOverlap) {
+            overlapSizeInput.value = String(safeMaxOverlap);
+        }
+    };
+    if (chunkSizeInput && overlapSizeInput) {
+        chunkSizeInput.addEventListener('input', syncIncrementalOverlapLimit);
+        syncIncrementalOverlapLimit();
+    }
     
     // Toggle advanced settings
     window.toggleAdvancedSettings = function() {
@@ -387,10 +421,25 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    if (runReferenceEvalBtn) {
+        runReferenceEvalBtn.addEventListener('click', function() {
+            runReferenceEvaluation();
+        });
+    }
+
+    if (runLlmEvalBtn) {
+        runLlmEvalBtn.addEventListener('click', function() {
+            runLlmEvaluation();
+        });
+    }
+
     function buildGraphFromText() {
         const urlInput = document.getElementById('url-input');
         const url = urlInput ? urlInput.value.trim() : '';
         const text = textInput ? textInput.value.trim() : '';
+
+        resetEvaluationUI();
+        latestGraphEvaluationPayload = null;
         
         // بررسی اینکه حداقل یکی از text یا URL وارد شده باشد
         if (!text && !url) {
@@ -476,18 +525,30 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         const chunkSize = document.getElementById('chunk-size');
-        if (chunkSize && method === 'incremental') {
-            requestData.chunk_size = parseInt(chunkSize.value) || 500;
-        }
-        
         const overlapSize = document.getElementById('overlap-size');
-        if (overlapSize && method === 'incremental') {
-            requestData.overlap = parseInt(overlapSize.value) || 100;
-        }
-        
         const incrementalBaseMethod = document.getElementById('incremental-base-method');
-        if (incrementalBaseMethod && method === 'incremental') {
-            requestData.base_method = incrementalBaseMethod.value || 'spacy';
+        if (method === 'incremental') {
+            const chunkSizeValue = chunkSize ? parseInt(chunkSize.value, 10) : 500;
+            const overlapValue = overlapSize ? parseInt(overlapSize.value, 10) : 100;
+
+            if (!Number.isFinite(chunkSizeValue) || !Number.isFinite(overlapValue)) {
+                showTextError('مقادیر Chunk Size و Overlap باید عدد صحیح باشند');
+                return;
+            }
+
+            if (overlapValue >= chunkSizeValue) {
+                showTextError('Overlap باید از Chunk Size کمتر باشد');
+                return;
+            }
+
+            if (overlapValue > Math.floor(chunkSizeValue / 2)) {
+                showTextError('برای جلوگیری از مصرف زیاد RAM، Overlap نباید بیشتر از نصف Chunk Size باشد');
+                return;
+            }
+
+            requestData.chunk_size = chunkSizeValue;
+            requestData.overlap = overlapValue;
+            requestData.base_method = incrementalBaseMethod ? (incrementalBaseMethod.value || 'spacy') : 'spacy';
         }
 
         // Add LLM-specific parameters
@@ -631,6 +692,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     let graphNetwork = null; // Store vis-network instance
+    let latestGraphEvaluationPayload = null;
 
     function showTextSuccess(data) {
         const stats = data.stats || {};
@@ -701,10 +763,459 @@ document.addEventListener('DOMContentLoaded', function() {
             displayGraphDetails(data.graph_data);
         }
 
+        latestGraphEvaluationPayload = {
+            source_text: data.source_text || '',
+            graph_data: data.graph_data || { nodes: [], edges: [] },
+            extraction_data: data.extraction_data || { entities: [], relationships: [] }
+        };
+        renderAutoEvaluation(data.auto_evaluation || null);
+
         textSuccessMessage.style.display = 'block';
         textErrorMessage.style.display = 'none';
         textResultSection.style.display = 'block';
         buildGraphBtn.disabled = false;
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function toPercent(value) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return '0%';
+        return `${(numeric * 100).toFixed(1)}%`;
+    }
+
+    function toScore(value) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return '0';
+        return numeric.toFixed(2);
+    }
+
+    function getQualityBand(score) {
+        const numeric = Number(score);
+        if (!Number.isFinite(numeric)) return '-';
+        if (numeric >= 85) return 'عالی';
+        if (numeric >= 70) return 'خوب';
+        if (numeric >= 55) return 'متوسط';
+        if (numeric >= 40) return 'ضعیف';
+        return 'خیلی ضعیف';
+    }
+
+    function tryParseJsonObject(text) {
+        if (!text || typeof text !== 'string') return null;
+        let cleaned = text.trim();
+        cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+        const candidates = [cleaned];
+        const firstBrace = cleaned.indexOf('{');
+        const lastBrace = cleaned.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace > firstBrace) {
+            candidates.push(cleaned.slice(firstBrace, lastBrace + 1));
+        }
+
+        for (const candidate of candidates) {
+            try {
+                const parsed = JSON.parse(candidate);
+                if (parsed && typeof parsed === 'object') {
+                    return parsed;
+                }
+            } catch (_) {}
+        }
+        return null;
+    }
+
+    function normalizeLlmEvaluation(payload) {
+        let evaluation = payload?.llm_evaluation && typeof payload.llm_evaluation === 'object'
+            ? { ...payload.llm_evaluation }
+            : {};
+
+        const rawSummary = typeof evaluation.summary === 'string' ? evaluation.summary.trim() : '';
+        if ((!evaluation.dimension_scores || Object.keys(evaluation.dimension_scores || {}).length === 0) && rawSummary) {
+            const parsedFromSummary = tryParseJsonObject(rawSummary);
+            if (parsedFromSummary) {
+                evaluation = { ...evaluation, ...parsedFromSummary };
+            }
+        }
+
+        const dimensionLabels = {
+            faithfulness_to_text: 'وفاداری به متن',
+            coverage_completeness: 'پوشش و جامعیت',
+            relation_correctness: 'درستی روابط',
+            schema_type_consistency: 'سازگاری نوع/اسکیما',
+            structural_quality: 'کیفیت ساختاری',
+            usefulness_for_downstream_tasks: 'کارایی برای کاربردهای پایین‌دستی'
+        };
+
+        const rawDimensions = evaluation.dimension_scores && typeof evaluation.dimension_scores === 'object'
+            ? evaluation.dimension_scores
+            : {};
+
+        const dimensionRows = Object.keys(rawDimensions).map((key) => {
+            const value = Number(rawDimensions[key]);
+            return {
+                key,
+                label: dimensionLabels[key] || key.replace(/_/g, ' '),
+                value: Number.isFinite(value) ? Math.max(0, Math.min(10, value)) : NaN
+            };
+        });
+
+        const listify = (value) => {
+            if (Array.isArray(value)) {
+                return value
+                    .map((item) => String(item ?? '').trim())
+                    .filter((item) => item.length > 0);
+            }
+            if (typeof value === 'string' && value.trim()) {
+                return [value.trim()];
+            }
+            return [];
+        };
+
+        const overallScoreNum = Number(evaluation.overall_score);
+        const overallScore = Number.isFinite(overallScoreNum)
+            ? Math.max(0, Math.min(100, overallScoreNum))
+            : NaN;
+
+        return {
+            overallScore,
+            qualityBand: getQualityBand(overallScore),
+            dimensionRows,
+            summary: typeof evaluation.summary === 'string' && evaluation.summary.trim()
+                ? evaluation.summary.trim()
+                : 'خلاصه‌ای از ارزیابی مدل دریافت نشد.',
+            strengths: listify(evaluation.strengths),
+            weaknesses: listify(evaluation.weaknesses),
+            unsupported: listify(evaluation.hallucinated_or_unsupported_examples),
+            missing: listify(evaluation.missing_facts_or_relations),
+            recommendations: listify(evaluation.recommendations)
+        };
+    }
+
+    function resetEvaluationUI() {
+        if (graphEvaluationSection) {
+            graphEvaluationSection.style.display = 'none';
+        }
+        if (autoEvalOverallScore) autoEvalOverallScore.textContent = '0';
+        if (autoEvalQualityBand) autoEvalQualityBand.textContent = '-';
+        if (autoEvalDimensions) autoEvalDimensions.innerHTML = '';
+        if (autoEvalMetricsGrid) autoEvalMetricsGrid.innerHTML = '';
+        if (autoEvalCounts) autoEvalCounts.innerHTML = '';
+        if (autoEvalUnsupported) autoEvalUnsupported.innerHTML = '';
+        if (referenceEvalResult) referenceEvalResult.innerHTML = '';
+        if (llmEvalResult) llmEvalResult.innerHTML = '';
+        if (llmEvalLoading) llmEvalLoading.style.display = 'none';
+    }
+
+    function renderAutoEvaluation(evaluation) {
+        if (!graphEvaluationSection) return;
+        graphEvaluationSection.style.display = 'block';
+
+        if (!evaluation) {
+            if (autoEvalMetricsGrid) autoEvalMetricsGrid.innerHTML = '<div class="metric-box"><div class="metric-label">وضعیت</div><div class="metric-value">ارزیابی خودکار در دسترس نیست</div></div>';
+            return;
+        }
+
+        if (autoEvalOverallScore) {
+            autoEvalOverallScore.textContent = toScore(evaluation.overall_score);
+        }
+        if (autoEvalQualityBand) {
+            autoEvalQualityBand.textContent = evaluation.quality_band || '-';
+        }
+
+        const dimensions = Array.isArray(evaluation.dimensions) ? evaluation.dimensions : [];
+        if (autoEvalDimensions) {
+            autoEvalDimensions.innerHTML = dimensions.map((item) => {
+                const score = Math.max(0, Math.min(100, Number(item.score || 0)));
+                return `
+                    <div class="dimension-item">
+                        <div class="dimension-header">
+                            <span>${escapeHtml(item.label || item.id || 'Dimension')}</span>
+                            <strong>${score.toFixed(1)}</strong>
+                        </div>
+                        <div class="dimension-bar">
+                            <div class="dimension-fill" style="width:${score}%;"></div>
+                        </div>
+                        <div class="dimension-hint">${escapeHtml(item.hint || '')}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        const metrics = evaluation.metrics || {};
+        const metricRows = [
+            { label: 'Entity Grounding', value: toPercent(metrics.entity_grounding_rate) },
+            { label: 'Edge Support', value: toPercent(metrics.edge_support_rate) },
+            { label: 'Semantic Plausibility', value: toPercent(metrics.semantic_plausibility) },
+            { label: 'Type Compatibility', value: toPercent(metrics.type_compatibility) },
+            { label: 'Structural Score', value: toPercent(metrics.structural_score) },
+            { label: 'Hallucination Rate', value: toPercent(metrics.hallucination_rate) },
+            { label: 'Omission Proxy', value: toPercent(metrics.omission_proxy) },
+            { label: 'Redundancy Rate', value: toPercent(metrics.redundancy_rate) }
+        ];
+
+        if (autoEvalMetricsGrid) {
+            autoEvalMetricsGrid.innerHTML = metricRows.map((row) => `
+                <div class="metric-box">
+                    <div class="metric-label">${escapeHtml(row.label)}</div>
+                    <div class="metric-value">${escapeHtml(row.value)}</div>
+                </div>
+            `).join('');
+        }
+
+        const counts = evaluation.counts || {};
+        const countLabels = {
+            nodes: 'Nodes',
+            edges: 'Edges',
+            supported_entities: 'Supported Entities',
+            supported_edges: 'Supported Edges',
+            candidate_pairs: 'Candidate Pairs',
+            missing_pairs: 'Missing Pairs',
+            duplicate_nodes: 'Duplicate Nodes',
+            duplicate_edges: 'Duplicate Edges',
+            components: 'Connected Components',
+            type_checked_edges: 'Type-Checked Edges',
+            type_matched_edges: 'Type-Matched Edges'
+        };
+
+        if (autoEvalCounts) {
+            autoEvalCounts.innerHTML = Object.keys(countLabels).map((key) => `
+                <div class="kv-item">
+                    <span class="kv-key">${escapeHtml(countLabels[key])}</span>
+                    <span class="kv-value">${escapeHtml(counts[key] ?? 0)}</span>
+                </div>
+            `).join('');
+        }
+
+        const unsupported = Array.isArray(evaluation.unsupported_edge_samples)
+            ? evaluation.unsupported_edge_samples
+            : [];
+
+        if (autoEvalUnsupported) {
+            if (unsupported.length === 0) {
+                autoEvalUnsupported.innerHTML = '<strong>Unsupported Samples:</strong> مورد پرریسکی شناسایی نشد.';
+            } else {
+                autoEvalUnsupported.innerHTML = `<strong>Unsupported Samples:</strong><br>${unsupported.map((item) => `- ${escapeHtml(item)}`).join('<br>')}`;
+            }
+        }
+    }
+
+    function renderReferenceEvaluation(referenceEvaluation) {
+        if (!referenceEvalResult) return;
+
+        if (!referenceEvaluation || referenceEvaluation.available === false) {
+            referenceEvalResult.innerHTML = `<div class="metric-box"><div class="metric-label">وضعیت</div><div class="metric-value">${escapeHtml(referenceEvaluation?.message || 'نتیجه‌ای ثبت نشده')}</div></div>`;
+            return;
+        }
+
+        const rows = [
+            { label: 'Triple Precision', value: toPercent(referenceEvaluation.triple_precision) },
+            { label: 'Triple Recall', value: toPercent(referenceEvaluation.triple_recall) },
+            { label: 'Triple F1 (T-F1)', value: toPercent(referenceEvaluation.triple_f1) },
+            { label: 'Node F1', value: toPercent(referenceEvaluation.node_f1) },
+            { label: 'G-F1 (Single Graph)', value: toPercent(referenceEvaluation.g_f1_single_graph) },
+            { label: 'Graph Exact Match', value: String(referenceEvaluation.graph_exact_match || 0) },
+            { label: 'GED (normalized)', value: toScore(referenceEvaluation.normalized_ged) },
+            { label: 'GED Similarity', value: toPercent(referenceEvaluation.ged_similarity) },
+            { label: 'G-BS Proxy', value: toPercent(referenceEvaluation.g_bertscore_proxy) }
+        ];
+
+        referenceEvalResult.innerHTML = `
+            <div class="reference-metrics-grid">
+                ${rows.map((row) => `
+                    <div class="metric-box">
+                        <div class="metric-label">${escapeHtml(row.label)}</div>
+                        <div class="metric-value">${escapeHtml(row.value)}</div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    function renderLlmEvaluation(payload) {
+        if (!llmEvalResult) return;
+
+        const evaluation = normalizeLlmEvaluation(payload);
+        const summaryHtml = escapeHtml(evaluation.summary).replace(/\n+/g, '<br>');
+        const providerName = payload?.provider === 'huggingface'
+            ? `HuggingFace / ${payload?.hf_provider || '-'}`
+            : (payload?.provider || '-');
+        const requestedModel = payload?.requested_model || payload?.model || '-';
+        const usedModel = payload?.model || '-';
+        const modelText = requestedModel !== usedModel
+            ? `مدل درخواستی: ${requestedModel} | مدل استفاده‌شده: ${usedModel}`
+            : `مدل: ${usedModel}`;
+        const rawPreview = payload?.raw_response_preview
+            ? String(payload.raw_response_preview).trim()
+            : '';
+
+        const listToHtml = (title, items) => {
+            const safeItems = Array.isArray(items) ? items : [];
+            if (safeItems.length === 0) return '';
+            return `
+                <div class="llm-section-block">
+                <h6>${escapeHtml(title)}</h6>
+                <ul class="llm-list">
+                    ${safeItems.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}
+                </ul>
+                </div>
+            `;
+        };
+
+        llmEvalResult.innerHTML = `
+            <div class="llm-eval-shell">
+            <div class="llm-overview-grid">
+                <div class="metric-box llm-overall-box">
+                    <div class="metric-label">امتیاز کلی LLM</div>
+                    <div class="metric-value">${Number.isFinite(evaluation.overallScore) ? evaluation.overallScore.toFixed(1) : '-'}</div>
+                    <div class="llm-overall-band">${escapeHtml(evaluation.qualityBand)}</div>
+                </div>
+                <div class="metric-box llm-meta-box">
+                    <div class="metric-label">جزئیات اجرا</div>
+                    <div class="llm-meta-line">${escapeHtml(modelText)}</div>
+                    <div class="llm-meta-line">ارائه‌دهنده: ${escapeHtml(providerName)}</div>
+                </div>
+            </div>
+            <div class="llm-score-grid">
+                ${evaluation.dimensionRows.length > 0
+                    ? evaluation.dimensionRows.map((row) => `
+                        <div class="metric-box">
+                            <div class="metric-label">${escapeHtml(row.label)}</div>
+                            <div class="metric-value">${Number.isFinite(row.value) ? `${row.value.toFixed(1)} / 10` : '-'}</div>
+                        </div>
+                    `).join('')
+                    : '<div class="metric-box"><div class="metric-label">وضعیت</div><div class="metric-value">امتیازهای جزئی در دسترس نیست</div></div>'
+                }
+            </div>
+            <div class="evaluation-card llm-content-card" style="margin: 0; padding: 10px;">
+                <div class="llm-section-block">
+                    <h6>خلاصه ارزیابی</h6>
+                    <div class="llm-summary-text">${summaryHtml}</div>
+                </div>
+                ${listToHtml('نقاط قوت', evaluation.strengths)}
+                ${listToHtml('نقاط ضعف', evaluation.weaknesses)}
+                ${listToHtml('نمونه‌های پشتیبانی‌نشده / هالوسینیشن', evaluation.unsupported)}
+                ${listToHtml('فکت‌ها/روابط جاافتاده', evaluation.missing)}
+                ${listToHtml('پیشنهادهای بهبود', evaluation.recommendations)}
+            </div>
+            ${rawPreview ? `
+                <details class="llm-raw-details">
+                    <summary>نمایش پاسخ خام مدل</summary>
+                    <pre>${escapeHtml(rawPreview)}</pre>
+                </details>
+            ` : ''}
+            </div>
+        `;
+    }
+
+    async function runReferenceEvaluation() {
+        if (!latestGraphEvaluationPayload) {
+            alert('ابتدا یک گراف بسازید تا ارزیابی انجام شود.');
+            return;
+        }
+
+        const referenceText = referenceTriplesInput ? referenceTriplesInput.value.trim() : '';
+        if (!referenceText) {
+            alert('برای ارزیابی مرجع، سه‌تایی‌های مرجع را وارد کنید.');
+            return;
+        }
+
+        if (runReferenceEvalBtn) runReferenceEvalBtn.disabled = true;
+        if (referenceEvalResult) referenceEvalResult.innerHTML = '<div class="metric-box"><div class="metric-label">وضعیت</div><div class="metric-value">در حال محاسبه...</div></div>';
+
+        try {
+            const response = await fetch('/api/evaluate_text_to_graph', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    source_text: latestGraphEvaluationPayload.source_text,
+                    graph_data: latestGraphEvaluationPayload.graph_data,
+                    extraction_data: latestGraphEvaluationPayload.extraction_data,
+                    reference_triples: referenceText
+                })
+            });
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || 'خطا در محاسبه ارزیابی مرجع');
+            }
+
+            if (data.auto_evaluation) {
+                renderAutoEvaluation(data.auto_evaluation);
+            }
+            renderReferenceEvaluation(data.reference_evaluation);
+        } catch (error) {
+            if (referenceEvalResult) {
+                referenceEvalResult.innerHTML = `<div class="metric-box"><div class="metric-label">خطا</div><div class="metric-value">${escapeHtml(error.message)}</div></div>`;
+            }
+        } finally {
+            if (runReferenceEvalBtn) runReferenceEvalBtn.disabled = false;
+        }
+    }
+
+    async function runLlmEvaluation() {
+        if (!latestGraphEvaluationPayload) {
+            alert('\u0627\u0628\u062a\u062f\u0627 \u06cc\u06a9 \u06af\u0631\u0627\u0641 \u0628\u0633\u0627\u0632\u06cc\u062f \u062a\u0627 \u0627\u0631\u0632\u06cc\u0627\u0628\u06cc LLM \u0627\u0646\u062c\u0627\u0645 \u0634\u0648\u062f.');
+            return;
+        }
+
+        if (!latestGraphEvaluationPayload.source_text) {
+            alert('\u0645\u062a\u0646 \u0645\u0631\u062c\u0639 \u0628\u0631\u0627\u06cc \u0627\u0631\u0632\u06cc\u0627\u0628\u06cc LLM \u062f\u0631 \u062f\u0633\u062a\u0631\u0633 \u0646\u06cc\u0633\u062a.');
+            return;
+        }
+
+        const selectedModel = llmEvalModel ? llmEvalModel.value : 'mistralai/Mistral-7B-Instruct-v0.2';
+        const provider = selectedModel.toLowerCase().startsWith('gpt-') ? 'openai' : 'huggingface';
+        const instruction = llmEvalInstruction ? llmEvalInstruction.value.trim() : '';
+        const extractionHfTokenInput = document.getElementById('hf-token');
+        const hfToken = (
+            (llmEvalHfToken ? llmEvalHfToken.value.trim() : '') ||
+            (extractionHfTokenInput ? extractionHfTokenInput.value.trim() : '')
+        );
+
+        if (runLlmEvalBtn) runLlmEvalBtn.disabled = true;
+        if (llmEvalLoading) llmEvalLoading.style.display = 'block';
+        if (llmEvalResult) llmEvalResult.innerHTML = '';
+
+        try {
+            const response = await fetch('/api/evaluate_text_to_graph_llm', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    source_text: latestGraphEvaluationPayload.source_text,
+                    graph_data: latestGraphEvaluationPayload.graph_data,
+                    extraction_data: latestGraphEvaluationPayload.extraction_data,
+                    model: selectedModel,
+                    provider,
+                    instruction,
+                    hf_token: hfToken,
+                    hf_provider: 'hf-inference'
+                })
+            });
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || '\u062e\u0637\u0627 \u062f\u0631 \u0627\u0631\u0632\u06cc\u0627\u0628\u06cc LLM');
+            }
+
+            renderLlmEvaluation(data);
+        } catch (error) {
+            if (llmEvalResult) {
+                llmEvalResult.innerHTML = `<div class="metric-box"><div class="metric-label">\u062e\u0637\u0627</div><div class="metric-value">${escapeHtml(error.message)}</div></div>`;
+            }
+        } finally {
+            if (llmEvalLoading) llmEvalLoading.style.display = 'none';
+            if (runLlmEvalBtn) runLlmEvalBtn.disabled = false;
+        }
     }
 
     function displayGraphPreview(graphData) {
@@ -910,6 +1421,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // Hide details
         const details = document.getElementById('graph-details');
         if (details) details.style.display = 'none';
+
+        latestGraphEvaluationPayload = null;
+        resetEvaluationUI();
+        if (referenceTriplesInput) referenceTriplesInput.value = '';
+        if (llmEvalInstruction) llmEvalInstruction.value = '';
+        if (llmEvalHfToken) llmEvalHfToken.value = '';
         
         textProgressSection.style.display = 'none';
         textResultSection.style.display = 'none';
